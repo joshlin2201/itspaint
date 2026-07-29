@@ -73,8 +73,19 @@ struct DemoSceneTests {
 
         #expect((image.width, image.height) == (1000, 640))
         #expect(image.pixel(at: TransparencyScene.backgroundSample) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 980, y: 600)) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 100, y: 500)) == .clear)
         #expect(image.pixel(at: PixelPoint(x: 500, y: 310))?.a == 255)
         #expect(image.pixel(at: PixelPoint(x: 500, y: 310)) != .clear)
+        #expect(image.pixel(at: PixelPoint(x: 660, y: 280)) == .white)
+        #expect(image.pixel(at: PixelPoint(x: 465, y: 220)) ==
+                RGBA8(r: 239, g: 106, b: 91))
+        #expect(image.pixel(at: PixelPoint(x: 420, y: 390)) ==
+                RGBA8(r: 47, g: 128, b: 237))
+        #expect(image.pixel(at: PixelPoint(x: 780, y: 300)) ==
+                RGBA8(r: 23, g: 50, b: 77))
+        #expect(image.pixel(at: PixelPoint(x: 650, y: 335)) ==
+                RGBA8(r: 181, g: 205, b: 214))
         #expect(image == TransparencyScene.render())
     }
 }
