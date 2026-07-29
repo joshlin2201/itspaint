@@ -1,0 +1,34 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Signing / secrets — never commit
+*.p12
+*.mobileprovision
+*.provisionprofile
+ExportOptions.local.plist
+fastlane/report.xml
+fastlane/Preview.html
+
+# Tooling output
+*.log
+.coverage/
+TestResults*.xcresult
+*.profraw
+*.profdata

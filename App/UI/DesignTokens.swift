@@ -1,0 +1,277 @@
+import SwiftUI
+
+/// The surface grammar for **Direction C — Canvas-first**.
+///
+/// With nothing selected the artwork owns ~96% of the window. All chrome is a
+/// single glass cluster at the bottom, an options pill that trails it, a title
+/// chip, and a colour popover on demand. Nothing is permanently docked to an
+/// edge, and nothing is ever placed on the artwork itself.
+///
+/// Three rules govern everything below.
+///
+/// **Colour is never invented.** Values resolve to system semantic colours or
+/// to the material's own label colours, so the app tracks appearance, accent,
+/// Increase Contrast and Reduce Transparency for free.
+///
+/// **Hierarchy comes from surface, space and type — not a stroke on every
+/// element.** Inside the cluster, cells are tonal: the accent fills the
+/// selected one and nothing else paints an edge.
+///
+/// **Elevation is the one thing this direction spends.** Exactly two levels:
+/// the cluster and the popover sit at the same height, and nothing else lifts.
+enum Tokens {
+
+    // MARK: - Spacing
+
+    /// One scale: 2 / 5 / 8 / 10 / 14 / 20.
+    enum Space {
+        /// Between tool cells — they read as one run, not separate buttons.
+        static let hair: CGFloat = 2
+        static let tight: CGFloat = 5
+        /// Cluster inner padding, and the gap between cluster and pill.
+        static let base: CGFloat = 8
+        static let snug: CGFloat = 10
+        static let comfortable: CGFloat = 14
+        /// Window safe inset — nothing sits under the traffic lights.
+        static let safeInset: CGFloat = 20
+    }
+
+    // MARK: - Control metrics
+
+    enum Size {
+        /// Inner element of a segmented control.
+        static let segment: CGFloat = 24
+        /// An action button inside the options panel.
+        static let pillAction: CGFloat = 26
+        /// A tool cell in the rail.
+        static let toolCell: CGFloat = 34
+        /// One of the two loaded colours. Sized with the swap button so the
+        /// colour block is exactly as wide as the two-cell tool grid above it.
+        static let colourWell: CGFloat = 24
+        static let colourSwap: CGFloat = 18
+        /// Glyph inside a tool cell — optically sized, not mathematically.
+        static let toolGlyph: CGFloat = 19
+        /// The options pill.
+        static let pill: CGFloat = 44
+        /// The same pair restated at full size inside the popover.
+        static let colourPairLarge: CGFloat = 28
+        /// A swatch in the always-visible palette.
+        static let swatch: CGFloat = 16
+        /// Every capsule in the top header shares one optical height.
+        static let headerControl: CGFloat = 32
+        /// Compact floating readout at the lower edge of the canvas.
+        static let statusStrip: CGFloat = 30
+        /// One square in the transparency grid behind the artwork.
+        static let transparencyTile: CGFloat = 8
+    }
+
+    // MARK: - Radii
+
+    /// Concentric by construction. A cell inside the cluster is
+    /// `cluster − padding` = 17 − 6 = 11, so the gap around each corner stays
+    /// visually constant instead of the inner shape looking pinched.
+    enum Radius {
+        static let rail: CGFloat = 16
+        static let cell: CGFloat = 11
+        static let pill: CGFloat = 15
+        /// The options panel: tighter than the rail, so it reads as attached to
+        /// it rather than as a second window floating nearby.
+        static let panel: CGFloat = 12
+        static let popover: CGFloat = 14
+        /// The well a grid sits in, inside the popover.
+        static let well: CGFloat = 10
+        static let segmentTrack: CGFloat = 7
+        static let segmentInner: CGFloat = 5
+        static let chip: CGFloat = 8
+        static let swatch: CGFloat = 4
+    }
+
+    // MARK: - Elevation
+
+    /// The two-level elevation this direction spends its budget on.
+    ///
+    /// A 0.5pt luminous hairline plus one ambient shadow. The hairline is what
+    /// separates the glass from artwork of any brightness; the shadow is what
+    /// says "this floats above the picture" without a border.
+    enum Elevation {
+        static let hairline: CGFloat = 0.5
+        static let hairlineOpacity: Double = 0.20
+        static let shadowRadius: CGFloat = 18
+        static let shadowY: CGFloat = 7
+        static let shadowOpacity: Double = 0.45
+    }
+
+    // MARK: - Type
+
+    /// Mapped to the macOS text styles so the app honours accessibility text
+    /// sizing. Nothing informational goes below `.footnote` — the platform's
+    /// equivalent of a 12px floor, in the system's own units.
+    enum Text {
+        static let pillLabel = Font.system(size: 11.5)
+        static let pillValue = Font.system(size: 11.5).monospacedDigit()
+        static let chip = Font.system(size: 12)
+        static let readout = Font.system(size: 11).monospacedDigit()
+        static let popoverTitle = Font.system(size: 12, weight: .medium)
+        static let popoverHint = Font.system(size: 11)
+    }
+
+    // MARK: - Motion
+
+    /// Motion explains a state change, never decorates. The pill's width
+    /// animates on tool change because its *content* changes; nothing else
+    /// moves.
+    enum Motion {
+        /// The options panel resizing as its content genuinely changes.
+        static let pillResize = Animation.smooth(duration: 0.22, extraBounce: 0.05)
+        static let micro = Animation.easeOut(duration: 0.12)
+        /// A press answering under the pointer. Short enough to read as
+        /// contact rather than animation.
+        static let press = Animation.easeOut(duration: 0.07)
+    }
+
+    // MARK: - The rail
+
+    enum Rail {
+        /// The width of a two-cell run: everything in the rail — the colour
+        /// block, the palette, the separators — is built to this so the column
+        /// has one edge rather than five.
+        static let run: CGFloat = Size.toolCell * 2 + Space.hair
+
+        /// Chrome should hug its controls. The old shared 90pt thickness made
+        /// the bottom layout inherit the side rail's proportions and read as a
+        /// dock. Each orientation now sizes to the content it actually carries.
+        static let padding: CGFloat = 6
+        static let sectionSpacing: CGFloat = Space.tight
+        static let colourInset: CGFloat = Space.hair
+        static let verticalThickness: CGFloat =
+            run + colourInset * 2 + padding * 2
+        static let horizontalThickness: CGFloat =
+            max(Size.colourWell * 1.42, Size.swatch * 2 + Space.hair)
+            + colourInset * 2 + padding * 2
+
+        static func thickness(for edge: EditorModel.ChromeEdge) -> CGFloat {
+            edge.isVertical ? verticalThickness : horizontalThickness
+        }
+
+        /// The options panel beside it. Fixed, so the chrome never resizes with
+        /// the window: a toolbar that grows with the frame is a toolbar you
+        /// have to re-learn at every size.
+        static let optionsWidth: CGFloat = 258
+    }
+
+    // MARK: - Chrome geometry
+
+    /// Fixed dimensions of the floating chrome, so a canvas fit can be derived
+    /// from a window size without waiting for a layout pass.
+    enum Chrome {
+        /// The barely-perceptible gap between the artwork and the window edge.
+        ///
+        /// Deliberately tiny: the chrome floats over the canvas, so it reserves
+        /// no space, and anything larger reads as a border the artwork is
+        /// sitting inside rather than a window it fills.
+        static let frameGap: CGFloat = 6
+
+        /// Room the transparent titlebar scrim occupies, so the rail starts
+        /// below the traffic lights rather than under them.
+        static let titleReserve: CGFloat = 44
+
+        /// Leading room reserved for the native macOS traffic lights.
+        static let trafficLightClearance: CGFloat = 68
+
+        /// How far the rail sits from the window edge. Small: the rail is part
+        /// of the window's furniture, not a panel hovering inside it.
+        static let railInset: CGFloat = Space.base
+
+        /// Space the rail actually takes away from the artwork.
+        static func railFootprint(for edge: EditorModel.ChromeEdge) -> CGFloat {
+            Rail.thickness(for: edge) + railInset + Space.tight
+        }
+
+        /// Canvas area available inside a window of `contentSize`.
+        ///
+        /// Canvas-first: the artwork runs to all four edges, so the chrome does
+        /// not take space away from it. Only the fit calculation pretends the
+        /// cluster is opaque, so a freshly opened image is not hidden under it.
+        static func canvasArea(in contentSize: CGSize, rail edge: EditorModel.ChromeEdge) -> CGSize {
+            // The rail is opaque and permanent, so it genuinely takes its
+            // space; only the options panel floats.
+            CGSize(
+                width: max(0, contentSize.width - frameGap * 2 - (edge.isVertical ? railFootprint(for: edge) : 0)),
+                height: max(0, contentSize.height - frameGap * 2 - (edge.isVertical ? 0 : railFootprint(for: edge)))
+            )
+        }
+    }
+}
+
+// MARK: - The chrome material
+
+/// The one surface treatment shared by the cluster, the pill, the title chip
+/// and the popover.
+///
+/// **The glass never relies on the artwork behind it.** A fixed tint floor sits
+/// over the blur, so label contrast is constant whether the chrome straddles
+/// white artwork, black artwork, or the boundary between them — the case that
+/// breaks a pure vibrancy panel. The blur contributes only a hint of the colour
+/// underneath.
+///
+/// Under Reduce Transparency the material becomes fully opaque rather than a
+/// slightly-less-tinted version of itself: the fallback is a real surface, not
+/// a weaker illusion of one.
+struct ChromeSurface: ViewModifier {
+    var cornerRadius: CGFloat
+    var elevated: Bool = true
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        return content
+            .background {
+                shape
+                    .fill(.ultraThinMaterial)
+                    .overlay { shape.fill(tintFloor) }
+            }
+            .overlay {
+                // The luminous hairline. Brighter than a separator on purpose:
+                // it is the only thing guaranteeing an edge against artwork of
+                // unknown brightness.
+                shape.strokeBorder(
+                    hairlineColour,
+                    lineWidth: Tokens.Elevation.hairline
+                )
+            }
+            .clipShape(shape)
+            .shadow(
+                color: .black.opacity(elevated && !reduceTransparency ? Tokens.Elevation.shadowOpacity : 0),
+                radius: Tokens.Elevation.shadowRadius,
+                y: Tokens.Elevation.shadowY
+            )
+    }
+
+    /// 62% of a near-black in dark appearance; the same rule inverted in light.
+    private var tintFloor: Color {
+        if reduceTransparency {
+            return colorScheme == .dark
+                ? Color(white: 0.12)
+                : Color(white: 0.97)
+        }
+        return colorScheme == .dark
+            ? Color(red: 0.118, green: 0.118, blue: 0.125).opacity(0.62)
+            : Color.white.opacity(0.72)
+    }
+
+    private var hairlineColour: Color {
+        colorScheme == .dark
+            ? .white.opacity(Tokens.Elevation.hairlineOpacity)
+            : .black.opacity(0.12)
+    }
+}
+
+extension View {
+    /// Apply the shared chrome material at a given corner radius.
+    func chromeSurface(cornerRadius: CGFloat, elevated: Bool = true) -> some View {
+        modifier(ChromeSurface(cornerRadius: cornerRadius, elevated: elevated))
+    }
+}

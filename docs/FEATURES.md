@@ -1,0 +1,183 @@
+# Feature reference
+
+Every tool and command, what it actually does, and the behaviour that is easy to
+miss. Written against the shipping code — if something here is wrong, that is a
+bug in one of the two.
+
+---
+
+## Tools
+
+Twelve rail buttons in three runs. Every one has a single-key shortcut, shown on
+hover and in the Tools menu.
+
+### Draw
+
+| | Tool | Behaviour |
+|---|---|---|
+| `P` | **Pencil** | Always a hard 1px nib. Not size-aware on purpose — that is the promise of the tool; making it size-aware would make it a small brush. |
+| `B` | **Brush** | Round, square or soft tip, 1–96px. Soft antialiases over the outer ring. |
+| `A` | **Airbrush** | Scatters coverage weighted to the centre; **keeps spraying while you hold still**, which is the whole feel of the tool. Flow control sets density. Seeded randomness, so a given engine sprays reproducibly. |
+| `H` | **Highlighter** | Chisel nib and a coverage buffer: overlapping passes within one stroke **never darken**. Drag back over your own line and it stays one flat tone, the way a real highlighter does. |
+| `E` | **Eraser** | Lays down the *background* colour — which is what makes it read as removing paint. Right-drag inverts that pairing. |
+
+### Insert
+
+| | Tool | Behaviour |
+|---|---|---|
+| `U` | **Shape** | Fifteen kinds, below. Stroke weight, dash, fill/outline, corner radius. |
+| `T` | **Text** | Drag a box and type in place, at the size and font it will land at. `⌘-drag` moves the box while you type. `⌘↩` places it, `⎋` discards. Rasterises on commit. A click instead of a drag gets a one-line box pulled back inside the canvas, so clicking near an edge still gives you something usable. |
+| `N` | **Step badge** | Click to drop `1`, `2`, `3`… in the current colour, numeral auto-contrasted. Size follows the brush size. "Restart at 1" is in the options. |
+| `K` | **Fill** | Scanline flood fill with a tolerance slider (0–128, per channel). Explicitly iterative — a recursive fill overflows the stack on any realistic canvas. Filling with the colour already there is a no-op rather than an infinite loop. |
+| `I` | **Eyedropper** | Samples into Colour 1. **Hold `⌥` with any tool** to do the same without switching — right-button samples into Colour 2. Never enters undo: a colour pick on the undo stack is a classic way to make ⌘Z feel broken. |
+
+### Select
+
+| | Tool | Behaviour |
+|---|---|---|
+| `M` | **Select** | Four modes in its options: **rectangle**, **ellipse**, **lasso**, **Instant Alpha**. Instant Alpha selects a connected colour without changing pixels; set tolerance, `⇧`-click to add, `⌥`-click to subtract, then choose **Make transparent**. Its marching ants follow the actual pixel mask rather than its bounds. |
+| `R` | **Pixelate** | Mosaic effect. Averages each block to one value for visual obscuring, with a block size of 4–48. This is not secure redaction; use an opaque filled shape for secrets. |
+
+**Dragging inside an existing marquee lifts it** and moves it, with no separate
+Cut step. Requiring Cut first is the classic reason people conclude a selection
+"doesn't do anything". Lifted content backfills with Colour 2.
+
+Transparency is shown over a checkerboard on the canvas, so Instant Alpha's
+result is visible before save rather than inferred from a white background.
+
+While content floats: drag to move, arrow keys to nudge one pixel, corner and
+edge handles to resize (⇧ for uniform), `↩` to land it, `⎋` to discard. It keeps
+its original pixels and re-renders on resize, so scaling down and back up does
+not accumulate resampling loss.
+
+---
+
+## Shapes
+
+Fifteen kinds inside the Shape tool, chosen from its gallery — which also arms
+the tool, so it is a way *in* rather than a setting you can only reach once you
+are already there. `⌥1`–`⌥9` pick the first nine.
+
+**Line · Curve · Arrow · Rectangle · Rounded rectangle · Ellipse · Triangle ·
+Right triangle · Diamond · Pentagon · Hexagon · Five-point star · Six-point star ·
+Speech bubble · Polygon**
+
+- **Curve** is two steps: drag the chord, release, then drag to bend it. The bend
+  point is a point the curve actually passes through, not an off-curve control
+  handle — dragging a handle the line never touches is why Bézier editors need
+  explaining and this one does not.
+- **Polygon** collects corners on each click and closes when you click the first
+  one again (or press `↩`). Fewer than three corners is treated as a stray click
+  and leaves nothing behind.
+- Both are *pending* until they finish: their pixels are on the canvas as a live
+  preview with no undo step, so `⎋` leaves no trace and finishing records exactly
+  one edit. Anything else you do lands them rather than dropping them.
+- **Speech bubble** leaves a gap in its outline where the tail meets the body, so
+  it reads as one shape rather than a box with a triangle stuck on.
+- The regular shapes (triangle through six-point star) come from **one parametric
+  generator** sampled on the ellipse inscribed in the drag rect, so they stretch
+  with the drag instead of staying stubbornly regular in a box that is not
+  square.
+
+**Every outline** can be solid, dashed or dotted, at any stroke weight; closed
+shapes can be outline, fill, or both. Fill uses Colour 2, outline uses Colour 1 —
+and right-dragging swaps that, like everywhere else.
+
+Hold `⇧` while dragging to constrain: lines snap to 45°, boxes and ellipses to
+squares and circles.
+
+---
+
+## Colour
+
+- **Colour 1 / Colour 2**, overlapped in the rail. Click either for the system
+  picker; `X` swaps them.
+- **All 28 swatches, always visible.** Click for Colour 1, right-click for
+  Colour 2.
+- Colours you pick that are not in the palette land in a **recent** run, so the
+  fixed 28 never move.
+- `⇧⌘C` opens the fuller swatch popover with hex read-outs and "Other colour…".
+
+---
+
+## Canvas and view
+
+| | |
+|---|---|
+| **Zoom** | `⌘+` / `⌘−` step the ramp (25% → 1600%); pinch and `⌘`-scroll are continuous and anchored at the pointer; `⌘0` actual size; `⌘9` fit. |
+| **Pan** | Hold `Space` and drag, with any tool. |
+| **Pixel grid** | `⌘'`, shown once a pixel is comfortably bigger than the line that draws it (4× and above). |
+| **Footprint ring** | Follows the pointer for every marking tool, showing exactly which pixels the next stroke covers. Past 4×, the single pixel under the pointer is outlined. |
+| **Toolbar position** | `⌥⌘T` moves the rail between left and bottom; remembered across launches. |
+| **Escape** | Abandons whatever is in flight: stroke, pending shape, text box, floating paste, selection, options panel. |
+
+---
+
+## Image commands
+
+Flip horizontal / vertical, rotate 90° either way or 180°, invert colours
+(**honours the selection** — inverting one region is far more often what you want
+on a screenshot), clear image, image size (`⌘R`), crop to selection (`⌘K`), trim
+borders (`⇧⌘T`).
+
+- **Crop to a lasso** crops to the traced shape, clearing everything outside it
+  to transparent — cropping to a freeform shape has to mean the shape, not the
+  box around it.
+- **Trim borders** is tolerant by default (6/255 per channel): a screenshot's
+  "solid" border is rarely one exact colour after a lossy format or a shadow, and
+  a zero-tolerance trim silently does nothing on exactly the images people most
+  want to trim.
+- A size change **clears undo history**, because patches are addressed in canvas
+  coordinates and would restore pixels into the wrong places.
+
+---
+
+## Clipboard, drag and drop
+
+- `⌘V` pastes as **movable floating content**, centred (or at the selection's
+  origin). `⇧⌘V` **pastes and fits** — growing the canvas rather than silently
+  cropping a screenshot bigger than it.
+- Dropping an image from Finder, a browser or any app lands it at the pointer,
+  growing the canvas if needed and clamping so it can never land entirely
+  off-canvas.
+- `⌥⌘C` copies the whole image; **Share…** opens the system share sheet.
+- Pasteboard reads prefer the raw file or PNG data over `NSImage`, whose
+  representation can arrive scaled or DPI-adjusted.
+
+---
+
+## Files and export
+
+**Documents** save as `.itspaint`: a package holding a lossless `canvas.png` plus
+`document.json` (size, both colours, palette). Autosave-in-place applies to these
+only — an imported PNG is your file and is never re-encoded in the background.
+
+**Export** (`⇧⌘E`) offers format and scale in the save panel:
+
+| Format | Notes |
+|---|---|
+| PNG, TIFF, GIF | lossless, alpha preserved |
+| JPEG, BMP | no alpha — flattened onto Colour 2 first, rather than turning transparency black |
+| HEIC, AVIF | modern, lossy, quality slider |
+| PDF | the bitmap wrapped in a single-page PDF |
+| ICO | fitted and centred into the nearest legal icon square (16–256); a non-square ICO is not a large icon, it is an invalid file |
+
+The format list is filtered by what this machine's ImageIO can **actually
+encode**, so it never offers something that will fail at the last step. No WebP:
+macOS reads it but ships no encoder.
+
+---
+
+## Menus worth knowing
+
+- **Tools** — every tool by name with its key, a Shape submenu with all fifteen
+  shapes, plus Swap Colours and Larger / Smaller Brush.
+- **View** — zoom commands, pixel grid, Move Toolbar, Colours…
+- **Edit** — the usual, plus Paste and Fit, Invert Selection, Crop to Selection,
+  Trim Borders, Swap Colours.
+- **Right-click on the canvas** — cut, copy, paste, delete, select all, deselect,
+  crop, trim, copy whole image, export, swap colours, image size. A right-click
+  that *drags* paints Colour 2 instead; `⌃`-click always opens the menu.
+
+Every menu item routes through the responder chain, so it is enabled only when
+something can actually perform it.

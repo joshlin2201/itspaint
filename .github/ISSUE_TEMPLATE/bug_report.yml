@@ -1,0 +1,37 @@
+name: Bug report
+description: Something behaves differently from what you expected
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: ItsPaint version
+      description: ItsPaint ▸ About ItsPaint, or the release you downloaded.
+      placeholder: "0.10.0"
+    validations: { required: true }
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "14.6 (Sonoma)"
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: The shortest path that reproduces it.
+      placeholder: |
+        1. Pick the shape tool
+        2. Choose the star
+        3. Drag from the top-left corner
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations: { required: true }
+  - type: textarea
+    id: extras
+    attributes:
+      label: Screenshot or file
+      description: Attach only what you are comfortable making public. Screenshots and .itspaint documents may contain private artwork, filenames, or personal information.

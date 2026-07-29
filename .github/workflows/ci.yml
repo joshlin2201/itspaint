@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: Engine tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+      # The engine is a plain Swift package with no UI and no dependencies, so
+      # it tests in about a second and is the fast signal on every push.
+      - name: Test PaintKit (debug)
+        run: swift test --package-path Packages/PaintKit
+      # The throughput guards only assert in release: unoptimised timings
+      # measure the compiler, not the algorithm.
+      - name: Test PaintKit (release, includes performance budgets)
+        run: swift test -c release --package-path Packages/PaintKit
+
+  app:
+    name: App build and tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+      - name: Build
+        run: |
+          xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
+            -destination 'platform=macOS' -configuration Release build
+      # These run the real AppKit views offscreen, so they need a GUI session —
+      # which the macOS runners provide.
+      - name: Test
+        run: |
+          xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
+            -destination 'platform=macOS' test

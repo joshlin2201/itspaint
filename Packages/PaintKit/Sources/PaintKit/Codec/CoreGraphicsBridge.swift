@@ -1,0 +1,174 @@
+import CoreGraphics
+import Foundation
+
+/// Conversion between `Bitmap` and Core Graphics.
+///
+/// The canvas format was chosen so this bridge is a memory reinterpretation
+/// rather than a pixel-by-pixel conversion: RGBA8 premultiplied sRGB is exactly
+/// `CGImageAlphaInfo.premultipliedLast` with `.byteOrder32Big`.
+public extension Bitmap {
+
+    static var colourSpace: CGColorSpace {
+        CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+    }
+
+    static var bitmapInfo: CGBitmapInfo {
+        CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+            .union(.byteOrder32Big)
+    }
+
+    var bytesPerRow: Int {
+        let (bytes, overflow) = width.multipliedReportingOverflow(
+            by: MemoryLayout<RGBA8>.stride
+        )
+        precondition(!overflow, "Bitmap row byte count overflowed")
+        return bytes
+    }
+
+    /// Snapshot as a `CGImage`. The data is copied, so the image stays valid
+    /// after the bitmap is mutated — required, because the view holds onto the
+    /// last drawn image while the next stroke is already writing.
+    /// One copy, not two: reading through `withUnsafeBytes` avoids the
+    /// copy-on-write that a mutable pointer into a second reference forces,
+    /// and this runs on every repaint of the canvas.
+    func makeCGImage() -> CGImage? {
+        let data = pixels.withUnsafeBytes { Data($0) }
+        guard let provider = CGDataProvider(data: data as CFData) else { return nil }
+        return CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: bytesPerRow,
+            space: Self.colourSpace,
+            bitmapInfo: Self.bitmapInfo,
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        )
+    }
+
+    /// Build a bitmap from any `CGImage`, normalising it into the canvas
+    /// format. This is the single entry point for imported images, so nothing
+    /// downstream ever has to cope with a foreign colour space or alpha layout.
+    ///
+    /// Pass `resizedTo` to resample in the same step.
+    ///
+    /// **This is the only correct way to draw a `CGImage` into a bitmap.**
+    /// `drawWithCoreGraphics` flips the context so that path and text drawing
+    /// can use canvas coordinates; a CGImage sent through that same flip lands
+    /// upside down. Image work goes here, vector work goes there.
+    init?(cgImage: CGImage, resizedTo target: (width: Int, height: Int)? = nil) {
+        guard Bitmap.isSizeSupported(width: cgImage.width, height: cgImage.height) else {
+            return nil
+        }
+        let width = target?.width ?? cgImage.width
+        let height = target?.height ?? cgImage.height
+        guard Bitmap.isSizeSupported(width: width, height: height) else { return nil }
+
+        let (pixelCount, pixelOverflow) = width.multipliedReportingOverflow(by: height)
+        let (rowBytes, rowOverflow) = width.multipliedReportingOverflow(
+            by: MemoryLayout<RGBA8>.stride
+        )
+        let (_, byteOverflow) = rowBytes.multipliedReportingOverflow(by: height)
+        guard !pixelOverflow, !rowOverflow, !byteOverflow else { return nil }
+
+        var buffer = [RGBA8](repeating: .clear, count: pixelCount)
+        let ok: Bool = buffer.withUnsafeMutableBytes { raw -> Bool in
+            guard let base = raw.baseAddress,
+                  let context = CGContext(
+                    data: base,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: rowBytes,
+                    space: Bitmap.colourSpace,
+                    bitmapInfo: Bitmap.bitmapInfo.rawValue
+                  )
+            else { return false }
+            context.interpolationQuality = target == nil ? .none : .high
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        guard ok else { return nil }
+        self.init(width: width, height: height, pixels: buffer)
+    }
+
+    // A `makeContext()` returning a bare `CGContext` over this bitmap was
+    // removed deliberately: the only way to build one is to hand Core Graphics
+    // a pointer into the pixel array, and that pointer is dangling the moment
+    // the function returns. Anything drawn through it writes to freed memory.
+    // `drawWithCoreGraphics` below is the safe equivalent — the pointer never
+    // outlives the closure.
+
+    /// Run Core Graphics drawing over this bitmap and keep the result.
+    ///
+    /// Core Graphics uses a y-up coordinate system while the canvas model is
+    /// y-down (row 0 at the top, as every image format stores it). The flip is
+    /// applied here, once, so no caller has to remember it.
+    mutating func drawWithCoreGraphics(_ body: (CGContext) -> Void) {
+        guard Self.isSizeSupported(width: width, height: height) else { return }
+        let rowBytes = bytesPerRow
+        let (byteCount, overflow) = rowBytes.multipliedReportingOverflow(by: height)
+        guard !overflow else { return }
+        var scratch = [UInt8](repeating: 0, count: byteCount)
+
+        pixels.withUnsafeBytes { source in
+            scratch.withUnsafeMutableBytes { destination in
+                if let s = source.baseAddress, let d = destination.baseAddress {
+                    d.copyMemory(from: s, byteCount: byteCount)
+                }
+            }
+        }
+
+        let produced: [RGBA8]? = scratch.withUnsafeMutableBytes { raw -> [RGBA8]? in
+            guard let base = raw.baseAddress,
+                  let context = CGContext(
+                    data: base,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: rowBytes,
+                    space: Bitmap.colourSpace,
+                    bitmapInfo: Bitmap.bitmapInfo.rawValue
+                  )
+            else { return nil }
+
+            context.translateBy(x: 0, y: CGFloat(height))
+            context.scaleBy(x: 1, y: -1)
+            body(context)
+
+            let typed = raw.bindMemory(to: RGBA8.self)
+            return Array(typed)
+        }
+
+        if let produced, produced.count == pixels.count {
+            pixels = produced
+        }
+    }
+}
+
+public extension PixelRect {
+    /// The smallest pixel rect fully containing `rect`.
+    init(enclosing rect: CGRect) {
+        let integral = rect.integral
+        self.init(
+            x: Int(integral.minX),
+            y: Int(integral.minY),
+            width: Int(integral.width),
+            height: Int(integral.height)
+        )
+    }
+}
+
+public extension PaintColour {
+    var cgColor: CGColor {
+        CGColor(
+            colorSpace: Bitmap.colourSpace,
+            components: [
+                CGFloat(red), CGFloat(green), CGFloat(blue), CGFloat(alpha),
+            ]
+        ) ?? CGColor(gray: 0, alpha: 1)
+    }
+}

@@ -1,0 +1,622 @@
+import AppKit
+import Darwin
+import PaintKit
+import SwiftUI
+import UniformTypeIdentifiers
+
+/// The document.
+///
+/// `NSDocument` rather than SwiftUI's `DocumentGroup`: this app needs a custom
+/// package format, real undo integration, autosave-in-place, Versions, and
+/// control over the window it opens into. `DocumentGroup` is concise but thin
+/// in exactly those places, and discovering that late means rewriting the
+/// document layer after the tools are already built on it.
+final class DrawingDocument: NSDocument {
+
+    let model: EditorModel
+
+    /// Format this document was opened from, so Save writes it back the same
+    /// way instead of silently converting the user's PNG into something else.
+    private var sourceFormat: ImageCodec.Format?
+
+    static let defaultCanvasSize = (width: 1280, height: 800)
+
+    // MARK: - Lifecycle
+
+    override init() {
+        let canvas = Bitmap(
+            width: Self.defaultCanvasSize.width,
+            height: Self.defaultCanvasSize.height,
+            fill: .white
+        )
+        model = EditorModel(canvas: canvas)
+        super.init()
+        wireModel()
+    }
+
+    private func wireModel() {
+        model.onCanvasChanged = { [weak self] _ in
+            self?.updateChangeCount(.changeDone)
+        }
+        model.onEditCommitted = { [weak self] name in
+            self?.registerUndoAction(named: name)
+        }
+        model.onDuplicate = { [weak self] in
+            _ = try? self?.duplicate()
+        }
+        syncDocumentIdentity()
+    }
+
+    /// Mirror the filename and dirty flag into the model, because the title
+    /// chip lives in the content view — the real titlebar is transparent so the
+    /// artwork can reach the top edge.
+    private func syncDocumentIdentity() {
+        model.documentName = displayName ?? "Untitled"
+        model.isEdited = isDocumentEdited
+    }
+
+    override func updateChangeCount(_ change: NSDocument.ChangeType) {
+        super.updateChangeCount(change)
+        MainActor.assumeIsolated { model.isEdited = isDocumentEdited }
+    }
+
+    override func close() {
+        // Otherwise a stale closure keeps writing into a closed document.
+        ColourPanelController.shared.relinquish(owner: model.colourPanelOwner)
+        super.close()
+    }
+
+    override class var autosavesInPlace: Bool { true }
+
+    /// Autosave only the native package.
+    ///
+    /// A `.itspaint` document is ours, so writing it in the background is exactly
+    /// what the user expects. An imported PNG or JPEG is *their* file, and
+    /// silently re-encoding it in the background is data loss waiting to
+    /// happen — a lossy format would degrade on every autosave, and any
+    /// metadata the original carried is gone. Imported images require an
+    /// explicit Save.
+    override var autosavingFileType: String? {
+        fileType == Self.packageType ? Self.packageType : nil
+    }
+
+    override var windowNibName: NSNib.Name? { nil }
+
+    // MARK: - Windows
+
+    override func makeWindowControllers() {
+        let hosting = NSHostingController(rootView: EditorView(model: model))
+
+        // Size the WINDOW to the artwork, not the artwork to a fixed window.
+        //
+        // Canvas-first means the frame should be barely perceptible, and
+        // fitting a 1000×640 image into a window sized to 86% of a 6K display
+        // cannot achieve that — the only ways to close the gap are to magnify
+        // the artwork (which lies about pixel art) or to shrink the window to
+        // the art. The second is honest, and it is what Preview does.
+        //
+        // The chrome floats *over* the canvas in this direction, so it claims
+        // no space of its own; the gap below is a hairline, not a reservation.
+        let visible = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
+        let ceiling = NSSize(width: visible.width * 0.94, height: visible.height * 0.94)
+
+        // Scale down only if the artwork is bigger than the screen allows.
+        let fit = min(
+            1,
+            min(
+                (ceiling.width - Tokens.Chrome.frameGap * 2) / Double(model.canvas.width),
+                (ceiling.height - Tokens.Chrome.frameGap * 2) / Double(model.canvas.height)
+            )
+        )
+        model.setZoomExact(fit)
+
+        let contentSize = NSSize(
+            width: min(
+                max(Double(model.canvas.width) * fit + Tokens.Chrome.frameGap * 2, 560),
+                ceiling.width
+            ),
+            height: min(
+                max(Double(model.canvas.height) * fit + Tokens.Chrome.frameGap * 2, 420),
+                ceiling.height
+            )
+        )
+
+        let window = NSWindow(contentViewController: hosting)
+        window.setContentSize(contentSize)
+        window.minSize = NSSize(width: 560, height: 420)
+        window.title = displayName
+
+        // Canvas-first: the artwork runs to all four edges, so the titlebar is
+        // transparent and the content view extends under it. The filename moves
+        // to its own glass chip in the content, and a scrim keeps the traffic
+        // lights legible over bright artwork.
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.styleMask.insert(.fullSizeContentView)
+        window.isMovableByWindowBackground = false
+        // Not `.preferred`: a forced tab bar occupies exactly the strip this
+        // direction keeps transparent, and restates the filename the title chip
+        // already shows. Users can still merge windows deliberately.
+        window.tabbingMode = .automatic
+        window.center()
+
+        syncDocumentIdentity()
+
+        let controller = NSWindowController(window: window)
+        controller.shouldCascadeWindows = true
+        addWindowController(controller)
+    }
+
+    // MARK: - Concurrency contract for file I/O
+    //
+    // `read` and `write` are nonisolated on NSDocument because AppKit is
+    // allowed to run them off the main thread. This document opts out of both,
+    // so the main-actor model is genuinely safe to touch inside them. Pinning
+    // it explicitly — rather than relying on the framework default — is what
+    // makes `MainActor.assumeIsolated` below a guarantee instead of a hope.
+
+    override class func canConcurrentlyReadDocuments(ofType typeName: String) -> Bool { false }
+
+    override func canAsynchronouslyWrite(
+        to url: URL, ofType typeName: String, for saveOperation: NSDocument.SaveOperationType
+    ) -> Bool { false }
+
+    // MARK: - Reading
+
+    override func read(from url: URL, ofType typeName: String) throws {
+        // Decode first, off the model entirely: a failed read must leave the
+        // open document untouched rather than half-replaced.
+        let isPackage = typeName == Self.packageType || url.pathExtension.lowercased() == "itspaint"
+        let contents = isPackage
+            ? try Self.readPackage(at: url)
+            : (canvas: try ImageCodec.decode(contentsOf: url), metadata: nil)
+        let format = isPackage ? nil : ImageCodec.Format.inferred(from: url)
+
+        MainActor.assumeIsolated {
+            sourceFormat = format
+            // Loaded into the existing model rather than a fresh one: Revert to
+            // Saved reads into a document whose window already captured this
+            // object, so replacing it would leave the old pixels on screen.
+            model.load(canvas: contents.canvas, metadata: contents.metadata)
+        }
+    }
+
+    /// The pixels, plus the editing state stored beside them. A package written
+    /// by an older build (or with a damaged `document.json`) still opens — the
+    /// artwork is the document, the rest is preference.
+    nonisolated private static func readPackage(
+        at url: URL
+    ) throws -> (canvas: Bitmap, metadata: DocumentMetadata?) {
+        let packageDescriptor = try openPackageDirectory(at: url)
+        defer { Darwin.close(packageDescriptor) }
+
+        let canvasURL = url.appendingPathComponent(PackageEntry.image)
+        let canvasData = try readRegularEntry(
+            named: PackageEntry.image,
+            in: packageDescriptor,
+            maximumBytes: PackagePolicy.maximumCanvasBytes
+        )
+        let canvas = try ImageCodec.decode(data: canvasData, sourceURL: canvasURL)
+
+        // Metadata is preference, not artwork. Missing, damaged, oversized or
+        // non-regular metadata therefore falls back to the defaults, while the
+        // required canvas remains fail-closed above.
+        let metadata: DocumentMetadata?
+        do {
+            let data = try readRegularEntry(
+                named: PackageEntry.metadata,
+                in: packageDescriptor,
+                maximumBytes: PackagePolicy.maximumMetadataBytes
+            )
+            metadata = try? JSONDecoder().decode(DocumentMetadata.self, from: data)
+        } catch {
+            metadata = nil
+        }
+        return (canvas, metadata)
+    }
+
+    /// Open the package once and resolve both fixed child names relative to
+    /// that pinned directory. This keeps validation and use attached to one
+    /// directory even if its pathname is replaced concurrently.
+    nonisolated private static func openPackageDirectory(at url: URL) throws -> Int32 {
+        let descriptor = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+            return Darwin.open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        }
+        guard descriptor >= 0 else {
+            throw PackageReadError.unreadablePackage(url)
+        }
+        return descriptor
+    }
+
+    /// Read a fixed package child through `openat`, refusing symlinks and every
+    /// non-regular file type. The size check is repeated by a capped read loop,
+    /// so growing a file after `fstat` cannot turn this into an unbounded read.
+    nonisolated private static func readRegularEntry(
+        named name: String,
+        in packageDescriptor: Int32,
+        maximumBytes: Int
+    ) throws -> Data {
+        guard !name.contains("/"), name != ".", name != ".." else {
+            throw PackageReadError.invalidEntry(name)
+        }
+
+        let descriptor = name.withCString {
+            Darwin.openat(
+                packageDescriptor,
+                $0,
+                // `O_NONBLOCK` prevents a malicious FIFO from hanging before
+                // `fstat` gets the chance to reject it as non-regular.
+                O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK
+            )
+        }
+        guard descriptor >= 0 else {
+            throw PackageReadError.invalidEntry(name)
+        }
+        defer { Darwin.close(descriptor) }
+
+        var information = stat()
+        guard Darwin.fstat(descriptor, &information) == 0,
+              (information.st_mode & S_IFMT) == S_IFREG
+        else {
+            throw PackageReadError.invalidEntry(name)
+        }
+        guard information.st_size >= 0,
+              UInt64(information.st_size) <= UInt64(maximumBytes)
+        else {
+            throw PackageReadError.entryTooLarge(name, maximumBytes: maximumBytes)
+        }
+
+        var result = Data()
+        result.reserveCapacity(min(Int(information.st_size), maximumBytes))
+        while result.count <= maximumBytes {
+            let requested = min(64 * 1024, maximumBytes + 1 - result.count)
+            var chunk = Data(count: requested)
+            let byteCount = chunk.withUnsafeMutableBytes {
+                Darwin.read(descriptor, $0.baseAddress, $0.count)
+            }
+            if byteCount < 0 {
+                if errno == EINTR { continue }
+                throw PackageReadError.unreadableEntry(name)
+            }
+            if byteCount == 0 { break }
+            result.append(chunk.prefix(byteCount))
+        }
+        guard result.count <= maximumBytes else {
+            throw PackageReadError.entryTooLarge(name, maximumBytes: maximumBytes)
+        }
+        return result
+    }
+
+    // MARK: - Writing
+
+    /// Everything writing needs, lifted off the main actor in one hop.
+    private struct WriteSnapshot: Sendable {
+        let canvas: Bitmap
+        let foreground: PaintColour
+        let background: PaintColour
+        let palette: Palette
+        let sourceFormat: ImageCodec.Format?
+    }
+
+    nonisolated private func makeWriteSnapshot() -> WriteSnapshot {
+        MainActor.assumeIsolated {
+            WriteSnapshot(
+                canvas: model.canvas,
+                foreground: model.foreground,
+                background: model.background,
+                palette: model.palette,
+                sourceFormat: sourceFormat
+            )
+        }
+    }
+
+    override func write(to url: URL, ofType typeName: String) throws {
+        let snapshot = makeWriteSnapshot()
+
+        if typeName == Self.packageType || url.pathExtension.lowercased() == "itspaint" {
+            try Self.writePackage(snapshot, to: url)
+            return
+        }
+
+        let format = ImageCodec.Format.inferred(from: url) ?? snapshot.sourceFormat ?? .png
+        try ImageCodec.write(
+            snapshot.canvas,
+            to: url,
+            as: format,
+            matte: snapshot.background
+        )
+    }
+
+    /// The `.itspaint` package: a lossless PNG plus the editing state that a flat
+    /// image cannot carry. Storing the pixels as PNG rather than a private blob
+    /// means the artwork is recoverable with any image tool even if this app
+    /// disappears — a document format should never hold work hostage.
+    nonisolated private static func writePackage(_ snapshot: WriteSnapshot, to url: URL) throws {
+        let fileManager = FileManager.default
+        let temporary = fileManager.temporaryDirectory
+            .appendingPathComponent("itspaint-write-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: temporary, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: temporary) }
+
+        try ImageCodec.write(
+            snapshot.canvas,
+            to: temporary.appendingPathComponent(PackageEntry.image),
+            as: .png
+        )
+
+        let metadata = DocumentMetadata(
+            formatVersion: DocumentMetadata.currentVersion,
+            width: snapshot.canvas.width,
+            height: snapshot.canvas.height,
+            foreground: snapshot.foreground,
+            background: snapshot.background,
+            palette: snapshot.palette
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(metadata)
+            .write(to: temporary.appendingPathComponent(PackageEntry.metadata))
+
+        if fileManager.fileExists(atPath: url.path) {
+            try fileManager.removeItem(at: url)
+        }
+        try fileManager.moveItem(at: temporary, to: url)
+    }
+
+    // MARK: - Types
+
+    nonisolated static let packageType = "com.joshlin.itspaint-drawing"
+
+    enum PackageEntry {
+        nonisolated static let image = "canvas.png"
+        nonisolated static let metadata = "document.json"
+    }
+
+    enum PackagePolicy {
+        /// Metadata written by the app is only a few kilobytes. A 256 KiB cap
+        /// leaves ample format-growth room without exposing JSON decoding to an
+        /// attacker-controlled allocation.
+        nonisolated static let maximumMetadataBytes = 256 * 1024
+
+        /// A maximum-size decoded canvas can produce a roughly 128 MiB PNG in
+        /// the incompressible case. Twice that size preserves legitimate work
+        /// while bounding the encoded-data copy used by the package reader.
+        nonisolated static let maximumCanvasBytes = 256 * 1024 * 1024
+    }
+
+    override class var readableTypes: [String] {
+        [packageType] + ImageCodec.Format.allCases.map(\.utType.identifier)
+    }
+
+    override class var writableTypes: [String] {
+        [packageType] + ImageCodec.Format.allCases.map(\.utType.identifier)
+    }
+
+    override func fileNameExtension(
+        forType typeName: String, saveOperation: NSDocument.SaveOperationType
+    ) -> String? {
+        if typeName == Self.packageType { return "itspaint" }
+        return ImageCodec.Format.allCases
+            .first { $0.utType.identifier == typeName }?
+            .fileExtension
+    }
+
+    // MARK: - Undo bridge
+
+    /// The engine owns the pixel history; `NSUndoManager` owns the user-facing
+    /// sequencing, menu titles, autosave coordination and Versions. Registering
+    /// the inverse from inside each replay is what keeps the two in lockstep
+    /// instead of drifting into two independent stacks.
+    private func registerUndoAction(named name: String) {
+        guard let undoManager else { return }
+        // `registerUndo`'s handler is nonisolated, and AppKit runs it on the
+        // main thread. Swift 6.1 requires that to be said out loud; 6.2 infers
+        // it, which is how this compiled locally and failed on CI.
+        undoManager.registerUndo(withTarget: self) { document in
+            MainActor.assumeIsolated { document.replayUndo() }
+        }
+        undoManager.setActionName(name)
+    }
+
+    private func replayUndo() {
+        let name = model.engine.undoStack.undoActionName ?? "Edit"
+        model.undo()
+        undoManager?.registerUndo(withTarget: self) { document in
+            MainActor.assumeIsolated { document.replayRedo() }
+        }
+        undoManager?.setActionName(name)
+    }
+
+    private func replayRedo() {
+        let name = model.engine.undoStack.redoActionName ?? "Edit"
+        model.redo()
+        undoManager?.registerUndo(withTarget: self) { document in
+            MainActor.assumeIsolated { document.replayUndo() }
+        }
+        undoManager?.setActionName(name)
+    }
+
+    // MARK: - Export
+
+    @IBAction func exportImage(_ sender: Any?) {
+        guard let window = windowControllers.first?.window else { return }
+
+        let options = ExportOptions()
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [options.format.utType]
+        panel.nameFieldStringValue = (displayName as NSString).deletingPathExtension
+        panel.canCreateDirectories = true
+        panel.message = "Choose a format and a size."
+
+        // A real accessory view rather than trusting the typed extension: the
+        // format list is checked against the encoders this machine actually
+        // has, and the scale is applied before encoding, so "export at 2×"
+        // does not mean "resize the document and undo it afterwards".
+        let accessory = NSHostingView(
+            rootView: ExportAccessory(options: options, canvas: (canvas: model.canvas.width, model.canvas.height)) { format in
+                panel.allowedContentTypes = [format.utType]
+            }
+        )
+        accessory.frame = NSRect(x: 0, y: 0, width: 380, height: 84)
+        panel.accessoryView = accessory
+
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url, let self else { return }
+            do {
+                let scaled = try options.scaled(self.model.canvas)
+                try ImageCodec.write(
+                    scaled,
+                    to: url,
+                    as: options.format,
+                    quality: options.quality,
+                    matte: self.model.background
+                )
+            } catch {
+                self.model.present(
+                    message: error.localizedDescription,
+                    recovery: (error as? ImageCodec.CodecError)?.recoverySuggestion
+                )
+            }
+        }
+    }
+}
+
+/// Actionable package failures shown by NSDocument. Optional metadata errors
+/// are absorbed by `readPackage`; these messages therefore describe failures
+/// that prevent the artwork itself from opening.
+private enum PackageReadError: LocalizedError {
+    case unreadablePackage(URL)
+    case invalidEntry(String)
+    case entryTooLarge(String, maximumBytes: Int)
+    case unreadableEntry(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .unreadablePackage(let url):
+            "Couldn't open \(url.lastPathComponent)."
+        case .invalidEntry(let name):
+            "The drawing's \(name) isn't a regular file inside the package."
+        case .entryTooLarge(let name, _):
+            "The drawing's \(name) is too large to open safely."
+        case .unreadableEntry(let name):
+            "Couldn't read the drawing's \(name)."
+        }
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .unreadablePackage:
+            "Check that the drawing still exists and you have permission to open it."
+        case .invalidEntry, .unreadableEntry:
+            "Open the package in Finder and make sure canvas.png is a regular PNG file."
+        case .entryTooLarge(_, let maximumBytes):
+            "Use a canvas.png smaller than \(ByteCountFormatter.string(fromByteCount: Int64(maximumBytes), countStyle: .file))."
+        }
+    }
+}
+
+/// Editing state stored alongside the pixels in a `.itspaint` package.
+struct DocumentMetadata: Codable {
+    static let currentVersion = 1
+
+    let formatVersion: Int
+    let width: Int
+    let height: Int
+    let foreground: PaintColour
+    let background: PaintColour
+    let palette: Palette
+}
+
+/// What the export panel collects.
+///
+/// Observable so the accessory view can drive the panel's own file type as the
+/// format changes — a save panel that keeps offering `.png` while the popup
+/// says JPEG is a trap, not a default.
+@MainActor
+@Observable
+final class ExportOptions {
+    var format: ImageCodec.Format = .png
+    var scale: Double = 1
+    var quality: Double = 0.9
+
+    /// The artwork at the chosen scale, resampled smoothly.
+    func scaled(_ bitmap: Bitmap) throws -> Bitmap {
+        guard scale != 1 else { return bitmap }
+        let rawWidth = (Double(bitmap.width) * scale).rounded()
+        let rawHeight = (Double(bitmap.height) * scale).rounded()
+        guard rawWidth.isFinite, rawHeight.isFinite,
+              rawWidth >= 1, rawHeight >= 1,
+              rawWidth <= Double(Int.max), rawHeight <= Double(Int.max)
+        else {
+            throw ImageCodec.CodecError.imageTooLarge(
+                width: Bitmap.maximumDimension + 1,
+                height: Bitmap.maximumDimension + 1
+            )
+        }
+        let target = (
+            width: Int(rawWidth),
+            height: Int(rawHeight)
+        )
+        guard Bitmap.isSizeSupported(width: target.width, height: target.height) else {
+            throw ImageCodec.CodecError.imageTooLarge(
+                width: target.width,
+                height: target.height
+            )
+        }
+        guard let scaled = ImageTransform.scaled(bitmap, to: target, using: .smooth) else {
+            throw ImageCodec.CodecError.encodeFailed(format)
+        }
+        return scaled
+    }
+}
+
+/// Format, scale and (for lossy formats) quality, inside the save panel.
+private struct ExportAccessory: View {
+    @Bindable var options: ExportOptions
+    let canvas: (canvas: Int, Int)
+    let onFormatChange: (ImageCodec.Format) -> Void
+
+    private static let scales: [(label: String, value: Double)] = [
+        ("25%", 0.25), ("50%", 0.5), ("100%", 1), ("200%", 2), ("400%", 4),
+    ]
+
+    var body: some View {
+        Form {
+            Picker("Format", selection: $options.format) {
+                // Only what this machine can actually write.
+                ForEach(ImageCodec.Format.exportable) { format in
+                    Text(format.displayName).tag(format)
+                }
+            }
+            .onChange(of: options.format) { _, format in onFormatChange(format) }
+
+            Picker("Size", selection: $options.scale) {
+                ForEach(Self.scales, id: \.value) { scale in
+                    let width = Int(Double(canvas.canvas) * scale.value)
+                    let height = Int(Double(canvas.1) * scale.value)
+                    Text("\(scale.label) — \(width) × \(height)")
+                        .tag(scale.value)
+                        .disabled(!Bitmap.isSizeSupported(width: width, height: height))
+                }
+            }
+
+            if options.format.supportsQuality {
+                Slider(value: $options.quality, in: 0.3...1) {
+                    Text("Quality")
+                } minimumValueLabel: {
+                    Text("Small")
+                } maximumValueLabel: {
+                    Text("Best")
+                }
+            }
+            if options.format.requiresIconSize {
+                Text("Icons are square: the artwork is fitted and centred.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 380)
+    }
+}

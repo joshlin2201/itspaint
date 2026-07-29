@@ -1,0 +1,104 @@
+# XcodeGen spec. The generated ItsPaint.xcodeproj IS committed, so a clone needs
+# only Xcode — regenerate with `xcodegen generate` after changing this file.
+name: ItsPaint
+options:
+  bundleIdPrefix: com.joshlin
+  deploymentTarget:
+    # Sonoma. The oldest release that has Observation and @Observable, which the
+    # editor model is built on — and still covers Macs back to 2018.
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+settings:
+  configs:
+    Debug:
+      # Build with optimisation even in Debug. Unoptimised, the pixel engine
+      # runs 40-140x slower — a live shape preview costs ~46ms per frame
+      # instead of ~0.3ms, which is the difference between usable and not.
+      # Debug symbols are retained; only the optimiser is turned on.
+      SWIFT_OPTIMIZATION_LEVEL: "-O"
+      GCC_OPTIMIZATION_LEVEL: "s"
+      ONLY_ACTIVE_ARCH: YES
+      # Keep local/test-host signing permissive: Swift-package frameworks are
+      # independently ad-hoc signed and cannot share a distribution Team ID.
+      ENABLE_HARDENED_RUNTIME: NO
+    Release:
+      # Distribution builds keep the declared sandbox entitlements but must not
+      # inherit Xcode's debugger-only `get-task-allow` entitlement.
+      CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+      ENABLE_HARDENED_RUNTIME: YES
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.10.0"
+    CURRENT_PROJECT_VERSION: "2"
+    DEVELOPMENT_TEAM: ""
+    # Ad-hoc signing. This is the correct choice for a locally built sandboxed
+    # app: the sandbox and its entitlements work, and it needs no provisioning
+    # profile. Distribution (Developer ID or App Store) requires a paid account
+    # and a real identity — see docs/MAC_ESSENTIALS.md.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGNING_REQUIRED: YES
+    CODE_SIGNING_ALLOWED: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+    DEAD_CODE_STRIPPING: YES
+    GCC_WARN_UNINITIALIZED_AUTOS: YES
+    CLANG_WARN_DOCUMENTATION_COMMENTS: YES
+
+packages:
+  PaintKit:
+    path: Packages/PaintKit
+
+targets:
+  ItsPaint:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+    dependencies:
+      - package: PaintKit
+        product: PaintKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.joshlin.itspaint
+        PRODUCT_NAME: ItsPaint
+        INFOPLIST_FILE: App/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/Resources/ItsPaint.entitlements
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_USER_SELECTED_FILES: readwrite
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        COMBINE_HIDPI_IMAGES: YES
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+
+  ItsPaintTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: AppTests
+    dependencies:
+      - target: ItsPaint
+      - package: PaintKit
+        product: PaintKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.joshlin.itspaint.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  ItsPaint:
+    build:
+      targets:
+        ItsPaint: all
+        ItsPaintTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - ItsPaintTests
+    archive:
+      config: Release

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/joshlin2201/itspaint/discussions
+    about: Ask how something works, or float an idea before building it.

@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v0.10.0)"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build release candidate
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Resolve release metadata
+        id: release
+        env:
+          REQUESTED_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$REQUESTED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must look like v0.10.0 or v0.10.0-beta.1, got: $REQUESTED_TAG" >&2
+            exit 1
+          fi
+
+          VERSION="${REQUESTED_TAG#v}"
+          BUNDLE_VERSION="${VERSION%%-*}"
+          echo "tag=$REQUESTED_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "bundle_version=$BUNDLE_VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+
+      - name: Test before shipping
+        run: |
+          set -euo pipefail
+          swift test -c release --package-path Packages/PaintKit
+          xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
+            -destination 'platform=macOS' test
+
+      - name: Build universal release
+        run: |
+          set -euo pipefail
+          xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
+            -configuration Release -destination 'generic/platform=macOS' \
+            -derivedDataPath build ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO build
+
+      # The public beta is ad-hoc signed until Developer ID and notarisation
+      # credentials are installed as repository secrets. Verify exactly what
+      # we ship rather than implying Gatekeeper approval it does not have.
+      - name: Package
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          EXPECTED_BUNDLE_VERSION: ${{ steps.release.outputs.bundle_version }}
+        run: |
+          set -euo pipefail
+          APP="$GITHUB_WORKSPACE/build/Build/Products/Release/ItsPaint.app"
+          DIST="$GITHUB_WORKSPACE/dist"
+          INFO_PLIST="$APP/Contents/Info.plist"
+          ENTITLEMENTS="$RUNNER_TEMP/ItsPaint-entitlements.plist"
+          STAGING="$(mktemp -d "$RUNNER_TEMP/itspaint-dmg.XXXXXX")"
+          VERIFY_DIR="$(mktemp -d "$RUNNER_TEMP/itspaint-verify.XXXXXX")"
+          DMG="$DIST/ItsPaint-$VERSION.dmg"
+          ZIP="$DIST/ItsPaint-$VERSION.zip"
+
+          test -d "$APP"
+          BUNDLE_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
+          if [[ "$BUNDLE_VERSION" != "$EXPECTED_BUNDLE_VERSION" ]]; then
+            echo "Bundle version $BUNDLE_VERSION does not match release $EXPECTED_BUNDLE_VERSION" >&2
+            exit 1
+          fi
+
+          EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$INFO_PLIST")"
+          EXECUTABLE="$APP/Contents/MacOS/$EXECUTABLE_NAME"
+          lipo "$EXECUTABLE" -verify_arch arm64 x86_64
+          echo "Architectures: $(lipo -archs "$EXECUTABLE")"
+
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -d --entitlements :- "$APP" > "$ENTITLEMENTS" 2>/dev/null
+          for entitlement in \
+            com.apple.security.app-sandbox \
+            com.apple.security.files.bookmarks.app-scope \
+            com.apple.security.files.user-selected.read-write
+          do
+            value="$(/usr/libexec/PlistBuddy -c "Print :$entitlement" "$ENTITLEMENTS")"
+            if [[ "$value" != "true" ]]; then
+              echo "Expected signed entitlement $entitlement=true, got: $value" >&2
+              exit 1
+            fi
+          done
+          SIGNATURE_INFO="$(codesign -dv --verbose=4 "$APP" 2>&1)"
+          if [[ "$SIGNATURE_INFO" != *"Signature=adhoc"* ]]; then
+            echo "Expected an ad-hoc signature" >&2
+            exit 1
+          fi
+          if [[ "$SIGNATURE_INFO" != *"runtime"* ]]; then
+            echo "Expected Hardened Runtime in the Release signature" >&2
+            exit 1
+          fi
+          if /usr/libexec/PlistBuddy \
+            -c 'Print :com.apple.security.get-task-allow' "$ENTITLEMENTS" >/dev/null 2>&1
+          then
+            echo "Release must not contain get-task-allow" >&2
+            exit 1
+          fi
+
+          mkdir -p "$DIST"
+          ditto "$APP" "$STAGING/ItsPaint.app"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create -volname "ItsPaint $VERSION" -srcfolder "$STAGING" \
+            -ov -format UDZO "$DMG"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+
+          hdiutil verify "$DMG"
+          ditto -x -k "$ZIP" "$VERIFY_DIR"
+          codesign --verify --deep --strict --verbose=2 "$VERIFY_DIR/ItsPaint.app"
+
+          (
+            cd "$DIST"
+            shasum -a 256 "ItsPaint-$VERSION.dmg" "ItsPaint-$VERSION.zip" > checksums.txt
+          )
+          cat "$DIST/checksums.txt"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ItsPaint-${{ steps.release.outputs.version }}
+          path: |
+            dist/ItsPaint-${{ steps.release.outputs.version }}.dmg
+            dist/ItsPaint-${{ steps.release.outputs.version }}.zip
+            dist/checksums.txt
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: ItsPaint ${{ steps.release.outputs.version }}
+          draft: true
+          prerelease: ${{ contains(steps.release.outputs.version, '-') || startsWith(steps.release.outputs.version, '0.') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/ItsPaint-${{ steps.release.outputs.version }}.dmg
+            dist/ItsPaint-${{ steps.release.outputs.version }}.zip
+            dist/checksums.txt
+          body: |
+            **Beta.** Built from `${{ steps.release.outputs.tag }}` by GitHub Actions.
+
+            ### Install
+            1. Download the `.dmg`, open it, drag **ItsPaint** to Applications.
+            2. The beta is ad-hoc signed, not notarised. Control-click the app,
+               choose **Open**, then confirm **Open**. If macOS still blocks it,
+               clear the download quarantine once:
+               ```
+               xattr -dr com.apple.quarantine /Applications/ItsPaint.app
+               ```
+
+            Requires macOS 14 (Sonoma) or later. Verify your download against
+            `checksums.txt`. Full notes in
+            [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.release.outputs.tag }}/CHANGELOG.md).

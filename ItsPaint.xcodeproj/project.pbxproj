@@ -1,0 +1,603 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		05A4C30BAB4A3AB1F58857EA /* PaintKit in Frameworks */ = {isa = PBXBuildFile; productRef = C292D927C6345EE278105A3E /* PaintKit */; };
+		18E4BB5BDECAEE5E553BD0DD /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BC3E9F635AA81443BB4BF957 /* PrivacyInfo.xcprivacy */; };
+		192AD6C35D59708B6C314B86 /* CanvasNSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D86C72CBA19ADE0DD74D35 /* CanvasNSView.swift */; };
+		1976F8F0D1BA69C8D0910DED /* MainMenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1648F5F1151885FA15DCB653 /* MainMenuBuilder.swift */; };
+		2966C26A04977F9BD83536E9 /* ToolOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */; };
+		397D8480B03F1D4E483412F6 /* CanvasRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CCE83773644C45A0171C62 /* CanvasRenderingTests.swift */; };
+		43DF040CF6A5A908A865E871 /* CanvasScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DC85A97B97F5CFF1EEBFE4 /* CanvasScrollView.swift */; };
+		48905D56B247546BA33C44F8 /* ItsPaintApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E7B1F407FDB6F47C079660 /* ItsPaintApp.swift */; };
+		4BC22C9E41431096754A0997 /* PaintKit in Frameworks */ = {isa = PBXBuildFile; productRef = 61964C2B3FE22724FE4E4A8B /* PaintKit */; };
+		530689DA33232E54BB8DFD63 /* ToolRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7833326AD2D84AF29B6DE601 /* ToolRail.swift */; };
+		57E1D3BD09515B40DFDBEDD9 /* ColourPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EC319E836430BA852D8EDB0 /* ColourPanelController.swift */; };
+		5B6FFEF7D300E81FCAE852C6 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 392ADD8A7EEC36D1855BA3D5 /* DesignTokens.swift */; };
+		62EE08BC08488DAE1C672EB1 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E86C21F2F8518B426159B77 /* EditorView.swift */; };
+		70251274389D468920E0FF44 /* DrawingDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18BC1714C722B756C83FFF6E /* DrawingDocument.swift */; };
+		71B8FC7E198B4F762F94C6A2 /* DocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F4A9F5632360B181403BDA /* DocumentTests.swift */; };
+		736B873DA05CA677039DB143 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 81D5AB95221C3E1A9DD3CFC7 /* Assets.xcassets */; };
+		762CD1BC00FE680EB32BD80B /* ColourPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83A429AB8B62EFEDC176D65 /* ColourPopover.swift */; };
+		8CFB1C6C1779CAF721DD34EA /* FixedGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80562B1588560C2E61CCE65 /* FixedGrid.swift */; };
+		924C2B7A35DD5F3985A29406 /* EssentialsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06E4A12B57303E5FE405DFC /* EssentialsTests.swift */; };
+		95E1D3A13CB44069D1DAE0AC /* DocumentCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFEF09B51CF5FC0B71765BA1 /* DocumentCommands.swift */; };
+		970A38652FFECA2910FFAAFF /* CanvasOverlays.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8468DB5919B3A21F63903298 /* CanvasOverlays.swift */; };
+		A75FAC3C0CD78F3C12737311 /* Tooltip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D10B48F97C15A6294B5737E /* Tooltip.swift */; };
+		CA7E69B188CC2D88EC2CE781 /* EditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B04711CAED447B409481B1 /* EditorModel.swift */; };
+		D00A7C03ECFC7BC4575AF104 /* SizeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2ACA876E800C1AB89C90365 /* SizeSheet.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1F013A78F793D13BB87E043C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DCB0C1E502362BB2757C6C50 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 823E094DE8C5F7BF20647083;
+			remoteInfo = ItsPaint;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		06D86C72CBA19ADE0DD74D35 /* CanvasNSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasNSView.swift; sourceTree = "<group>"; };
+		11CCE83773644C45A0171C62 /* CanvasRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasRenderingTests.swift; sourceTree = "<group>"; };
+		14E7B1F407FDB6F47C079660 /* ItsPaintApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItsPaintApp.swift; sourceTree = "<group>"; };
+		1648F5F1151885FA15DCB653 /* MainMenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenuBuilder.swift; sourceTree = "<group>"; };
+		18BC1714C722B756C83FFF6E /* DrawingDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingDocument.swift; sourceTree = "<group>"; };
+		1E097DB4C0F96FC0EE4CB28B /* ItsPaint.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ItsPaint.entitlements; sourceTree = "<group>"; };
+		1EC319E836430BA852D8EDB0 /* ColourPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColourPanelController.swift; sourceTree = "<group>"; };
+		20B04711CAED447B409481B1 /* EditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorModel.swift; sourceTree = "<group>"; };
+		30AE5E34F15348E6ACA11DFC /* ItsPaintTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ItsPaintTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		392ADD8A7EEC36D1855BA3D5 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		3ABAEBA2B88281FDAA9CF273 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		54F4A9F5632360B181403BDA /* DocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTests.swift; sourceTree = "<group>"; };
+		57CB1F5FDC405482E21278EA /* ItsPaint.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ItsPaint.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		60DC85A97B97F5CFF1EEBFE4 /* CanvasScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScrollView.swift; sourceTree = "<group>"; };
+		6E86C21F2F8518B426159B77 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		7833326AD2D84AF29B6DE601 /* ToolRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolRail.swift; sourceTree = "<group>"; };
+		81D5AB95221C3E1A9DD3CFC7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8468DB5919B3A21F63903298 /* CanvasOverlays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasOverlays.swift; sourceTree = "<group>"; };
+		8D10B48F97C15A6294B5737E /* Tooltip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tooltip.swift; sourceTree = "<group>"; };
+		BC3E9F635AA81443BB4BF957 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		BFEF09B51CF5FC0B71765BA1 /* DocumentCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCommands.swift; sourceTree = "<group>"; };
+		C06E4A12B57303E5FE405DFC /* EssentialsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EssentialsTests.swift; sourceTree = "<group>"; };
+		C83A429AB8B62EFEDC176D65 /* ColourPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColourPopover.swift; sourceTree = "<group>"; };
+		CA3B7CF910C5BF4084044565 /* PaintKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PaintKit; path = Packages/PaintKit; sourceTree = SOURCE_ROOT; };
+		E80562B1588560C2E61CCE65 /* FixedGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixedGrid.swift; sourceTree = "<group>"; };
+		F2ACA876E800C1AB89C90365 /* SizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeSheet.swift; sourceTree = "<group>"; };
+		FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolOptions.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		2E95401FA485E39CCB45924A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				05A4C30BAB4A3AB1F58857EA /* PaintKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		449E834C8136BC6D23A5E87D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4BC22C9E41431096754A0997 /* PaintKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		06686A057FE29D2A639D7EB2 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				CA3B7CF910C5BF4084044565 /* PaintKit */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		0E64CEEBE6D7B351C63B423C /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				8468DB5919B3A21F63903298 /* CanvasOverlays.swift */,
+				1EC319E836430BA852D8EDB0 /* ColourPanelController.swift */,
+				C83A429AB8B62EFEDC176D65 /* ColourPopover.swift */,
+				392ADD8A7EEC36D1855BA3D5 /* DesignTokens.swift */,
+				6E86C21F2F8518B426159B77 /* EditorView.swift */,
+				E80562B1588560C2E61CCE65 /* FixedGrid.swift */,
+				F2ACA876E800C1AB89C90365 /* SizeSheet.swift */,
+				FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */,
+				7833326AD2D84AF29B6DE601 /* ToolRail.swift */,
+				8D10B48F97C15A6294B5737E /* Tooltip.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		3B2D0B54D6997CD795FAC308 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				B8BAF587C87F15E3874CD8DD /* Canvas */,
+				F29CA523AD950B5AF0F4E641 /* Document */,
+				9102E8CC0C38D878D3903E02 /* Model */,
+				E2F6E6DF3AE7A2F30AAFAEA6 /* Resources */,
+				0E64CEEBE6D7B351C63B423C /* UI */,
+				14E7B1F407FDB6F47C079660 /* ItsPaintApp.swift */,
+				1648F5F1151885FA15DCB653 /* MainMenuBuilder.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		4E00104E54E43D0176AD2DAF /* AppTests */ = {
+			isa = PBXGroup;
+			children = (
+				11CCE83773644C45A0171C62 /* CanvasRenderingTests.swift */,
+				54F4A9F5632360B181403BDA /* DocumentTests.swift */,
+				C06E4A12B57303E5FE405DFC /* EssentialsTests.swift */,
+			);
+			path = AppTests;
+			sourceTree = "<group>";
+		};
+		9102E8CC0C38D878D3903E02 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				20B04711CAED447B409481B1 /* EditorModel.swift */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		A6A8D0FBBD317921BEF2EFC7 = {
+			isa = PBXGroup;
+			children = (
+				3B2D0B54D6997CD795FAC308 /* App */,
+				4E00104E54E43D0176AD2DAF /* AppTests */,
+				06686A057FE29D2A639D7EB2 /* Packages */,
+				FA7AF6CCECEAE7B4E0A6DFE3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B8BAF587C87F15E3874CD8DD /* Canvas */ = {
+			isa = PBXGroup;
+			children = (
+				06D86C72CBA19ADE0DD74D35 /* CanvasNSView.swift */,
+				60DC85A97B97F5CFF1EEBFE4 /* CanvasScrollView.swift */,
+			);
+			path = Canvas;
+			sourceTree = "<group>";
+		};
+		E2F6E6DF3AE7A2F30AAFAEA6 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				81D5AB95221C3E1A9DD3CFC7 /* Assets.xcassets */,
+				3ABAEBA2B88281FDAA9CF273 /* Info.plist */,
+				1E097DB4C0F96FC0EE4CB28B /* ItsPaint.entitlements */,
+				BC3E9F635AA81443BB4BF957 /* PrivacyInfo.xcprivacy */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		F29CA523AD950B5AF0F4E641 /* Document */ = {
+			isa = PBXGroup;
+			children = (
+				BFEF09B51CF5FC0B71765BA1 /* DocumentCommands.swift */,
+				18BC1714C722B756C83FFF6E /* DrawingDocument.swift */,
+			);
+			path = Document;
+			sourceTree = "<group>";
+		};
+		FA7AF6CCECEAE7B4E0A6DFE3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				57CB1F5FDC405482E21278EA /* ItsPaint.app */,
+				30AE5E34F15348E6ACA11DFC /* ItsPaintTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4DE3886FAE0BEA6172FA9724 /* ItsPaintTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A32991FD4BB4F9F8D4FD95C0 /* Build configuration list for PBXNativeTarget "ItsPaintTests" */;
+			buildPhases = (
+				8CB29CAB1D8912D9D4A4FFC3 /* Sources */,
+				2E95401FA485E39CCB45924A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F80DE5E07D91A5D5C96C6463 /* PBXTargetDependency */,
+			);
+			name = ItsPaintTests;
+			packageProductDependencies = (
+				C292D927C6345EE278105A3E /* PaintKit */,
+			);
+			productName = ItsPaintTests;
+			productReference = 30AE5E34F15348E6ACA11DFC /* ItsPaintTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		823E094DE8C5F7BF20647083 /* ItsPaint */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DF80946FDC320004708D0BF6 /* Build configuration list for PBXNativeTarget "ItsPaint" */;
+			buildPhases = (
+				15762A9CC2AC49AE15713518 /* Sources */,
+				618A455BC32EA0FAA1B698EB /* Resources */,
+				449E834C8136BC6D23A5E87D /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ItsPaint;
+			packageProductDependencies = (
+				61964C2B3FE22724FE4E4A8B /* PaintKit */,
+			);
+			productName = ItsPaint;
+			productReference = 57CB1F5FDC405482E21278EA /* ItsPaint.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DCB0C1E502362BB2757C6C50 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					4DE3886FAE0BEA6172FA9724 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
+					823E094DE8C5F7BF20647083 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = 610764B416048922C39824AF /* Build configuration list for PBXProject "ItsPaint" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = A6A8D0FBBD317921BEF2EFC7;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B2A6425770ED11C620D3B90F /* XCLocalSwiftPackageReference "Packages/PaintKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = FA7AF6CCECEAE7B4E0A6DFE3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				823E094DE8C5F7BF20647083 /* ItsPaint */,
+				4DE3886FAE0BEA6172FA9724 /* ItsPaintTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		618A455BC32EA0FAA1B698EB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				736B873DA05CA677039DB143 /* Assets.xcassets in Resources */,
+				18E4BB5BDECAEE5E553BD0DD /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		15762A9CC2AC49AE15713518 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				192AD6C35D59708B6C314B86 /* CanvasNSView.swift in Sources */,
+				970A38652FFECA2910FFAAFF /* CanvasOverlays.swift in Sources */,
+				43DF040CF6A5A908A865E871 /* CanvasScrollView.swift in Sources */,
+				57E1D3BD09515B40DFDBEDD9 /* ColourPanelController.swift in Sources */,
+				762CD1BC00FE680EB32BD80B /* ColourPopover.swift in Sources */,
+				5B6FFEF7D300E81FCAE852C6 /* DesignTokens.swift in Sources */,
+				95E1D3A13CB44069D1DAE0AC /* DocumentCommands.swift in Sources */,
+				70251274389D468920E0FF44 /* DrawingDocument.swift in Sources */,
+				CA7E69B188CC2D88EC2CE781 /* EditorModel.swift in Sources */,
+				62EE08BC08488DAE1C672EB1 /* EditorView.swift in Sources */,
+				8CFB1C6C1779CAF721DD34EA /* FixedGrid.swift in Sources */,
+				48905D56B247546BA33C44F8 /* ItsPaintApp.swift in Sources */,
+				1976F8F0D1BA69C8D0910DED /* MainMenuBuilder.swift in Sources */,
+				D00A7C03ECFC7BC4575AF104 /* SizeSheet.swift in Sources */,
+				2966C26A04977F9BD83536E9 /* ToolOptions.swift in Sources */,
+				530689DA33232E54BB8DFD63 /* ToolRail.swift in Sources */,
+				A75FAC3C0CD78F3C12737311 /* Tooltip.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8CB29CAB1D8912D9D4A4FFC3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				397D8480B03F1D4E483412F6 /* CanvasRenderingTests.swift in Sources */,
+				71B8FC7E198B4F762F94C6A2 /* DocumentTests.swift in Sources */,
+				924C2B7A35DD5F3985A29406 /* EssentialsTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F80DE5E07D91A5D5C96C6463 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 823E094DE8C5F7BF20647083 /* ItsPaint */;
+			targetProxy = 1F013A78F793D13BB87E043C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		40BADD89C86156804BD3246C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.10.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		4AE6B2B258372B4BB991A3E1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Resources/ItsPaint.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				INFOPLIST_FILE = App/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshlin.itspaint;
+				PRODUCT_NAME = ItsPaint;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		6F5EA71A70E0D240BF3413F9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.10.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		A3A7599667015B27B085840F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshlin.itspaint.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ItsPaint.app/Contents/MacOS/ItsPaint";
+			};
+			name = Debug;
+		};
+		D74DE18368B972AD884F88C3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshlin.itspaint.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ItsPaint.app/Contents/MacOS/ItsPaint";
+			};
+			name = Release;
+		};
+		ED2C088D8211B0D79EFD6E8E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Resources/ItsPaint.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				INFOPLIST_FILE = App/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshlin.itspaint;
+				PRODUCT_NAME = ItsPaint;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		610764B416048922C39824AF /* Build configuration list for PBXProject "ItsPaint" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				40BADD89C86156804BD3246C /* Debug */,
+				6F5EA71A70E0D240BF3413F9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A32991FD4BB4F9F8D4FD95C0 /* Build configuration list for PBXNativeTarget "ItsPaintTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A3A7599667015B27B085840F /* Debug */,
+				D74DE18368B972AD884F88C3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DF80946FDC320004708D0BF6 /* Build configuration list for PBXNativeTarget "ItsPaint" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ED2C088D8211B0D79EFD6E8E /* Debug */,
+				4AE6B2B258372B4BB991A3E1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		B2A6425770ED11C620D3B90F /* XCLocalSwiftPackageReference "Packages/PaintKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/PaintKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		61964C2B3FE22724FE4E4A8B /* PaintKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PaintKit;
+		};
+		C292D927C6345EE278105A3E /* PaintKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PaintKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = DCB0C1E502362BB2757C6C50 /* Project object */;
+}

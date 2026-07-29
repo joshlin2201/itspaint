@@ -1,0 +1,23 @@
+name: Feature request
+description: Something the app should be able to do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task, not the control — it often has a simpler answer.
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you add?
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      description: >
+        The app's whole premise is that it stays small and learnable in minutes.
+      options:
+        - label: This fits inside an existing tool's options rather than needing a new rail button
+        - label: I have checked the open issues for the same request
