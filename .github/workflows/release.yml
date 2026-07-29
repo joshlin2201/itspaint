@@ -20,7 +20,11 @@ jobs:
   build:
     name: Build release candidate
     runs-on: macos-15
-    timeout-minutes: 30
+    # Generous because notarisation is a queue at Apple, not work we control.
+    # The first submission from a newly issued Developer ID is routinely the
+    # slowest — a 30-minute cap killed one after 26 minutes of "In Progress",
+    # with the build itself having already eaten four of them.
+    timeout-minutes: 90
     steps:
       - name: Resolve release metadata
         id: release
@@ -234,11 +238,25 @@ jobs:
           NOTARISED=false
           if [[ "$SIGNED" == "true" && -n "${NOTARY_APPLE_ID:-}" && -n "${NOTARY_PASSWORD:-}" ]]; then
             echo "Submitting $DMG to the notary service…"
+            SUBMIT_LOG="$RUNNER_TEMP/notarytool.log"
+            set +e
             xcrun notarytool submit "$DMG" \
               --apple-id "$NOTARY_APPLE_ID" \
               --password "$NOTARY_PASSWORD" \
               --team-id "${NOTARY_TEAM_ID:-$SIGN_TEAM}" \
-              --wait --timeout 30m
+              --wait --timeout 60m 2>&1 | tee "$SUBMIT_LOG"
+            SUBMIT_STATUS=${PIPESTATUS[0]}
+            set -e
+            # Surface the id even on failure: a submission that timed out here
+            # usually still completes at Apple, and `notarytool log <id>` is the
+            # only way to find out why it was rejected.
+            SUBMISSION_ID="$(awk '/^ *id: /{print $2; exit}' "$SUBMIT_LOG")"
+            echo "Notarisation submission id: ${SUBMISSION_ID:-unknown}"
+            if [[ $SUBMIT_STATUS -ne 0 ]]; then
+              echo "notarytool failed; inspect with:" >&2
+              echo "  xcrun notarytool log ${SUBMISSION_ID:-<id>} --apple-id … --team-id …" >&2
+              exit $SUBMIT_STATUS
+            fi
             xcrun stapler staple "$DMG"
             xcrun stapler staple "$APP"
             NOTARISED=true
