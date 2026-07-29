@@ -58,5 +58,11 @@ struct DemoSceneTests {
         #expect(first == second)
         #expect(first.pixel(at: PixelPoint(x: 118, y: 122)) != .white)
         #expect(first.pixel(at: PixelPoint(x: 500, y: 328)) != .white)
+        #expect(first.pixel(at: PixelPoint(x: 110, y: 95)) ==
+                RGBA8(r: 23, g: 50, b: 77))
+        #expect(first.pixel(at: PixelPoint(x: 500, y: 543)) ==
+                RGBA8(r: 47, g: 128, b: 237))
+        #expect(first.pixel(at: PixelPoint(x: 405, y: 188)) ==
+                RGBA8(r: 239, g: 106, b: 91))
     }
 }
