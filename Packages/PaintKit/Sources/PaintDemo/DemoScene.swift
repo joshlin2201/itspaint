@@ -1,4 +1,5 @@
 import PaintKit
+import Foundation
 
 enum DemoScene: String, CaseIterable, Sendable {
     case clipboard
@@ -13,10 +14,18 @@ enum DemoScene: String, CaseIterable, Sendable {
         }
     }
 
-    /// Scene artwork is added by the dedicated asset tasks. Keeping this
-    /// fixture-sized canvas here makes the public command contract testable.
     @MainActor
-    func render() -> DemoCanvas {
-        DemoCanvas()
+    func render() -> Bitmap {
+        switch self {
+        case .clipboard:
+            ClipboardMarkupScene.render()
+        case .quickSketch, .transparency:
+            DemoCanvas().engine.canvas
+        }
+    }
+
+    @MainActor
+    func write(to output: URL) throws {
+        try ImageCodec.write(render(), to: output, as: .png)
     }
 }

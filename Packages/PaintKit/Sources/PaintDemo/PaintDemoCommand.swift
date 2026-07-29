@@ -59,7 +59,15 @@ struct PaintDemoCommand {
                 printSceneUsage()
                 return 2
             }
-            return write(scene.render(), to: url(for: arguments[2], currentDirectory: currentDirectory))
+            let output = url(for: arguments[2], currentDirectory: currentDirectory)
+            do {
+                try scene.write(to: output)
+                print("Wrote scene \(scene.rawValue) to \(output.path)")
+                return 0
+            } catch {
+                writeError("Failed: \(error)\n")
+                return 1
+            }
         }
 
         let output = arguments.first.map { url(for: $0, currentDirectory: currentDirectory) }

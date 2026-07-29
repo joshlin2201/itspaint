@@ -1,4 +1,5 @@
 import Foundation
+import PaintKit
 import Testing
 @testable import PaintDemo
 
@@ -12,5 +13,18 @@ struct DemoSceneTests {
         #expect(DemoScene.clipboard.defaultFilename == "clipboard-markup.png")
         #expect(DemoScene.quickSketch.defaultFilename == "quick-sketch.png")
         #expect(DemoScene.transparency.defaultFilename == "transparency.png")
+    }
+
+    @Test("Clipboard markup is fixed, deterministic, and visibly annotated")
+    @MainActor
+    func clipboardMarkup() {
+        let first = ClipboardMarkupScene.render()
+        let second = ClipboardMarkupScene.render()
+
+        #expect((first.width, first.height) == (1000, 640))
+        #expect(first == second)
+        #expect(first.pixel(at: PixelPoint(x: 618, y: 267)) !=
+                first.pixel(at: PixelPoint(x: 618, y: 232)))
+        #expect(first.pixel(at: PixelPoint(x: 388, y: 360))?.a == 255)
     }
 }
