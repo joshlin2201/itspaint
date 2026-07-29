@@ -207,9 +207,22 @@ distribution needs.
    xcrun notarytool submit ItsPaint.dmg --keychain-profile "AC_PASSWORD" --wait
    xcrun stapler staple ItsPaint.dmg
    ```
-5. **CI.** Export the certificate as a `.p12`, base64 it, and add it plus the
-   app-specific password as repository secrets; `release.yml` imports it into a
-   temporary keychain and runs the same two commands.
+5. **CI.** `release.yml` does the whole thing when the secrets are present:
+
+   | Secret | What it is |
+   |---|---|
+   | `MACOS_CERTIFICATE_P12` | base64 of a `.p12` holding the certificate **and** its private key |
+   | `MACOS_CERTIFICATE_PASSWORD` | the password that `.p12` was exported with |
+   | `NOTARY_APPLE_ID` | the Apple ID holding the membership |
+   | `NOTARY_PASSWORD` | an app-specific password, **not** the account password |
+   | `NOTARY_TEAM_ID` | optional; derived from the certificate when unset |
+
+   Both stages degrade rather than lie. With no certificate the build is
+   ad-hoc and the verification asserts *ad-hoc*; with a certificate but no
+   notary credentials it is signed but unstapled and says so. The install
+   instructions in the release notes are composed from what actually
+   happened, so a build can never tell people to clear a quarantine flag it
+   does not set.
 
 Stapling matters: it writes the notarisation ticket into the disk image so a
 first launch works without a network round-trip to Apple.

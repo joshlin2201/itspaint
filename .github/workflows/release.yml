@@ -53,21 +53,95 @@ jobs:
           xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
             -destination 'platform=macOS' test
 
-      - name: Build universal release
+      # Signing is deliberately not in project.yml: ci.yml builds Release on
+      # every push, and a hardcoded Developer ID identity would fail every one
+      # of those runs on a machine that has no certificate. The identity is
+      # supplied here, where the certificate exists.
+      - name: Import signing certificate
+        id: signing
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
         run: |
           set -euo pipefail
-          xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
-            -configuration Release -destination 'generic/platform=macOS' \
-            -derivedDataPath build ARCHS="arm64 x86_64" \
-            ONLY_ACTIVE_ARCH=NO build
+          if [[ -z "${CERT_P12:-}" ]]; then
+            echo "::warning::No MACOS_CERTIFICATE_P12 secret — falling back to ad-hoc signing."
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-      # The public beta is ad-hoc signed until Developer ID and notarisation
-      # credentials are installed as repository secrets. Verify exactly what
-      # we ship rather than implying Gatekeeper approval it does not have.
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          P12="$RUNNER_TEMP/certificate.p12"
+
+          printf '%s' "$CERT_P12" | base64 --decode > "$P12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # Long enough for the whole job; the runner is destroyed afterwards.
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$P12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          # Without this, codesign blocks on a UI prompt no one can answer.
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          # Prepend rather than replace: dropping the login keychain takes the
+          # Apple intermediates with it and the chain stops validating.
+          security list-keychains -d user -s "$KEYCHAIN" \
+            $(security list-keychains -d user | sed -e 's/^ *//' -e 's/"//g')
+          rm -f "$P12"
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | awk -F'"' '/Developer ID Application/ {print $2; exit}')"
+          if [[ -z "$IDENTITY" ]]; then
+            echo "The certificate imported but no Developer ID Application identity resolved." >&2
+            exit 1
+          fi
+          # Derived from the identity rather than carried as its own secret, so
+          # the two can never disagree about which team is signing.
+          TEAM="$(sed -n 's/.*(\([A-Z0-9]\{10\}\))$/\1/p' <<< "$IDENTITY")"
+          test -n "$TEAM"
+
+          echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
+          echo "team=$TEAM" >> "$GITHUB_OUTPUT"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "Signing as: $IDENTITY"
+
+      - name: Build universal release
+        env:
+          SIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+          SIGN_TEAM: ${{ steps.signing.outputs.team }}
+        run: |
+          set -euo pipefail
+          ARGS=(
+            -project ItsPaint.xcodeproj -scheme ItsPaint
+            -configuration Release -destination 'generic/platform=macOS'
+            -derivedDataPath build ARCHS="arm64 x86_64"
+            ONLY_ACTIVE_ARCH=NO
+          )
+          if [[ "$SIGN_IDENTITY" != "-" ]]; then
+            # --timestamp is not optional: the notary service rejects a
+            # signature without a secure timestamp.
+            ARGS+=(
+              CODE_SIGN_IDENTITY="$SIGN_IDENTITY"
+              DEVELOPMENT_TEAM="$SIGN_TEAM"
+              OTHER_CODE_SIGN_FLAGS="--timestamp"
+            )
+          fi
+          xcodebuild "${ARGS[@]}" build
+
+      # Verify exactly what we ship rather than implying Gatekeeper approval it
+      # does not have. Both paths are asserted: an ad-hoc build must say ad-hoc,
+      # and a Developer ID build must carry the expected team and a timestamp.
       - name: Package
         env:
           VERSION: ${{ steps.release.outputs.version }}
           EXPECTED_BUNDLE_VERSION: ${{ steps.release.outputs.bundle_version }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
+          SIGN_TEAM: ${{ steps.signing.outputs.team }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
         run: |
           set -euo pipefail
           APP="$GITHUB_WORKSPACE/build/Build/Products/Release/ItsPaint.app"
@@ -105,7 +179,23 @@ jobs:
             fi
           done
           SIGNATURE_INFO="$(codesign -dv --verbose=4 "$APP" 2>&1)"
-          if [[ "$SIGNATURE_INFO" != *"Signature=adhoc"* ]]; then
+          if [[ "$SIGNED" == "true" ]]; then
+            if [[ "$SIGNATURE_INFO" != *"Authority=Developer ID Application"* ]]; then
+              echo "Expected a Developer ID signature, got:" >&2
+              echo "$SIGNATURE_INFO" >&2
+              exit 1
+            fi
+            if [[ "$SIGNATURE_INFO" != *"TeamIdentifier=$SIGN_TEAM"* ]]; then
+              echo "Signed by an unexpected team; wanted $SIGN_TEAM" >&2
+              exit 1
+            fi
+            # No timestamp means the notary service will reject it later, and
+            # it is far cheaper to find that out here than after a submission.
+            if [[ "$SIGNATURE_INFO" != *"Timestamp="* ]]; then
+              echo "Expected a secure timestamp in the Release signature" >&2
+              exit 1
+            fi
+          elif [[ "$SIGNATURE_INFO" != *"Signature=adhoc"* ]]; then
             echo "Expected an ad-hoc signature" >&2
             exit 1
           fi
@@ -125,12 +215,54 @@ jobs:
           ln -s /Applications "$STAGING/Applications"
           hdiutil create -volname "ItsPaint $VERSION" -srcfolder "$STAGING" \
             -ov -format UDZO "$DMG"
+
+          # Notarise the disk image, then staple both it and the app inside it.
+          #
+          # One submission covers both: the notary service tickets the app's
+          # cdhash as well as the container, so `stapler staple` on the .app
+          # finds a ticket without a second round trip. The zip is built from
+          # the stapled app afterwards — a zip cannot carry a ticket itself,
+          # only the app inside it can.
+          #
+          # Stapling is what makes a first launch work with no network. Without
+          # it Gatekeeper has to ask Apple, and an offline user sees the app
+          # refuse to open.
+          # A plain shell variable, *not* $GITHUB_ENV, because this same step
+          # branches on it below — anything written to $GITHUB_ENV only reaches
+          # later steps, so reading it back here would silently always be false
+          # and quietly skip the verification underneath.
+          NOTARISED=false
+          if [[ "$SIGNED" == "true" && -n "${NOTARY_APPLE_ID:-}" && -n "${NOTARY_PASSWORD:-}" ]]; then
+            echo "Submitting $DMG to the notary service…"
+            xcrun notarytool submit "$DMG" \
+              --apple-id "$NOTARY_APPLE_ID" \
+              --password "$NOTARY_PASSWORD" \
+              --team-id "${NOTARY_TEAM_ID:-$SIGN_TEAM}" \
+              --wait --timeout 30m
+            xcrun stapler staple "$DMG"
+            xcrun stapler staple "$APP"
+            NOTARISED=true
+          else
+            echo "::warning::Not notarised — NOTARY_APPLE_ID / NOTARY_PASSWORD are unset."
+          fi
+          # And for the release-notes step, which is a later step.
+          echo "NOTARISED=$NOTARISED" >> "$GITHUB_ENV"
+
+          # Built after stapling so the archive carries the ticket too.
           ditto -c -k --keepParent "$APP" "$ZIP"
 
           hdiutil verify "$DMG"
           ditto -x -k "$ZIP" "$VERIFY_DIR"
           codesign --verify --deep --strict --verbose=2 "$VERIFY_DIR/ItsPaint.app"
 
+          # The assessment Gatekeeper itself will make on a user's Mac.
+          if [[ "$NOTARISED" == "true" ]]; then
+            spctl -a -vvv -t exec "$VERIFY_DIR/ItsPaint.app"
+            xcrun stapler validate "$DMG"
+            xcrun stapler validate "$VERIFY_DIR/ItsPaint.app"
+          fi
+
+          # Last, because stapling rewrites the files it tickets.
           (
             cd "$DIST"
             shasum -a 256 "ItsPaint-$VERSION.dmg" "ItsPaint-$VERSION.zip" > checksums.txt
@@ -146,6 +278,30 @@ jobs:
             dist/checksums.txt
           if-no-files-found: error
           compression-level: 0
+
+      # The install instructions have to match what was actually produced.
+      # Telling a notarised build's users to clear a quarantine flag teaches
+      # them to do it reflexively, which is a habit worth not creating.
+      - name: Compose install instructions
+        id: install
+        run: |
+          set -euo pipefail
+          {
+            echo 'text<<INSTALL_EOF'
+            echo '1. Download the `.dmg`, open it, drag **ItsPaint** to Applications.'
+            if [[ "${NOTARISED:-false}" == "true" ]]; then
+              echo '2. Open it. The build is signed with a Developer ID and notarised'
+              echo '   by Apple, so Gatekeeper lets it through with no extra steps.'
+            else
+              echo '2. This build is **not notarised**. Control-click the app, choose'
+              echo '   **Open**, then confirm **Open**. If macOS still blocks it, clear'
+              echo '   the download quarantine once:'
+              echo '   ```'
+              echo '   xattr -dr com.apple.quarantine /Applications/ItsPaint.app'
+              echo '   ```'
+            fi
+            echo 'INSTALL_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create draft release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
@@ -165,13 +321,7 @@ jobs:
             Built from `${{ steps.release.outputs.tag }}` by GitHub Actions.
 
             ## Install
-            1. Download the `.dmg`, open it, drag **ItsPaint** to Applications.
-            2. The beta is ad-hoc signed, not notarised. Control-click the app,
-               choose **Open**, then confirm **Open**. If macOS still blocks it,
-               clear the download quarantine once:
-               ```
-               xattr -dr com.apple.quarantine /Applications/ItsPaint.app
-               ```
+            ${{ steps.install.outputs.text }}
 
             Verify your download against `checksums.txt`. Full notes are in
             [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.release.outputs.tag }}/CHANGELOG.md).
