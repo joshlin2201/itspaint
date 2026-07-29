@@ -31,4 +31,20 @@ struct DemoSceneTests {
         #expect(first.pixel(at: PixelPoint(x: 500, y: 361)) !=
                 unmarked.pixel(at: PixelPoint(x: 500, y: 361)))
     }
+
+    @Test("Clipboard photo source has no poster-like horizon seam")
+    @MainActor
+    func clipboardMarkupPhotoSource() {
+        let source = ClipboardMarkupScene.unmarkedSource()
+        let abruptColumns = (48..<478).filter { x in
+            let above = source.pixel(at: PixelPoint(x: x, y: 291))!
+            let below = source.pixel(at: PixelPoint(x: x, y: 292))!
+            let difference = abs(Int(above.r) - Int(below.r))
+                + abs(Int(above.g) - Int(below.g))
+                + abs(Int(above.b) - Int(below.b))
+            return difference > 48
+        }.count
+
+        #expect(abruptColumns < 100)
+    }
 }

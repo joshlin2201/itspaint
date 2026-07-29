@@ -44,160 +44,15 @@ enum ClipboardMarkupScene {
             into: &source
         )
 
-        // A compact, deterministic travel-photo surrogate: uneven depth
-        // layers, haze, reflections, shoreline detail, and foreground foliage.
-        fillRoundedRect(
-            PixelRect(x: 48, y: 132, width: 430, height: 448),
-            radius: 22,
-            colour: sky.rgba8,
-            into: &source
-        )
-        for y in 132..<306 {
-            let progress = Double(y - 132) / 174
-            Raster.fillRect(
-                PixelRect(x: 48, y: y, width: 430, height: 1),
-                colour: mix(sky, warmWhite, progress * 0.32).rgba8,
-                into: &source
-            )
-        }
-        Raster.fillPolygon(
-            [
-                PixelPoint(x: 76, y: 188), PixelPoint(x: 143, y: 172),
-                PixelPoint(x: 214, y: 187), PixelPoint(x: 270, y: 176),
-                PixelPoint(x: 337, y: 202), PixelPoint(x: 276, y: 211),
-                PixelPoint(x: 188, y: 204), PixelPoint(x: 112, y: 215),
-            ],
-            colour: translucent(warmWhite, alpha: 0.36),
-            into: &source
-        )
-        for y in 292..<496 {
-            let progress = Double(y - 292) / 204
-            Raster.fillRect(
-                PixelRect(x: 48, y: y, width: 430, height: 1),
-                colour: mix(ocean, navy, progress * 0.24).rgba8,
-                into: &source
-            )
-        }
-
-        // Distant headlands overlap instead of forming one geometric wedge.
-        Raster.fillPolygon(
-            [
-                PixelPoint(x: 48, y: 222), PixelPoint(x: 91, y: 205),
-                PixelPoint(x: 129, y: 213), PixelPoint(x: 163, y: 196),
-                PixelPoint(x: 211, y: 218), PixelPoint(x: 244, y: 259),
-                PixelPoint(x: 48, y: 302),
-            ],
-            colour: translucent(slate, alpha: 0.54),
-            into: &source
-        )
-        Raster.fillPolygon(
-            [
-                PixelPoint(x: 48, y: 190), PixelPoint(x: 78, y: 173),
-                PixelPoint(x: 104, y: 183), PixelPoint(x: 131, y: 158),
-                PixelPoint(x: 151, y: 186), PixelPoint(x: 180, y: 169),
-                PixelPoint(x: 199, y: 207), PixelPoint(x: 177, y: 250),
-                PixelPoint(x: 118, y: 270), PixelPoint(x: 48, y: 289),
-            ],
-            colour: slate.rgba8,
-            into: &source
-        )
-
-        let reflectionBrush = Brush(shape: .round, size: 2)
-        for ripple in [
-            (74, 327, 62), (166, 310, 41), (236, 347, 88), (340, 321, 47),
-            (91, 379, 92), (217, 401, 57), (301, 373, 116), (356, 433, 73),
-            (61, 421, 44), (151, 454, 71),
-        ] {
-            Raster.strokeLine(
-                from: PixelPoint(x: ripple.0, y: ripple.1),
-                to: PixelPoint(x: ripple.0 + ripple.2, y: ripple.1 + (ripple.0 % 3) - 1),
-                brush: reflectionBrush,
-                colour: translucent(warmWhite, alpha: 0.30),
-                into: &source
-            )
-        }
-
-        let wetSand = mix(sand, ocean, 0.24)
-        Raster.fillPolygon(
-            [
-                PixelPoint(x: 48, y: 458), PixelPoint(x: 84, y: 451),
-                PixelPoint(x: 126, y: 431), PixelPoint(x: 170, y: 442),
-                PixelPoint(x: 221, y: 435), PixelPoint(x: 265, y: 416),
-                PixelPoint(x: 311, y: 426), PixelPoint(x: 352, y: 408),
-                PixelPoint(x: 405, y: 421), PixelPoint(x: 478, y: 414),
-                PixelPoint(x: 478, y: 580), PixelPoint(x: 48, y: 580),
-            ],
-            colour: wetSand.rgba8,
-            into: &source
-        )
-        Raster.fillPolygon(
-            [
-                PixelPoint(x: 48, y: 475), PixelPoint(x: 91, y: 460),
-                PixelPoint(x: 139, y: 449), PixelPoint(x: 184, y: 458),
-                PixelPoint(x: 233, y: 446), PixelPoint(x: 279, y: 431),
-                PixelPoint(x: 326, y: 440), PixelPoint(x: 374, y: 424),
-                PixelPoint(x: 421, y: 438), PixelPoint(x: 478, y: 431),
-                PixelPoint(x: 478, y: 580), PixelPoint(x: 48, y: 580),
-            ],
-            colour: sand.rgba8,
-            into: &source
-        )
-
-        // Irregular foreground detail keeps the panel from reading like icon art.
-        for rock in [
-            PixelRect(x: 297, y: 465, width: 25, height: 10),
-            PixelRect(x: 333, y: 446, width: 12, height: 7),
-            PixelRect(x: 195, y: 491, width: 18, height: 8),
-            PixelRect(x: 436, y: 474, width: 21, height: 9),
-        ] {
-            Raster.fillEllipse(in: rock, colour: translucent(slate, alpha: 0.48), into: &source)
-        }
-        let branchBrush = Brush(shape: .round, size: 3)
-        Raster.strokeLine(
-            from: PixelPoint(x: 431, y: 304), to: PixelPoint(x: 426, y: 232),
-            brush: branchBrush, colour: navy.rgba8, into: &source
-        )
-        for branch in [
-            (426, 245, 400, 226), (428, 256, 454, 236),
-            (427, 268, 397, 255), (429, 277, 456, 262),
-        ] {
-            Raster.strokeLine(
-                from: PixelPoint(x: branch.0, y: branch.1),
-                to: PixelPoint(x: branch.2, y: branch.3),
-                brush: branchBrush,
-                colour: navy.rgba8,
-                into: &source
-            )
-        }
-        Raster.fillPolygon(
-            [
-                PixelPoint(x: 390, y: 247), PixelPoint(x: 398, y: 224),
-                PixelPoint(x: 413, y: 218), PixelPoint(x: 420, y: 203),
-                PixelPoint(x: 437, y: 211), PixelPoint(x: 448, y: 226),
-                PixelPoint(x: 462, y: 233), PixelPoint(x: 468, y: 253),
-                PixelPoint(x: 453, y: 267), PixelPoint(x: 434, y: 264),
-                PixelPoint(x: 420, y: 276), PixelPoint(x: 401, y: 268),
-            ],
-            colour: slate.rgba8,
-            into: &source
-        )
-        let grassBrush = Brush(shape: .round, size: 2)
-        for grass in [
-            (62, 522, 53, 492), (75, 529, 82, 487), (94, 521, 111, 481),
-            (448, 529, 438, 484), (463, 535, 454, 475),
-        ] {
-            Raster.strokeLine(
-                from: PixelPoint(x: grass.0, y: grass.1),
-                to: PixelPoint(x: grass.2, y: grass.3),
-                brush: grassBrush,
-                colour: translucent(navy, alpha: 0.68),
-                into: &source
-            )
-        }
-
-        addPhotoTexture(
+        drawTravelPhoto(
             in: PixelRect(x: 48, y: 132, width: 430, height: 448),
-            to: &source
+            navy: navy,
+            warmWhite: warmWhite,
+            ocean: ocean,
+            sky: sky,
+            sand: sand,
+            slate: slate,
+            into: &source
         )
 
         Raster.fillEllipse(
@@ -407,34 +262,105 @@ enum ClipboardMarkupScene {
         )
     }
 
-    private static func translucent(_ colour: PaintColour, alpha: Double) -> RGBA8 {
-        PaintColour(red: colour.red, green: colour.green, blue: colour.blue, alpha: alpha).rgba8
-    }
-
-    private static func addPhotoTexture(in rect: PixelRect, to bitmap: inout Bitmap) {
-        let centreX = Double(rect.minX + rect.width / 2)
-        let centreY = Double(rect.minY + rect.height / 2)
+    private static func drawTravelPhoto(
+        in rect: PixelRect,
+        navy: PaintColour,
+        warmWhite: PaintColour,
+        ocean: PaintColour,
+        sky: PaintColour,
+        sand: PaintColour,
+        slate: PaintColour,
+        into bitmap: inout Bitmap
+    ) {
+        let width = Double(rect.width - 1)
+        let height = Double(rect.height - 1)
         for y in rect.minY..<rect.maxY {
             for x in rect.minX..<rect.maxX {
-                let point = PixelPoint(x: x, y: y)
-                guard let pixel = bitmap.pixel(at: point) else { continue }
-                let base = PaintColour(pixel)
+                let u = Double(x - rect.minX) / width
+                let v = Double(y - rect.minY) / height
                 let hash = (x &* 73_856_093) ^ (y &* 19_349_663)
                 let grain = Double(hash & 255) / 255 - 0.5
-                let wave = sin(Double(x) * 0.071) + sin(Double(y) * 0.053)
-                let dx = abs(Double(x) - centreX) / Double(rect.width / 2)
-                let dy = abs(Double(y) - centreY) / Double(rect.height / 2)
-                let vignette = max(0, dx * dx + dy * dy - 0.42) * 0.055
-                let light = grain * 0.055 + wave * 0.012 - vignette
+
+                let waterVariation = 0.05 * sin(u * 17.0 + v * 5.0)
+                    + 0.025 * sin(u * 39.0 - v * 21.0)
+                var sample = mix(sky, ocean, 0.30 + v * 0.48 + waterVariation)
+
+                // Sunlit stone enters as a broad, defocused foreground mass.
+                let stoneField = v + 0.075 * sin(u * 8.4) + 0.035 * sin(u * 23.0 + v * 4.0)
+                let stoneMask = smoothstep(0.62, 0.91, stoneField)
+                sample = mix(sample, sand, stoneMask * 0.86)
+
+                // Soft, overlapping colour clusters imply out-of-focus foliage
+                // at the crop edges without drawing any leaf or tree symbol.
+                let leftFoliage = blob(u, v, centreX: -0.03, centreY: 0.18, radiusX: 0.26, radiusY: 0.34)
+                    + blob(u, v, centreX: 0.12, centreY: 0.05, radiusX: 0.20, radiusY: 0.22)
+                    + blob(u, v, centreX: 0.05, centreY: 0.40, radiusX: 0.16, radiusY: 0.25)
+                let rightFoliage = blob(u, v, centreX: 1.02, centreY: 0.20, radiusX: 0.22, radiusY: 0.31)
+                    + blob(u, v, centreX: 0.91, centreY: 0.04, radiusX: 0.18, radiusY: 0.19)
+                let foliageDetail = 0.76 + 0.16 * sin(u * 53.0 + v * 29.0)
+                let foliage = min(1, (leftFoliage + rightFoliage) * foliageDetail)
+                sample = mix(sample, slate, foliage * 0.74)
+                sample = mix(sample, navy, foliage * foliage * 0.20)
+
+                // A close blue rail supplies the meeting-point landmark. Both
+                // members use Gaussian falloff so they sit in the same soft
+                // photographic depth as the surroundings instead of becoming
+                // clean diagram lines.
+                let railY = 0.51 + 0.018 * sin(u * 5.2)
+                let railDistance = (v - railY) / 0.034
+                let horizontalRail = exp(-(railDistance * railDistance))
+                let postX = 0.79 + (v - 0.50) * 0.045
+                let postDistance = (u - postX) / 0.032
+                let verticalRail = exp(-(postDistance * postDistance))
+                    * smoothstep(0.24, 0.34, v)
+                let rail = min(1, horizontalRail + verticalRail)
+                sample = mix(sample, navy, min(0.34, rail * 0.28))
+                sample = mix(sample, mix(ocean, sky, 0.38), rail * 0.88)
+
+                let railHighlight = exp(-pow((v - railY + 0.012) / 0.010, 2))
+                    + exp(-pow((u - postX + 0.010) / 0.010, 2))
+                        * smoothstep(0.26, 0.36, v)
+                sample = mix(sample, warmWhite, min(0.52, railHighlight * 0.44))
+
+                // Lens-like light and muted shadow vary continuously across the crop.
+                let flare = blob(u, v, centreX: 0.27, centreY: 0.16, radiusX: 0.34, radiusY: 0.27)
+                let shade = blob(u, v, centreX: 0.58, centreY: 0.88, radiusX: 0.45, radiusY: 0.30)
+                sample = mix(sample, warmWhite, flare * 0.22)
+                sample = mix(sample, slate, shade * 0.13)
+
+                let vignetteX = (u - 0.5) * 2
+                let vignetteY = (v - 0.5) * 2
+                let vignette = max(0, vignetteX * vignetteX + vignetteY * vignetteY - 0.48)
+                let light = grain * 0.038
+                    + 0.014 * sin(u * 71.0 + v * 31.0)
+                    - vignette * 0.035
                 bitmap.setPixel(
                     PaintColour(
-                        red: base.red + light,
-                        green: base.green + light,
-                        blue: base.blue + light
+                        red: sample.red + light,
+                        green: sample.green + light,
+                        blue: sample.blue + light
                     ).rgba8,
-                    at: point
+                    at: PixelPoint(x: x, y: y)
                 )
             }
         }
+    }
+
+    private static func blob(
+        _ x: Double,
+        _ y: Double,
+        centreX: Double,
+        centreY: Double,
+        radiusX: Double,
+        radiusY: Double
+    ) -> Double {
+        let dx = (x - centreX) / radiusX
+        let dy = (y - centreY) / radiusY
+        return exp(-(dx * dx + dy * dy))
+    }
+
+    private static func smoothstep(_ lower: Double, _ upper: Double, _ value: Double) -> Double {
+        let amount = min(1, max(0, (value - lower) / (upper - lower)))
+        return amount * amount * (3 - 2 * amount)
     }
 }
