@@ -93,6 +93,39 @@ struct HeaderButton: View {
     }
 }
 
+/// Share, routed through the responder chain to the document.
+///
+/// An `NSViewRepresentable` rather than a SwiftUI `ShareLink` because the sheet
+/// has to be anchored to *this* button — `ShareLink` anchors to whatever SwiftUI
+/// decides, and a share popover that opens at the far corner of the window
+/// looks like it belongs to something else.
+struct ShareButton: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSButton {
+        let button = NSButton()
+        button.bezelStyle = .accessoryBarAction
+        button.isBordered = false
+        button.imagePosition = .imageOnly
+        button.image = NSImage(
+            systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Share"
+        )
+        button.contentTintColor = .labelColor
+        button.toolTip = "Share…"
+        button.setAccessibilityLabel("Share")
+        // nil target: the document supplies `shareImage(_:)`, exactly like the
+        // File menu item, so the two can never diverge.
+        button.target = nil
+        button.action = #selector(AppCommands.shareImage(_:))
+        button.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ nsView: NSButton, context: Context) {}
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSButton, context: Context) -> CGSize? {
+        CGSize(width: 26, height: 26)
+    }
+}
+
 /// A hairline between two runs inside one group.
 struct HeaderDivider: View {
     var body: some View {
@@ -187,6 +220,10 @@ struct WindowActions: View {
             }
 
             HeaderGroup {
+                // Share is in the File menu, but a markup app's whole purpose
+                // is getting the result to someone else — burying its most
+                // common last step one menu down is the wrong emphasis.
+                ShareButton()
                 HeaderButton(symbol: "doc.on.doc", title: "Duplicate", shortcut: "⇧⌘S") {
                     model.duplicateDocument()
                 }

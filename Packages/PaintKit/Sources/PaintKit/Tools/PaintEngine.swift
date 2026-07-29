@@ -710,6 +710,26 @@ public final class PaintEngine {
     public func paste(_ bitmap: Bitmap) -> PixelRect {
         var dirty = commitFloating()
 
+        // Grow first, so the pasted image is *entirely on the canvas* the
+        // moment it arrives.
+        //
+        // Before this, an image larger than the canvas floated with its edges
+        // outside the document — which meant they were not drawn, its top-left
+        // resize handle sat off the visible area where no click could reach it,
+        // and the window had no idea it should be any bigger. Every one of
+        // those reads as a different bug; they were all this.
+        if growsToFitFloating, bitmap.width > canvas.width || bitmap.height > canvas.height {
+            let wanted = PixelRect(x: 0, y: 0, width: bitmap.width, height: bitmap.height)
+            if let grown = ImageTransform.canvasGrown(
+                canvas, toInclude: wanted, fill: colours.background
+            ) {
+                let before = canvas
+                canvas = grown.canvas
+                recordResize(name: "Fit to pasted image", from: before)
+                dirty = canvas.bounds
+            }
+        }
+
         let origin: PixelPoint
         if let selection, !selection.isEmpty {
             origin = PixelPoint(x: selection.bounds.minX, y: selection.bounds.minY)
@@ -727,16 +747,60 @@ public final class PaintEngine {
         return dirty.union(floating?.frame ?? .empty)
     }
 
-    /// Write floating content into the canvas as one undoable edit.
+    /// Write floating content into the canvas as one undoable edit, growing the
+    /// canvas if the content does not fit inside it.
+    ///
+    /// **Placing something must never destroy part of it.** This used to
+    /// composite against `canvas.bounds` and silently drop whatever fell
+    /// outside — so pasting an image larger than the canvas, or dragging one
+    /// half off the edge, looked fine right up until you clicked away and the
+    /// overhang was gone. The undo stack held the crop, not the original, so
+    /// there was nothing to recover.
+    ///
+    /// Growing is the honest default for a markup app: the canvas is a sheet of
+    /// paper you are annotating, not a fixed frame the content has to earn its
+    /// way into. `growsToFitFloating` exists for the one caller that genuinely
+    /// wants the old behaviour — a stamp clipped to the page.
     @discardableResult
     public func commitFloating() -> PixelRect {
         guard let floating else { return .empty }
         self.floating = nil
 
+        let before = canvas
+        var placement = floating.origin
+
+        if growsToFitFloating, canvas.bounds.union(floating.frame) != canvas.bounds {
+            guard let grown = ImageTransform.canvasGrown(
+                canvas, toInclude: floating.frame, fill: colours.background
+            ) else {
+                // Too large to represent. Fall back to clipping rather than
+                // losing the edit entirely.
+                return compositeClipped(floating, before: before)
+            }
+            canvas = grown.canvas
+            placement = PixelPoint(
+                x: floating.origin.x + grown.offset.dx,
+                y: floating.origin.y + grown.offset.dy
+            )
+            // Any surviving selection now names the wrong pixels — the artwork
+            // moved underneath it. Dropping it is honest; silently leaving a
+            // marquee pointing somewhere else is not.
+            selection = nil
+            lassoPath = []
+            canvas.composite(floating.bitmap, at: placement)
+            recordResize(name: "Paste", from: before)
+            return canvas.bounds
+        }
+
+        return compositeClipped(floating, before: before)
+    }
+
+    /// Whether committing floating content may enlarge the canvas.
+    public var growsToFitFloating = true
+
+    private func compositeClipped(_ floating: FloatingSelection, before: Bitmap) -> PixelRect {
         let target = floating.frame.intersection(canvas.bounds)
         guard !target.isEmpty else { return floating.frame.insetBy(-handleTolerance) }
-
-        let before = canvas
         canvas.composite(floating.bitmap, at: floating.origin)
         recordEdit(name: "Move", before: before, dirty: target)
         return floating.frame.union(target)
@@ -988,17 +1052,29 @@ public final class PaintEngine {
         }
     }
 
-    /// Replace the canvas wholesale (resize, flip, rotate). Recorded as one
-    /// undoable edit when the size is unchanged; a size change clears history
-    /// because patches are addressed in canvas coordinates and would restore
-    /// pixels into the wrong places.
+    /// Replace the canvas wholesale (resize, flip, rotate), as one undoable edit.
+    ///
+    /// A size change used to clear the history outright, because a rect patch is
+    /// addressed in canvas coordinates and restoring one into a differently-sized
+    /// canvas puts pixels in the wrong places. It now records both canvases whole
+    /// instead — so resizing, rotating by an arbitrary angle or cropping is
+    /// undoable like everything else, and the work before it survives.
     public func replaceCanvas(with newCanvas: Bitmap, actionName: String) {
-        guard newCanvas.width == canvas.width && newCanvas.height == canvas.height else {
-            return reset(to: newCanvas)
-        }
         let before = canvas
+        let resized = newCanvas.width != canvas.width || newCanvas.height != canvas.height
         canvas = newCanvas
-        recordEdit(name: actionName, before: before, dirty: canvas.bounds)
+
+        if resized {
+            // A selection or lasso path names coordinates that no longer mean
+            // what they did; keeping them would draw a marquee over unrelated
+            // pixels.
+            selection = nil
+            lassoPath = []
+            recordResize(name: actionName, from: before)
+        } else {
+            recordEdit(name: actionName, before: before, dirty: canvas.bounds)
+        }
+
         floating = nil
         gesture = .idle
     }
@@ -1045,6 +1121,14 @@ public final class PaintEngine {
                 after: RectPatch(capturing: dirty, from: canvas)
             )
         )
+    }
+
+    /// Record an edit that changed the canvas's size.
+    ///
+    /// Whole-canvas rather than a patch, because a patch is addressed in canvas
+    /// coordinates and cannot describe an edit that moved every coordinate.
+    private func recordResize(name: String, from before: Bitmap) {
+        undoStack.record(PixelEdit.resizing(name, from: before, to: canvas))
     }
 
     private func commitSingleShot(

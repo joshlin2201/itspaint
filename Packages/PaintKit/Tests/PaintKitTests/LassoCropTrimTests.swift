@@ -277,14 +277,21 @@ struct TrimTests {
         #expect(engine.canvas.width == 50)
     }
 
-    @Test("Trim clears history because coordinates no longer line up")
-    func trimClearsHistory() {
+    @Test("Trim is undoable and restores the untrimmed canvas")
+    func trimIsUndoable() {
+        // Trim changes the canvas size, which used to clear the history. A size
+        // change now stores both canvases whole, so an over-eager trim is one
+        // ⌘Z away rather than permanent.
         let engine = borderedEngine(border: .white)
         #expect(engine.canUndo)
+        let before = engine.canvas
+
         _ = engine.trimBorders()
-        // Undo patches are addressed in canvas coordinates; keeping them across
-        // a resize would restore pixels into the wrong places.
-        #expect(!engine.canUndo)
+        #expect(engine.canvas.width < before.width)
+        #expect(engine.canUndo)
+
+        engine.undo()
+        #expect(engine.canvas == before, "undo did not restore the untrimmed canvas")
     }
 }
 

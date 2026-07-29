@@ -512,16 +512,31 @@ struct EngineGestureTests {
         #expect(engine.canvas == drawn)
     }
 
-    @Test("Resizing the canvas clears history rather than corrupting it")
-    func resizeClearsHistory() {
+    @Test("Resizing the canvas is undoable, and the work before it survives")
+    func resizeIsUndoable() {
+        // This used to clear the history: a rect patch is addressed in canvas
+        // coordinates, so replaying one into a differently-sized canvas put
+        // pixels in the wrong places, and wiping the stack was the safe way out.
+        // A size change now records both canvases whole, so the resize *and*
+        // everything before it stay reversible.
         let engine = PaintEngine(width: 20, height: 20)
         engine.settings.tool = .pencil
         engine.beginStroke(at: PixelPoint(x: 5, y: 5)); engine.endStroke()
         #expect(engine.canUndo)
+        let drawn = engine.canvas
 
         engine.replaceCanvas(with: Bitmap(width: 40, height: 40), actionName: "Resize")
-        #expect(!engine.canUndo)
         #expect(engine.canvas.width == 40)
+        #expect(engine.canUndo)
+
+        engine.undo()
+        #expect(engine.canvas.width == 20, "undo did not restore the original size")
+        #expect(engine.canvas == drawn, "undo did not restore the pixels drawn before the resize")
+
+        // And the stroke underneath is still reachable.
+        #expect(engine.canUndo)
+        engine.undo()
+        #expect(engine.canvas != drawn)
     }
 }
 

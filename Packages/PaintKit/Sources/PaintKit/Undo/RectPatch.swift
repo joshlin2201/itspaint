@@ -43,10 +43,50 @@ public struct PixelEdit: Equatable, Sendable {
     public let before: RectPatch
     public let after: RectPatch
 
-    public init(name: String, before: RectPatch, after: RectPatch) {
+    /// Whole-canvas snapshots, for the edits that change the canvas's **size**.
+    ///
+    /// A rect patch is addressed in canvas coordinates, so it cannot describe an
+    /// edit that moves every coordinate — restoring one into a differently-sized
+    /// canvas puts pixels in the wrong places. That is why a resize used to wipe
+    /// the history outright.
+    ///
+    /// Pasting now grows the canvas, and paste is far too common an operation to
+    /// leave `⌘Z` doing nothing. So a size change carries both canvases whole.
+    /// The per-stroke cost this file exists to avoid is not incurred: this is
+    /// only ever populated for resizes, which are rare, and the byte budget
+    /// accounts for it like anything else.
+    public let resize: Resize?
+
+    public struct Resize: Equatable, Sendable {
+        public let before: Bitmap
+        public let after: Bitmap
+
+        public init(before: Bitmap, after: Bitmap) {
+            self.before = before
+            self.after = after
+        }
+
+        var byteCount: Int {
+            (before.width * before.height + after.width * after.height)
+                * MemoryLayout<RGBA8>.stride
+        }
+    }
+
+    public init(name: String, before: RectPatch, after: RectPatch, resize: Resize? = nil) {
         self.name = name
         self.before = before
         self.after = after
+        self.resize = resize
+    }
+
+    /// An edit that replaces the whole canvas, size and all.
+    public static func resizing(_ name: String, from before: Bitmap, to after: Bitmap) -> PixelEdit {
+        PixelEdit(
+            name: name,
+            before: RectPatch(rect: .empty, pixels: []),
+            after: RectPatch(rect: .empty, pixels: []),
+            resize: Resize(before: before, after: after)
+        )
     }
 
     /// Capture an edit by running `body` and diffing only the rect it reports
@@ -69,8 +109,15 @@ public struct PixelEdit: Equatable, Sendable {
         )
     }
 
-    public var byteCount: Int { before.byteCount + after.byteCount }
+    public var byteCount: Int {
+        before.byteCount + after.byteCount + (resize?.byteCount ?? 0)
+    }
 
-    public func undo(on bitmap: inout Bitmap) { before.apply(to: &bitmap) }
-    public func redo(on bitmap: inout Bitmap) { after.apply(to: &bitmap) }
+    public func undo(on bitmap: inout Bitmap) {
+        if let resize { bitmap = resize.before } else { before.apply(to: &bitmap) }
+    }
+
+    public func redo(on bitmap: inout Bitmap) {
+        if let resize { bitmap = resize.after } else { after.apply(to: &bitmap) }
+    }
 }

@@ -331,3 +331,95 @@ struct RectangleHandleTests {
         #expect(crossed.minX < crossed.maxX)
     }
 }
+
+/// Placing content must never destroy part of it.
+///
+/// `commitFloating` used to composite against `canvas.bounds` and drop whatever
+/// fell outside. Pasting an image larger than the canvas, or dragging one half
+/// off the edge, looked correct right up until you clicked away — and because
+/// the undo stack recorded the crop rather than the original, there was nothing
+/// left to recover.
+@Suite("Committing floating content grows the canvas")
+@MainActor
+struct FloatingGrowthTests {
+
+    private func engine(_ w: Int, _ h: Int) -> PaintEngine {
+        PaintEngine(canvas: Bitmap(width: w, height: h, fill: .white))
+    }
+
+    private func red(_ w: Int, _ h: Int) -> Bitmap {
+        Bitmap(width: w, height: h, fill: PaintColour(hex: "FF0000")!.rgba8)
+    }
+
+    @Test("Pasting an image larger than the canvas enlarges the canvas")
+    func pasteGrowsCanvas() {
+        let e = engine(100, 100)
+        e.paste(red(300, 200))
+        #expect(e.canvas.width == 300)
+        #expect(e.canvas.height == 200)
+        // And it lands fully on-canvas, so every handle is reachable.
+        let frame = try! #require(e.floating).frame
+        #expect(e.canvas.bounds.union(frame) == e.canvas.bounds)
+    }
+
+    @Test("Committing keeps every pixel that was outside the canvas")
+    func commitKeepsOverhang() {
+        let e = engine(100, 100)
+        e.paste(red(40, 40))
+        // Drag it so most of it hangs off the bottom-right.
+        e.moveFloating(to: PixelPoint(x: 80, y: 80))
+        e.commitFloating()
+
+        #expect(e.canvas.width == 120, "the canvas did not grow to hold the overhang")
+        #expect(e.canvas.height == 120)
+        let corner = e.canvas.pixel(at: PixelPoint(x: 119, y: 119))
+        #expect(corner == PaintColour(hex: "FF0000")!.rgba8, "the overhanging corner was cropped")
+    }
+
+    @Test("Content dragged off the top-left shifts the artwork instead of cropping")
+    func commitHandlesNegativeOrigin() {
+        let e = engine(100, 100)
+        e.paste(red(40, 40))
+        e.moveFloating(to: PixelPoint(x: -20, y: -20))
+        e.commitFloating()
+
+        #expect(e.canvas.width == 120)
+        #expect(e.canvas.height == 120)
+        // The pasted square now starts at the origin…
+        #expect(e.canvas.pixel(at: PixelPoint(x: 0, y: 0)) == PaintColour(hex: "FF0000")!.rgba8)
+        // …and the original artwork moved down-right by the same offset rather
+        // than being overwritten.
+        #expect(e.canvas.pixel(at: PixelPoint(x: 119, y: 119)) == PaintColour.white.rgba8)
+    }
+
+    @Test("Growth is one undoable step that restores the original size")
+    func growthUndoesCleanly() {
+        let e = engine(100, 100)
+        let before = (e.canvas.width, e.canvas.height)
+        e.paste(red(300, 200))
+        e.commitFloating()
+        #expect(e.canvas.width == 300)
+
+        while e.canUndo { _ = e.undo() }
+        #expect((e.canvas.width, e.canvas.height) == before, "undo did not restore the canvas size")
+    }
+
+    @Test("Content that already fits does not resize anything")
+    func fittingContentLeavesCanvasAlone() {
+        let e = engine(200, 200)
+        e.paste(red(40, 40))
+        e.commitFloating()
+        #expect(e.canvas.width == 200)
+        #expect(e.canvas.height == 200)
+    }
+
+    @Test("Growth can be turned off, and then it crops as before")
+    func growthIsOptional() {
+        let e = engine(100, 100)
+        e.growsToFitFloating = false
+        e.paste(red(300, 200))
+        #expect(e.canvas.width == 100, "growth was disabled but the canvas grew anyway")
+        e.commitFloating()
+        #expect(e.canvas.width == 100)
+    }
+}

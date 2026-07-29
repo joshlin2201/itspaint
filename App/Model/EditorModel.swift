@@ -271,6 +271,7 @@ final class EditorModel {
     func noteChange(_ dirty: PixelRect) {
         guard !dirty.isEmpty else { return }
         revision &+= 1
+        noteCanvasSizeIfChanged()
         onCanvasChanged?(dirty)
 
         // Distinguish a *new* edit from an undo/redo replay. Only the former
@@ -296,6 +297,25 @@ final class EditorModel {
     @ObservationIgnored private var lastKnownUndoCount: Int = 0
     @ObservationIgnored var onCanvasChanged: ((PixelRect) -> Void)?
     @ObservationIgnored var onEditCommitted: ((String) -> Void)?
+    /// Fires when the canvas changes *size*, so the window can follow it.
+    ///
+    /// The window is sized to the artwork at open and then never again, which
+    /// was fine while the canvas was fixed — but pasting now grows it, and a
+    /// document that silently becomes larger than its window is one you have to
+    /// go and resize by hand before you can see what you just pasted.
+    @ObservationIgnored var onCanvasResized: ((_ width: Int, _ height: Int) -> Void)?
+
+    @ObservationIgnored private var lastKnownCanvasSize: (width: Int, height: Int)?
+
+    /// Notice a size change and tell whoever is listening. Called from the one
+    /// place every pixel change already funnels through.
+    private func noteCanvasSizeIfChanged() {
+        let size = (canvas.width, canvas.height)
+        defer { lastKnownCanvasSize = size }
+        guard let last = lastKnownCanvasSize else { return }
+        guard last != size else { return }
+        onCanvasResized?(size.0, size.1)
+    }
 
     /// Pulls engine-side changes (eyedropper, paste's tool switch) back to the UI.
     func syncFromEngine() {
@@ -452,36 +472,13 @@ final class EditorModel {
         }
     }
 
-    /// Paste, then grow the canvas if the content does not fit — so dropping in
-    /// a big screenshot shows all of it instead of silently cropping.
-    func pasteFittingCanvas() {
-        let bitmap: Bitmap
-        do {
-            bitmap = try readPasteboardBitmap()
-        } catch {
-            presentImageImportError(error)
-            return
-        }
-
-        if bitmap.width > canvas.width || bitmap.height > canvas.height {
-            let target = (
-                width: max(canvas.width, bitmap.width),
-                height: max(canvas.height, bitmap.height)
-            )
-            guard Bitmap.isSizeSupported(width: target.width, height: target.height) else {
-                presentUnsupportedImageSize(width: target.width, height: target.height)
-                return
-            }
-            let grown = ImageTransform.resizedCanvas(
-                canvas,
-                to: target,
-                fill: background
-            )
-            engine.replaceCanvas(with: grown, actionName: "Fit to pasted image")
-        }
-        noteChange(engine.paste(bitmap))
-        syncFromEngine()
-    }
+    /// Paste, growing the canvas to hold the image.
+    ///
+    /// Now the same thing `paste()` does — the engine grows on arrival and on
+    /// commit, so there is no longer a version of paste that crops. Kept as its
+    /// own command because `⇧⌘V` is in the menu and in muscle memory, and
+    /// because "Paste and Fit" states the intent that plain Paste now shares.
+    func pasteFittingCanvas() { paste() }
 
     /// Place a dropped or pasted image centred on `point`, growing the canvas
     /// first if it would not otherwise fit.

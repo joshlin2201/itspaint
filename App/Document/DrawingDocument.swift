@@ -24,13 +24,15 @@ final class DrawingDocument: NSDocument {
     // MARK: - Lifecycle
 
     override init() {
-        let canvas = Bitmap(
-            width: Self.defaultCanvasSize.width,
-            height: Self.defaultCanvasSize.height,
-            fill: .white
-        )
+        // The user's preferred size, falling back to the built-in default. The
+        // constant stays as the fallback rather than being replaced, so a
+        // corrupt or missing preference cannot produce a document with no
+        // canvas at all.
+        let size = Settings.shared.newCanvasSize
+        let canvas = Bitmap(width: size.width, height: size.height, fill: .white)
         model = EditorModel(canvas: canvas)
         super.init()
+        Settings.shared.apply(to: model)
         wireModel()
     }
 
@@ -97,32 +99,14 @@ final class DrawingDocument: NSDocument {
         //
         // The chrome floats *over* the canvas in this direction, so it claims
         // no space of its own; the gap below is a hairline, not a reservation.
-        let visible = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
-        let ceiling = NSSize(width: visible.width * 0.94, height: visible.height * 0.94)
-
-        // Scale down only if the artwork is bigger than the screen allows.
-        let fit = min(
-            1,
-            min(
-                (ceiling.width - Tokens.Chrome.frameGap * 2) / Double(model.canvas.width),
-                (ceiling.height - Tokens.Chrome.frameGap * 2) / Double(model.canvas.height)
-            )
+        let sized = Self.windowFit(
+            forCanvas: (model.canvas.width, model.canvas.height),
+            on: NSScreen.main
         )
-        model.setZoomExact(fit)
-
-        let contentSize = NSSize(
-            width: min(
-                max(Double(model.canvas.width) * fit + Tokens.Chrome.frameGap * 2, 560),
-                ceiling.width
-            ),
-            height: min(
-                max(Double(model.canvas.height) * fit + Tokens.Chrome.frameGap * 2, 420),
-                ceiling.height
-            )
-        )
+        model.setZoomExact(sized.zoom)
 
         let window = NSWindow(contentViewController: hosting)
-        window.setContentSize(contentSize)
+        window.setContentSize(sized.contentSize)
         window.minSize = NSSize(width: 560, height: 420)
         window.title = displayName
 
@@ -142,9 +126,85 @@ final class DrawingDocument: NSDocument {
 
         syncDocumentIdentity()
 
+        // Follow the artwork when it grows — pasting a screenshot larger than
+        // the canvas now enlarges the canvas, and a document that quietly
+        // outgrows its window is one you have to resize by hand before you can
+        // see what you just pasted.
+        model.onCanvasResized = { [weak window, weak self] width, height in
+            guard let window, let self, Settings.shared.resizeWindowWithCanvas else { return }
+            self.growWindow(window, toFitCanvas: (width, height))
+        }
+
         let controller = NSWindowController(window: window)
         controller.shouldCascadeWindows = true
         addWindowController(controller)
+    }
+
+    /// The window size and zoom a canvas of `size` wants.
+    ///
+    /// Shared by the open path and the grow path so a window opened at 1000×640
+    /// and a window grown to 1000×640 are the same window.
+    static func windowFit(
+        forCanvas size: (width: Int, height: Int), on screen: NSScreen?
+    ) -> (contentSize: NSSize, zoom: Double) {
+        // Size the WINDOW to the artwork, not the artwork to a fixed window.
+        //
+        // Canvas-first means the frame should be barely perceptible, and
+        // fitting a 1000×640 image into a window sized to 86% of a 6K display
+        // cannot achieve that — the only ways to close the gap are to magnify
+        // the artwork (which lies about pixel art) or to shrink the window to
+        // the art. The second is honest, and it is what Preview does.
+        let visible = screen?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
+        let ceiling = NSSize(width: visible.width * 0.94, height: visible.height * 0.94)
+
+        // Scale down only if the artwork is bigger than the screen allows.
+        let zoom = min(
+            1,
+            min(
+                (ceiling.width - Tokens.Chrome.frameGap * 2) / Double(max(1, size.width)),
+                (ceiling.height - Tokens.Chrome.frameGap * 2) / Double(max(1, size.height))
+            )
+        )
+        let contentSize = NSSize(
+            width: min(
+                max(Double(size.width) * zoom + Tokens.Chrome.frameGap * 2, 560),
+                ceiling.width
+            ),
+            height: min(
+                max(Double(size.height) * zoom + Tokens.Chrome.frameGap * 2, 420),
+                ceiling.height
+            )
+        )
+        return (contentSize, zoom)
+    }
+
+    /// Enlarge the window to hold a grown canvas, keeping it on screen.
+    ///
+    /// **Only ever grows.** Shrinking would fight a window the user has
+    /// deliberately sized, and cropping a canvas is a far rarer intent than
+    /// pasting into one.
+    private func growWindow(_ window: NSWindow, toFitCanvas size: (width: Int, height: Int)) {
+        let wanted = Self.windowFit(forCanvas: size, on: window.screen ?? NSScreen.main).contentSize
+        let current = window.contentLayoutRect.size
+        guard wanted.width > current.width + 1 || wanted.height > current.height + 1 else { return }
+
+        let target = NSSize(
+            width: max(current.width, wanted.width),
+            height: max(current.height, wanted.height)
+        )
+        // Grow from the window's own centre rather than its bottom-left, which
+        // is what `setContentSize` alone does — a window that expands downward
+        // off the screen edge is worse than one that did not grow at all.
+        var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: target))
+        frame.origin = NSPoint(
+            x: window.frame.midX - frame.width / 2,
+            y: window.frame.midY - frame.height / 2
+        )
+        if let visible = (window.screen ?? NSScreen.main)?.visibleFrame {
+            frame.origin.x = min(max(frame.minX, visible.minX), visible.maxX - frame.width)
+            frame.origin.y = min(max(frame.minY, visible.minY), visible.maxY - frame.height)
+        }
+        window.setFrame(frame, display: true, animate: true)
     }
 
     // MARK: - Concurrency contract for file I/O

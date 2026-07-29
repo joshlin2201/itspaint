@@ -181,6 +181,38 @@ public enum ImageTransform {
         return out
     }
 
+    /// Grow the canvas so `rect` fits inside it, returning the new bitmap and
+    /// how far the original artwork moved.
+    ///
+    /// `resizedCanvas` can only ever extend right and down, because it anchors
+    /// the original at the origin. Content dragged off the *top-left* needs the
+    /// existing artwork to shift instead — so this returns the offset, and every
+    /// coordinate the caller is still holding (a selection, a floating origin)
+    /// has to be moved by it.
+    public static func canvasGrown(
+        _ bitmap: Bitmap, toInclude rect: PixelRect, fill: PaintColour = .white
+    ) -> (canvas: Bitmap, offset: (dx: Int, dy: Int))? {
+        let union = bitmap.bounds.union(rect)
+        guard union != bitmap.bounds else { return (bitmap, (0, 0)) }
+        guard Bitmap.isSizeSupported(width: union.width, height: union.height) else { return nil }
+
+        let dx = -union.minX
+        let dy = -union.minY
+        var out = Bitmap(width: union.width, height: union.height, fill: fill.rgba8)
+        // Replace rather than blend, for the same reason `resizedCanvas` does:
+        // a transparent source pixel must stay transparent instead of picking
+        // up the new canvas fill.
+        for y in 0..<bitmap.height {
+            for x in 0..<bitmap.width {
+                out.setPixel(
+                    bitmap.unsafePixel(at: PixelPoint(x: x, y: y)),
+                    at: PixelPoint(x: x + dx, y: y + dy)
+                )
+            }
+        }
+        return (out, (dx, dy))
+    }
+
     // MARK: - Resampling
 
     /// Scale the artwork to a new pixel size.

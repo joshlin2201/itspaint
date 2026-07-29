@@ -97,20 +97,70 @@ extension DrawingDocument {
     @IBAction func copyWholeImage(_ sender: Any?) { model.copyWholeImage() }
 
     /// The system share sheet, anchored to the window it came from.
+    /// The system share sheet, anchored to whatever asked for it.
+    ///
+    /// **Shares a file URL, not an `NSImage`.** The picker accepts both, but an
+    /// in-memory image has no name — so AirDrop sends "Image", Mail attaches an
+    /// untitled file, and Notes files it as an unnamed attachment. A real `.png`
+    /// on disk named after the document gets the full service list *and* keeps
+    /// the name at the other end, which is the whole point of sharing it.
+    ///
+    /// The file goes to a temporary directory the sandbox already grants, and
+    /// the system copies it into whichever service the user picks.
     @IBAction func shareImage(_ sender: Any?) {
         guard let window = windowControllers.first?.window,
-              let view = window.contentView,
-              let data = try? ImageCodec.encode(model.canvas, as: .png),
-              let image = NSImage(data: data)
+              let view = window.contentView
         else { return }
-        let picker = NSSharingServicePicker(items: [image])
-        picker.show(relativeTo: .zero, of: view, preferredEdge: .minY)
+
+        let items: [Any]
+        do {
+            items = [try exportedImageURL()]
+        } catch {
+            // Sharing is not worth failing over — fall back to the image
+            // itself, which still reaches every service that takes one.
+            guard let data = try? ImageCodec.encode(model.canvas, as: .png),
+                  let image = NSImage(data: data)
+            else { return }
+            items = [image]
+        }
+
+        let picker = NSSharingServicePicker(items: items)
+        // Anchored to the control that invoked it where there is one, so the
+        // popover points at the button rather than at the window's corner.
+        if let button = sender as? NSView {
+            picker.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        } else {
+            let anchor = NSRect(
+                x: view.bounds.maxX - Tokens.Space.safeInset,
+                y: view.bounds.maxY - Tokens.Chrome.titleReserve,
+                width: 1, height: 1
+            )
+            picker.show(relativeTo: anchor, of: view, preferredEdge: .minY)
+        }
+    }
+
+    /// Write the canvas to a uniquely-named temporary `.png` for sharing.
+    ///
+    /// Uniquely-named because sharing the same document twice in a session must
+    /// not have the second share silently hand out the first one's pixels.
+    private func exportedImageURL() throws -> URL {
+        let data = try ImageCodec.encode(model.canvas, as: .png)
+        let name = (displayName.isEmpty ? "Untitled" : displayName)
+            .replacingOccurrences(of: "/", with: "-")
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("Share-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true
+        )
+        let url = directory
+            .appendingPathComponent(name)
+            .appendingPathExtension("png")
+        try data.write(to: url, options: .atomic)
+        return url
     }
 
     @IBAction func showSettings(_ sender: Any?) {
-        // Deliberately not implemented yet. Rather than ship a menu item that
-        // opens an empty window, it stays disabled until there is a setting
-        // worth showing — a dead control is a defect, not a placeholder.
+        SettingsWindowController.show()
     }
 
     /// Reflect state in the menu: checkmarks for toggles, and disable the
@@ -171,8 +221,6 @@ extension DrawingDocument {
             menuItem.state = model.isTextUnderlined ? .on : .off
             return true
 
-        case #selector(showSettings(_:)):
-            return false
 
         default:
             return super.validateMenuItem(menuItem)
