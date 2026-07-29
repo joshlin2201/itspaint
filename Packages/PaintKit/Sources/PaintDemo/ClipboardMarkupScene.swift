@@ -204,7 +204,7 @@ enum ClipboardMarkupScene {
         engine.settings.brushSize = 9
         engine.colours.foreground = coral
         engine.beginStroke(at: PixelPoint(x: 72, y: 156))
-        engine.beginStroke(at: PixelPoint(x: 534, y: 156))
+        engine.beginStroke(at: PixelPoint(x: 906, y: 156))
 
         engine.settings.tool = .pencil
         engine.settings.brushSize = 3

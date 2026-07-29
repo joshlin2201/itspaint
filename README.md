@@ -16,11 +16,11 @@ window.
 
 <br>
 
-![ItsPaint showing a feature tour drawn with the app](docs/images/editor-window.png)
+![ItsPaint marking up a pasted event-plan screenshot](docs/images/editor-window.png)
 
-<sub>The artwork in this screenshot was produced by PaintKit, the same engine
-used by the editor. The sample is reproducible with
-<code>swift run --package-path Packages/PaintKit paint-demo out.png</code>.</sub>
+<sub>A pasted plan, highlighted and annotated in ItsPaint. Reproduce the canvas
+with <code>swift run --package-path Packages/PaintKit paint-demo --scene
+clipboard out.png</code>.</sub>
 
 </div>
 
@@ -35,6 +35,19 @@ used by the editor. The sample is reproducible with
   above 100%, pixel grids, and live tool footprints.
 - **Native documents and common exports** with no third-party dependencies,
   accounts, telemetry, or cloud service.
+
+## Quick edits, ready to send
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/quick-sketch-window.png" alt="A simple room layout sketched in ItsPaint"></td>
+    <td width="50%"><img src="docs/images/transparency-window.png" alt="A paper-airplane sticker with its background removed in ItsPaint"></td>
+  </tr>
+  <tr>
+    <td><strong>Sketch the idea.</strong> Draw a layout, route, or quick correction.</td>
+    <td><strong>Keep transparency.</strong> Remove a plain background with Instant Alpha.</td>
+  </tr>
+</table>
 
 ## Install
 
