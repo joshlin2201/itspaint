@@ -18,6 +18,7 @@ struct DemoSceneTests {
     @Test("Clipboard markup is fixed, deterministic, and visibly annotated")
     @MainActor
     func clipboardMarkup() {
+        let unmarked = ClipboardMarkupScene.unmarkedSource()
         let first = ClipboardMarkupScene.render()
         let second = ClipboardMarkupScene.render()
 
@@ -25,6 +26,9 @@ struct DemoSceneTests {
         #expect(first == second)
         #expect(first.pixel(at: PixelPoint(x: 618, y: 267)) !=
                 first.pixel(at: PixelPoint(x: 618, y: 232)))
-        #expect(first.pixel(at: PixelPoint(x: 388, y: 360))?.a == 255)
+        #expect(first.pixel(at: PixelPoint(x: 350, y: 360)) !=
+                unmarked.pixel(at: PixelPoint(x: 350, y: 360)))
+        #expect(first.pixel(at: PixelPoint(x: 500, y: 361)) !=
+                unmarked.pixel(at: PixelPoint(x: 500, y: 361)))
     }
 }
