@@ -77,15 +77,33 @@ struct DemoSceneTests {
         #expect(image.pixel(at: PixelPoint(x: 100, y: 500)) == .clear)
         #expect(image.pixel(at: PixelPoint(x: 500, y: 310))?.a == 255)
         #expect(image.pixel(at: PixelPoint(x: 500, y: 310)) != .clear)
-        #expect(image.pixel(at: PixelPoint(x: 660, y: 280)) == .white)
-        #expect(image.pixel(at: PixelPoint(x: 465, y: 220)) ==
+        #expect(image.pixel(at: PixelPoint(x: 632, y: 281)) == .white)
+        #expect(image.pixel(at: PixelPoint(x: 456, y: 230)) ==
                 RGBA8(r: 239, g: 106, b: 91))
-        #expect(image.pixel(at: PixelPoint(x: 420, y: 390)) ==
+        #expect(image.pixel(at: PixelPoint(x: 414, y: 375)) ==
                 RGBA8(r: 47, g: 128, b: 237))
-        #expect(image.pixel(at: PixelPoint(x: 780, y: 300)) ==
+        #expect(image.pixel(at: PixelPoint(x: 741, y: 298)) ==
                 RGBA8(r: 23, g: 50, b: 77))
-        #expect(image.pixel(at: PixelPoint(x: 650, y: 335)) ==
+        #expect(image.pixel(at: PixelPoint(x: 623, y: 328)) ==
                 RGBA8(r: 181, g: 205, b: 214))
         #expect(image == TransparencyScene.render())
+    }
+
+    @Test("Transparency keeps the full sticker in its centred 500 by 300 frame")
+    @MainActor
+    func transparencyFrame() {
+        let image = TransparencyScene.render()
+        let painted = image.pixels.enumerated().filter { $0.element.a > 0 }.map(\.offset)
+        let xs = painted.map { $0 % image.width }
+        let ys = painted.map { $0 / image.width }
+
+        #expect(xs.min() == 250)
+        #expect(xs.max() == 749)
+        #expect(ys.min() == 170)
+        #expect(ys.max() == 469)
+        #expect(image.pixel(at: PixelPoint(x: 249, y: 320)) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 750, y: 320)) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 500, y: 169)) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 500, y: 470)) == .clear)
     }
 }

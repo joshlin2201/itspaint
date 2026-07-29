@@ -9,30 +9,30 @@ enum TransparencyScene {
         let engine = canvas.engine
         let navy = colour("17324D")
         let plane = [
-            point(780, 300), // Nose: the plane is travelling right.
-            point(390, 150), // Long swept main wing.
-            point(470, 290),
-            point(240, 320), // Asymmetric tail.
-            point(410, 490), // Shorter folded underside.
-            point(520, 350),
+            point(741, 298), // Nose: the plane is travelling right.
+            point(388, 170), // Long swept main wing.
+            point(460, 290),
+            point(252, 315), // Asymmetric tail.
+            point(406, 461), // Shorter folded underside.
+            point(505, 341),
         ]
 
         // Every part starts as an opaque shape on a single mint canvas. The
         // connected mint region is removed below through Instant Alpha.
         filledPolygon(
             on: canvas,
-            points: plane.map { point($0.x + 12, $0.y + 12) },
+            points: plane.map { point($0.x + 10, $0.y + 9) },
             colour: colour("B5CDD6")
         )
         filledPolygon(on: canvas, points: plane, colour: .white)
         filledPolygon(
             on: canvas,
-            points: [point(390, 150), point(470, 290), point(610, 258)],
+            points: [point(388, 170), point(460, 290), point(586, 262)],
             colour: colour("EF6A5B")
         )
         filledPolygon(
             on: canvas,
-            points: [point(340, 335), point(520, 350), point(410, 490)],
+            points: [point(342, 328), point(505, 341), point(406, 461)],
             colour: colour("2F80ED")
         )
 
@@ -41,10 +41,10 @@ enum TransparencyScene {
         engine.settings.strokeDash = .solid
         engine.colours.foreground = navy
         polygon(on: canvas, points: plane)
-        line(on: canvas, from: point(470, 290), to: point(780, 300))
-        line(on: canvas, from: point(470, 290), to: point(610, 258))
-        line(on: canvas, from: point(240, 320), to: point(520, 350))
-        line(on: canvas, from: point(340, 335), to: point(410, 490))
+        line(on: canvas, from: point(460, 290), to: point(741, 298))
+        line(on: canvas, from: point(460, 290), to: point(586, 262))
+        line(on: canvas, from: point(252, 315), to: point(505, 341))
+        line(on: canvas, from: point(342, 328), to: point(406, 461))
 
         engine.settings.tool = .select
         engine.settings.selectionKind = .instantAlpha
