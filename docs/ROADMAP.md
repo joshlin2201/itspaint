@@ -4,7 +4,7 @@ Where this goes next, in the order it should go, with the reasoning attached.
 Anything not listed here is not planned; anything in **Not planned** is a settled
 no rather than an open question.
 
-Status: **0.10.0 beta.** The engine and the chrome are done and tested; what
+Status: **0.11.0 beta.** The engine and the chrome are done and tested; what
 remains is depth in markup and the last mile to a shippable release.
 
 ---
@@ -145,19 +145,57 @@ still carry breaking changes to the document format.
 2. Move the entries in `CHANGELOG.md` from **Unreleased** into a new version
    heading with today's date, and update the link refs at the bottom.
 3. Bump `MARKETING_VERSION` in `project.yml`, then `xcodegen generate`.
-4. Tag and push:
+4. Tag the commit **on `public/main`** and push the tag there:
    ```bash
-   git tag v0.10.0 && git push origin main --tags
+   git tag -a v0.11.0 <public/main sha> -m "ItsPaint 0.11.0"
+   git push public v0.11.0
    ```
-5. [`release.yml`](../.github/workflows/release.yml) runs the full suite, builds
-   a universal Release, verifies its bundle version, architectures, ad-hoc
-   signature and sandbox entitlements, then packages a `.dmg` and a `.zip` with
-   `checksums.txt`. It creates a **draft** GitHub Release — marked prerelease
-   automatically while the version starts with `0.` or contains a `-`.
-6. Download the draft artifacts and check the `.dmg` on a clean machine,
-   quarantine flag and all. The release notes tell people to clear it; make
-   sure that instruction is still true. Publish the draft only after that
-   smoke test passes; the workflow never makes a release public automatically.
+   The tag has to point into the published history. `public/main` and the
+   local archive branch share no ancestor — see *Two histories* below — so a
+   tag cut on the archive names a commit the public repo has never seen.
+5. [`release.yml`](../.github/workflows/release.yml) runs the full suite, imports
+   the Developer ID certificate from repository secrets, builds a signed
+   universal Release, then verifies its bundle version, architectures,
+   signature and sandbox entitlements. It submits the disk image for
+   notarisation, staples the ticket to both the image and the app, and packages
+   a `.dmg` and a `.zip` with `checksums.txt`. It creates a **draft** GitHub
+   Release — marked prerelease automatically while the version starts with `0.`
+   or contains a `-`.
+
+   Both signing and notarisation degrade rather than lie: without the
+   certificate the build is ad-hoc and the verification asserts *ad-hoc*, and
+   the install instructions in the release notes are composed from what
+   actually happened.
+
+   **Notarisation is a queue at Apple**, not work the workflow controls, and
+   the first submission from a newly issued Developer ID is routinely the
+   slowest — allow for tens of minutes rather than assuming the couple of
+   minutes later submissions take.
+6. Download the draft artifacts and check the `.dmg` on a clean machine. Verify
+   Gatekeeper accepts it without any manual step:
+   ```bash
+   spctl -a -vvv -t exec /Volumes/ItsPaint*/ItsPaint.app
+   xcrun stapler validate ItsPaint-<version>.dmg
+   ```
+   Publish the draft only after that passes; the workflow never makes a release
+   public automatically.
+
+### Two histories
+
+`origin` is a private archive with the project's full history. `public` is the
+published repository, rooted at a fresh `ItsPaint 0.10.0 public beta` squash.
+**They have no common ancestor**, so `git merge` between them fails outright and
+cherry-pick is the only way to move work across — deliberately, because it is
+also what keeps planning and specification documents out of the public tree.
+
+Land work on the archive branch first, then cherry-pick the implementation
+commits onto a worktree based on `public/main`:
+
+```bash
+git worktree add .worktrees/public-sync public/main
+cd .worktrees/public-sync && git cherry-pick <sha>...
+git push public HEAD:main
+```
 
 **Definition of done for any change here:** the fast suite is green, the change
 has a test that fails without it, the docs that describe it are updated in the
