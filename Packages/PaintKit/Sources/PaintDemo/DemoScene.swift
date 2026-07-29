@@ -19,7 +19,9 @@ enum DemoScene: String, CaseIterable, Sendable {
         switch self {
         case .clipboard:
             ClipboardMarkupScene.render()
-        case .quickSketch, .transparency:
+        case .quickSketch:
+            QuickSketchScene.render()
+        case .transparency:
             DemoCanvas().engine.canvas
         }
     }

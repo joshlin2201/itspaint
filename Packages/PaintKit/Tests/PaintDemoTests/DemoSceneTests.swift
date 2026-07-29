@@ -47,4 +47,16 @@ struct DemoSceneTests {
 
         #expect(abruptColumns < 100)
     }
+
+    @Test("Quick sketch stays a simple two-colour explanation")
+    @MainActor
+    func quickSketch() {
+        let first = QuickSketchScene.render()
+        let second = QuickSketchScene.render()
+
+        #expect((first.width, first.height) == (1000, 640))
+        #expect(first == second)
+        #expect(first.pixel(at: PixelPoint(x: 118, y: 122)) != .white)
+        #expect(first.pixel(at: PixelPoint(x: 500, y: 328)) != .white)
+    }
 }
