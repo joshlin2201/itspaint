@@ -63,7 +63,6 @@ single most surprising thing in the app.
 |---|---|
 | `⌘Z` / `⇧⌘Z` | Undo / redo, named after the operation ("Undo Pencil") |
 | `⌘X` / `⌘C` / `⌘V` | Cut / copy / paste |
-| `⇧⌘V` | Paste and fit — grows the canvas rather than cropping the paste |
 | `⌫` | Delete the selection |
 | `⌘A` / `⇧⌘A` | Select all / deselect |
 | `⇧⌘I` | Invert selection |
@@ -98,7 +97,7 @@ offers a command that does nothing teaches people to distrust it.
 - **File** — New, Open, Open Recent (auto-populated), Close, Save, Save As,
   Duplicate, Rename, Move To, Revert to Saved, Export… (format + scale),
   Copy Whole Image, Share…, Page Setup, Print
-- **Edit** — Undo, Redo, Cut, Copy, Paste, Paste and Fit, Delete, Select All,
+- **Edit** — Undo, Redo, Cut, Copy, Paste, Delete, Select All,
   Deselect, Invert Selection, Crop to Selection, Trim Borders, Swap Colours,
   Emoji & Symbols, Start Dictation
 - **View** — Zoom In/Out/Actual Size/Zoom to Fit, Show Pixel Grid, Move

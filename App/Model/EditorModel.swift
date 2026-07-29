@@ -472,14 +472,6 @@ final class EditorModel {
         }
     }
 
-    /// Paste, growing the canvas to hold the image.
-    ///
-    /// Now the same thing `paste()` does — the engine grows on arrival and on
-    /// commit, so there is no longer a version of paste that crops. Kept as its
-    /// own command because `⇧⌘V` is in the menu and in muscle memory, and
-    /// because "Paste and Fit" states the intent that plain Paste now shares.
-    func pasteFittingCanvas() { paste() }
-
     /// Place a dropped or pasted image centred on `point`, growing the canvas
     /// first if it would not otherwise fit.
     ///

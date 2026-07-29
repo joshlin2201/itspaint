@@ -106,10 +106,6 @@ enum MainMenuBuilder {
         add(to: menu, "Cut", #selector(NSText.cut(_:)), "x")
         add(to: menu, "Copy", #selector(NSText.copy(_:)), "c")
         add(to: menu, "Paste", #selector(NSText.paste(_:)), "v")
-        // Pasting a screenshot larger than the canvas and silently losing its
-        // edges is the classic paste failure; this grows the canvas instead.
-        let pasteFit = add(to: menu, "Paste and Fit", #selector(AppCommands.pasteFitting(_:)), "v")
-        pasteFit.keyEquivalentModifierMask = [.command, .shift]
         add(to: menu, "Delete", #selector(NSText.delete(_:)), "")
         menu.addItem(.separator())
         add(to: menu, "Select All", #selector(NSText.selectAll(_:)), "a")
@@ -341,7 +337,6 @@ enum MainMenuBuilder {
     func toggleBold(_ sender: Any?)
     func toggleItalic(_ sender: Any?)
     func toggleUnderline(_ sender: Any?)
-    func pasteFitting(_ sender: Any?)
     func deselect(_ sender: Any?)
     func invertSelection(_ sender: Any?)
     func zoomToFit(_ sender: Any?)

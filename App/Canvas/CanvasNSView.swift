@@ -199,6 +199,15 @@ final class CanvasNSView: NSView {
             if textEditor == nil {
                 drawAnts(around: frame, context: context)
             } else {
+                // A quiet frame around the live box, so the draggable border is
+                // visible rather than something you have to be told about. The
+                // handles alone imply "resizable" but not "movable".
+                context.saveGState()
+                context.setShouldAntialias(false)
+                context.setStrokeColor(NSColor.controlAccentColor.withAlphaComponent(0.55).cgColor)
+                context.setLineWidth(1)
+                context.stroke(frame.insetBy(dx: -0.5, dy: -0.5))
+                context.restoreGState()
                 drawHandles(around: frame, context: context)
             }
         }
@@ -1592,18 +1601,40 @@ private final class TextEntryView: NSTextView {
     /// `PixelRect.handle(at:tolerance:)` — one tolerance, one tie-break, one
     /// set of edge-crossing rules.
     override func mouseDown(with event: NSEvent) {
-        if let handle = handle(at: convert(event.locationInWindow, from: nil)) {
+        let local = convert(event.locationInWindow, from: nil)
+
+        if let handle = handle(at: local) {
             track(event) { [weak self] point in self?.onResize?(handle, point) }
             return
         }
-        // ⌘-drag moves the box. The modifier as well as the handles, because
-        // grabbing the middle of a text box has to keep meaning "select text".
-        guard event.modifierFlags.contains(.command) else { return super.mouseDown(with: event) }
-        var last = event.locationInWindow
-        track(event) { [weak self] point in
-            self?.onMove?(NSPoint(x: point.x - last.x, y: last.y - point.y))
-            last = point
+
+        // **Dragging the border moves the box**, with no modifier.
+        //
+        // ⌘-drag still works and is still documented, but a modifier is a thing
+        // you have to be told about, and a text box you cannot reposition by
+        // dragging is the single most common complaint about this tool. The
+        // border is the only region that can carry it: the interior has to keep
+        // meaning "select text", or the box stops being a text field.
+        if isOnBorder(local) || event.modifierFlags.contains(.command) {
+            var last = event.locationInWindow
+            track(event) { [weak self] point in
+                self?.onMove?(NSPoint(x: point.x - last.x, y: last.y - point.y))
+                last = point
+            }
+            return
         }
+
+        super.mouseDown(with: event)
+    }
+
+    /// Whether a point is in the draggable frame around the editable area.
+    private func isOnBorder(_ point: NSPoint) -> Bool {
+        let reach = max(4, (handleTolerance?() ?? 8).rounded())
+        let inner = bounds.insetBy(dx: reach, dy: reach)
+        // An inset that has eaten the whole box would make every click a drag
+        // and leave no way to type into a short one.
+        guard inner.width > reach, inner.height > reach else { return false }
+        return bounds.contains(point) && !inner.contains(point)
     }
 
     /// Follow a drag to its mouse-up, reporting each position in window space.
@@ -1635,13 +1666,29 @@ private final class TextEntryView: NSTextView {
         )
     }
 
-    /// I-beam in the middle, resize arrows on the edges — the same cursors the
-    /// canvas shows for a floating selection's handles.
+    /// I-beam in the middle, an open hand on the draggable border, resize arrows
+    /// on the handles — the same cursors the canvas shows for a floating
+    /// selection, so the two objects behave alike under the pointer.
+    ///
+    /// Ordered innermost-last because later rects win: the border sits over the
+    /// I-beam, and the handles sit over the border.
     override func resetCursorRects() {
         discardCursorRects()
         addCursorRect(bounds, cursor: .iBeam)
 
-        let reach = max(3, (handleTolerance?() ?? 8).rounded())
+        let reach = max(4, (handleTolerance?() ?? 8).rounded())
+        // The border, as four strips rather than one inverted rect — cursor
+        // rects cannot have holes.
+        let edges = [
+            NSRect(x: 0, y: 0, width: bounds.width, height: reach),
+            NSRect(x: 0, y: bounds.maxY - reach, width: bounds.width, height: reach),
+            NSRect(x: 0, y: 0, width: reach, height: bounds.height),
+            NSRect(x: bounds.maxX - reach, y: 0, width: reach, height: bounds.height),
+        ]
+        for edge in edges where !edge.intersection(bounds).isEmpty {
+            addCursorRect(edge.intersection(bounds), cursor: .openHand)
+        }
+
         let box = PixelRect(
             x: 0, y: 0,
             width: max(1, Int(bounds.width.rounded())),

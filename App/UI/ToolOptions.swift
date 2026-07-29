@@ -94,7 +94,7 @@ struct ToolOptions: View {
     private var hint: String? {
         switch model.tool {
         case .pencil: "1 px, fixed"
-        case .text: "Drag a box · ⌘-drag moves it · ⌘↩ places it"
+        case .text: "Drag its edge to move · corners resize · ⌘↩ places it"
         case .eyedropper: "Click to load Colour 1 · ⌥ from any tool"
         case .select where model.selectionKind == .lasso: "Trace any shape · it closes itself"
         case .select where model.selectionKind == .instantAlpha:

@@ -51,7 +51,6 @@ extension DrawingDocument {
     @IBAction func cut(_ sender: Any?) { model.cutSelection() }
     @IBAction func copy(_ sender: Any?) { model.copySelection() }
     @IBAction func paste(_ sender: Any?) { model.paste() }
-    @IBAction func pasteFitting(_ sender: Any?) { model.pasteFittingCanvas() }
     @IBAction func delete(_ sender: Any?) { model.deleteSelection() }
     @IBAction func selectAll(_ sender: Any?) { model.selectAll() }
     @IBAction func deselect(_ sender: Any?) { model.deselect() }
@@ -96,7 +95,6 @@ extension DrawingDocument {
 
     @IBAction func copyWholeImage(_ sender: Any?) { model.copyWholeImage() }
 
-    /// The system share sheet, anchored to the window it came from.
     /// The system share sheet, anchored to whatever asked for it.
     ///
     /// **Shares a file URL, not an `NSImage`.** The picker accepts both, but an
@@ -189,7 +187,7 @@ extension DrawingDocument {
             // Always available: with nothing selected it means "select all".
             return true
 
-        case #selector(paste(_:)), #selector(pasteFitting(_:)):
+        case #selector(paste(_:)):
             return model.canPaste
 
         case #selector(selectShapeFromMenu(_:)):

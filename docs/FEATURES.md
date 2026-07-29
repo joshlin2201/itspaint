@@ -174,7 +174,7 @@ macOS reads it but ships no encoder.
 - **Tools** — every tool by name with its key, a Shape submenu with all fifteen
   shapes, plus Swap Colours and Larger / Smaller Brush.
 - **View** — zoom commands, pixel grid, Move Toolbar, Colours…
-- **Edit** — the usual, plus Paste and Fit, Invert Selection, Crop to Selection,
+- **Edit** — the usual, plus Invert Selection, Crop to Selection,
   Trim Borders, Swap Colours.
 - **Right-click on the canvas** — cut, copy, paste, delete, select all, deselect,
   crop, trim, copy whole image, export, swap colours, image size. A right-click

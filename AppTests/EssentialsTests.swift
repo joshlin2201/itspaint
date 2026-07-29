@@ -256,7 +256,7 @@ struct MenuBarTests {
     @Test("Edit carries the full clipboard and selection set")
     func editCommands() {
         let titles = items(in: "Edit")
-        for expected in ["Undo", "Redo", "Cut", "Copy", "Paste", "Paste and Fit",
+        for expected in ["Undo", "Redo", "Cut", "Copy", "Paste",
                          "Select All", "Deselect", "Invert Selection",
                          "Crop to Selection", "Trim Borders"] {
             #expect(titles.contains(expected), "Edit is missing \(expected)")
