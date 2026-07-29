@@ -1,6 +1,6 @@
 # Documentation
 
-Six documents, in the order they are worth reading.
+Six documents about the app, in the order they are worth reading.
 
 | | |
 |---|---|
@@ -10,6 +10,14 @@ Six documents, in the order they are worth reading.
 | **[FEATURES.md](FEATURES.md)** | What every tool and command actually does, including the behaviour that is easy to miss. The reference to check a bug report against. |
 | **[TESTING.md](TESTING.md)** | The testing protocol: what each suite is for, how to write a test that stays useful, the guard tests, and the three app-host failure modes that each cost a day. |
 | **[ROADMAP.md](ROADMAP.md)** | Path forward — now / next / later, what is explicitly not planned, and exactly how a release is cut. |
+
+Three about where it goes and who else is in the space:
+
+| | |
+|---|---|
+| **[COMPETITIVE.md](COMPETITIVE.md)** | The capability map against Windows 11 Paint and macOS Markup, the rest of the field, and the two empty slots the positioning comes from. |
+| **[CAPTURE.md](CAPTURE.md)** | Replacing the screenshot workflow: everything macOS's own capture tools do, four routes in ranked by what they cost the user in permissions, and the integration surfaces that cost nothing. |
+| **[GROWTH.md](GROWTH.md)** | Distribution, where to post and what to say, the utility worth building to attract contributors, and which money models survive the constraints in PHILOSOPHY. |
 
 Two more, kept for the reasoning rather than as current reference:
 
