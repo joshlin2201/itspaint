@@ -86,8 +86,11 @@ already exists.
 - **Notarised releases. Move this to *Now*.** Every install today asks a
   stranger to Control-click, confirm, and possibly run `xattr` in a terminal,
   which is where most first-time users leave. It also gates a Homebrew cask and
-  any paid build. Needs a Developer ID identity in CI secrets. See
-  [GROWTH](GROWTH.md).
+  any paid build. The membership is already paid; what is missing is a
+  **Developer ID Application** certificate issued under that team — the identity
+  currently in the keychain belongs to a free personal team and cannot be
+  notarised. Steps in [MAC_ESSENTIALS](MAC_ESSENTIALS.md) § *Getting off ad-hoc
+  signing*.
 - **A Homebrew cask.** `brew install --cask itspaint` is how Mac developers
   install Mac software. One small PR, permanent discoverability, automatic
   updates. Depends on notarisation.

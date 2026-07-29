@@ -18,10 +18,17 @@ possibly run `xattr -dr com.apple.quarantine` in a terminal. That is a
 catastrophic funnel. Most people who click a Show HN link and hit that screen
 close the tab and assume the app is broken or unsafe.
 
-**Fix:** Apple Developer Program, $99/yr, Developer ID identity in CI secrets,
-`--notarize` in the release workflow. It is already listed under *Later* in
-[ROADMAP](ROADMAP.md); it should be moved to *Now*, because every other item on
-this page multiplies against it.
+**Fix, and it is cheaper than it looks:** the Apple Developer Program membership
+is already paid. What is missing is a **Developer ID Application** certificate
+issued under that paid team — not the membership itself. The certificate that
+exists locally belongs to a *free personal team*, which can only ever issue
+Apple Development certs, and those cannot be notarised.
+
+So the remaining work is a certificate, a `.p12` in CI secrets, and `notarytool`
+plus `stapler` in the release workflow — an afternoon, not a purchase decision.
+Full steps in [MAC_ESSENTIALS](MAC_ESSENTIALS.md) § *Getting off ad-hoc
+signing*. It is listed under *Later* in [ROADMAP](ROADMAP.md); it belongs in
+*Now*, because every other item on this page multiplies against it.
 
 ### 2. There is no `brew install`
 

@@ -164,3 +164,56 @@ missing.
 **Not done, and not automatable from here:** App Store Connect record, pricing,
 screenshots (16:10 at 2880×1800), and submission. Those need the Apple Developer
 account and interactive steps.
+
+### Getting off ad-hoc signing
+
+Releases are ad-hoc signed (`CODE_SIGN_IDENTITY: "-"`, `DEVELOPMENT_TEAM: ""`).
+That is correct for a local build — the sandbox and its entitlements work, and
+it needs no provisioning profile — but Gatekeeper rejects it on anyone else's
+Mac, which is why the README has to tell people to clear the quarantine flag by
+hand.
+
+The membership is not the blocker. What is missing is a **Developer ID
+Application** certificate issued under the *paid* team.
+
+The distinction that costs people an afternoon: a free personal team and a paid
+Developer Program team are different teams with different IDs, and a personal
+team can only ever issue **Apple Development** certificates — which sign for
+your own devices and cannot be notarised. Seeing an identity in the keychain is
+not evidence that the paid team has one.
+
+```bash
+security find-identity -v -p codesigning
+```
+
+If the team ID in that output is not the one on the Developer Program
+membership page, the certificate belongs to a personal team and is not the one
+distribution needs.
+
+1. **Xcode ▸ Settings ▸ Accounts.** Add the Apple ID that holds the paid
+   membership — it is not necessarily the one already signed in — then select
+   the paid team.
+2. **Manage Certificates ▸ + ▸ Developer ID Application.** Only the Account
+   Holder role can create one, and a team is capped at five.
+3. Set `DEVELOPMENT_TEAM` to the paid team ID and
+   `CODE_SIGN_IDENTITY: "Developer ID Application"` in the Release config of
+   `project.yml`, then `xcodegen generate`. Leave `CODE_SIGN_STYLE: Manual`;
+   Hardened Runtime and `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` are already set
+   for Release.
+4. **Notarise.** An app-specific password from appleid.apple.com, then:
+   ```bash
+   xcrun notarytool store-credentials "AC_PASSWORD" \
+     --apple-id <apple-id> --team-id <paid-team-id> --password <app-specific>
+   xcrun notarytool submit ItsPaint.dmg --keychain-profile "AC_PASSWORD" --wait
+   xcrun stapler staple ItsPaint.dmg
+   ```
+5. **CI.** Export the certificate as a `.p12`, base64 it, and add it plus the
+   app-specific password as repository secrets; `release.yml` imports it into a
+   temporary keychain and runs the same two commands.
+
+Stapling matters: it writes the notarisation ticket into the disk image so a
+first launch works without a network round-trip to Apple.
+
+**Renewal.** Notarising new builds requires an active membership. An expired
+one does not break software already notarised and stapled, but nothing new can
+be submitted — so if auto-renew is off, the renewal date is a release deadline.
