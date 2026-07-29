@@ -22,7 +22,7 @@ enum DemoScene: String, CaseIterable, Sendable {
         case .quickSketch:
             QuickSketchScene.render()
         case .transparency:
-            DemoCanvas().engine.canvas
+            TransparencyScene.render()
         }
     }
 

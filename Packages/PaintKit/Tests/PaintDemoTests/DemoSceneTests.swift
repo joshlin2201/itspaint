@@ -65,4 +65,16 @@ struct DemoSceneTests {
         #expect(first.pixel(at: PixelPoint(x: 405, y: 188)) ==
                 RGBA8(r: 239, g: 106, b: 91))
     }
+
+    @Test("Transparency removes the connected background through alpha")
+    @MainActor
+    func transparency() {
+        let image = TransparencyScene.render()
+
+        #expect((image.width, image.height) == (1000, 640))
+        #expect(image.pixel(at: TransparencyScene.backgroundSample) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 500, y: 310))?.a == 255)
+        #expect(image.pixel(at: PixelPoint(x: 500, y: 310)) != .clear)
+        #expect(image == TransparencyScene.render())
+    }
 }
