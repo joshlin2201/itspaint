@@ -15,6 +15,27 @@ struct DemoSceneTests {
         #expect(DemoScene.transparency.defaultFilename == "transparency.png")
     }
 
+    @Test("Every named scene writes a valid distinct PNG")
+    @MainActor
+    func writesEveryScene() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var decoded: [Bitmap] = []
+        for scene in DemoScene.allCases {
+            let output = root.appendingPathComponent(scene.defaultFilename)
+            try scene.write(to: output)
+            let bitmap = try ImageCodec.decode(contentsOf: output)
+            #expect((bitmap.width, bitmap.height) == (1000, 640))
+            decoded.append(bitmap)
+        }
+        #expect(decoded[0] != decoded[1])
+        #expect(decoded[0] != decoded[2])
+        #expect(decoded[1] != decoded[2])
+    }
+
     @Test("Clipboard markup is fixed, deterministic, and visibly annotated")
     @MainActor
     func clipboardMarkup() {
