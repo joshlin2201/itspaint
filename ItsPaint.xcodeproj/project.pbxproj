@@ -12,6 +12,7 @@
 		192AD6C35D59708B6C314B86 /* CanvasNSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D86C72CBA19ADE0DD74D35 /* CanvasNSView.swift */; };
 		1976F8F0D1BA69C8D0910DED /* MainMenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1648F5F1151885FA15DCB653 /* MainMenuBuilder.swift */; };
 		2966C26A04977F9BD83536E9 /* ToolOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */; };
+		382566FBB983772559BF672D /* ToolbarGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */; };
 		397D8480B03F1D4E483412F6 /* CanvasRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CCE83773644C45A0171C62 /* CanvasRenderingTests.swift */; };
 		43DF040CF6A5A908A865E871 /* CanvasScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DC85A97B97F5CFF1EEBFE4 /* CanvasScrollView.swift */; };
 		48905D56B247546BA33C44F8 /* ItsPaintApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E7B1F407FDB6F47C079660 /* ItsPaintApp.swift */; };
@@ -20,6 +21,7 @@
 		57E1D3BD09515B40DFDBEDD9 /* ColourPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EC319E836430BA852D8EDB0 /* ColourPanelController.swift */; };
 		5B6FFEF7D300E81FCAE852C6 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 392ADD8A7EEC36D1855BA3D5 /* DesignTokens.swift */; };
 		62EE08BC08488DAE1C672EB1 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E86C21F2F8518B426159B77 /* EditorView.swift */; };
+		6B8140C107D4A209AD6CD789 /* RotateSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C35AB5A1478944CF8934D3 /* RotateSheet.swift */; };
 		70251274389D468920E0FF44 /* DrawingDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18BC1714C722B756C83FFF6E /* DrawingDocument.swift */; };
 		71B8FC7E198B4F762F94C6A2 /* DocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F4A9F5632360B181403BDA /* DocumentTests.swift */; };
 		736B873DA05CA677039DB143 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 81D5AB95221C3E1A9DD3CFC7 /* Assets.xcassets */; };
@@ -62,6 +64,7 @@
 		7833326AD2D84AF29B6DE601 /* ToolRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolRail.swift; sourceTree = "<group>"; };
 		81D5AB95221C3E1A9DD3CFC7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8468DB5919B3A21F63903298 /* CanvasOverlays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasOverlays.swift; sourceTree = "<group>"; };
+		86C35AB5A1478944CF8934D3 /* RotateSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotateSheet.swift; sourceTree = "<group>"; };
 		8D10B48F97C15A6294B5737E /* Tooltip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tooltip.swift; sourceTree = "<group>"; };
 		BC3E9F635AA81443BB4BF957 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BFEF09B51CF5FC0B71765BA1 /* DocumentCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCommands.swift; sourceTree = "<group>"; };
@@ -70,6 +73,7 @@
 		CA3B7CF910C5BF4084044565 /* PaintKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PaintKit; path = Packages/PaintKit; sourceTree = SOURCE_ROOT; };
 		E80562B1588560C2E61CCE65 /* FixedGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixedGrid.swift; sourceTree = "<group>"; };
 		F2ACA876E800C1AB89C90365 /* SizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeSheet.swift; sourceTree = "<group>"; };
+		F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarGeometryTests.swift; sourceTree = "<group>"; };
 		FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolOptions.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -110,6 +114,7 @@
 				392ADD8A7EEC36D1855BA3D5 /* DesignTokens.swift */,
 				6E86C21F2F8518B426159B77 /* EditorView.swift */,
 				E80562B1588560C2E61CCE65 /* FixedGrid.swift */,
+				86C35AB5A1478944CF8934D3 /* RotateSheet.swift */,
 				F2ACA876E800C1AB89C90365 /* SizeSheet.swift */,
 				FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */,
 				7833326AD2D84AF29B6DE601 /* ToolRail.swift */,
@@ -138,6 +143,7 @@
 				11CCE83773644C45A0171C62 /* CanvasRenderingTests.swift */,
 				54F4A9F5632360B181403BDA /* DocumentTests.swift */,
 				C06E4A12B57303E5FE405DFC /* EssentialsTests.swift */,
+				F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */,
 			);
 			path = AppTests;
 			sourceTree = "<group>";
@@ -313,6 +319,7 @@
 				8CFB1C6C1779CAF721DD34EA /* FixedGrid.swift in Sources */,
 				48905D56B247546BA33C44F8 /* ItsPaintApp.swift in Sources */,
 				1976F8F0D1BA69C8D0910DED /* MainMenuBuilder.swift in Sources */,
+				6B8140C107D4A209AD6CD789 /* RotateSheet.swift in Sources */,
 				D00A7C03ECFC7BC4575AF104 /* SizeSheet.swift in Sources */,
 				2966C26A04977F9BD83536E9 /* ToolOptions.swift in Sources */,
 				530689DA33232E54BB8DFD63 /* ToolRail.swift in Sources */,
@@ -327,6 +334,7 @@
 				397D8480B03F1D4E483412F6 /* CanvasRenderingTests.swift in Sources */,
 				71B8FC7E198B4F762F94C6A2 /* DocumentTests.swift in Sources */,
 				924C2B7A35DD5F3985A29406 /* EssentialsTests.swift in Sources */,
+				382566FBB983772559BF672D /* ToolbarGeometryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

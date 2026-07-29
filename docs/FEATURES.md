@@ -92,10 +92,11 @@ squares and circles.
 
 - **Colour 1 / Colour 2**, overlapped in the rail. Click either for the system
   picker; `X` swaps them.
-- **All 28 swatches, always visible.** Click for Colour 1, right-click for
-  Colour 2.
-- Colours you pick that are not in the palette land in a **recent** run, so the
-  fixed 28 never move.
+- **The palette, always visible**, two swatches across the rail. The bottom bar
+  shows all 28; the narrower side rail shows the leading 14, truncated by column
+  so every swatch keeps its place. Click for Colour 1, right-click for Colour 2.
+- Colours you pick that are not in the palette land in a **recent** run in the
+  popover, so the fixed 28 never move and the toolbar never changes height.
 - `⇧⌘C` opens the fuller swatch popover with hex read-outs and "Other colour…".
 
 ---

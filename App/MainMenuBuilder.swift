@@ -177,6 +177,9 @@ enum MainMenuBuilder {
         add(to: menu, "Rotate 90° Right", #selector(AppCommands.rotateRight(_:)), "]")
         add(to: menu, "Rotate 90° Left", #selector(AppCommands.rotateLeft(_:)), "[")
         add(to: menu, "Rotate 180°", #selector(AppCommands.rotateHalf(_:)), "")
+        // Quarter turns are exact and need no dialog; any other angle resamples
+        // and grows the canvas, so it gets a sheet with a size preview.
+        add(to: menu, "Rotate…", #selector(AppCommands.showRotateSheet(_:)), "")
         menu.addItem(.separator())
         add(to: menu, "Invert Colours", #selector(AppCommands.invertColours(_:)), "i")
         add(to: menu, "Clear Image", #selector(AppCommands.clearImage(_:)), "")
@@ -238,6 +241,19 @@ enum MainMenuBuilder {
         let shapesItem = NSMenuItem(title: "Shape", action: nil, keyEquivalent: "")
         shapesItem.submenu = shapes
         menu.addItem(shapesItem)
+
+        menu.addItem(.separator())
+
+        // Text traits, in the Tools menu rather than a Format menu: this app
+        // has exactly one text tool, and a whole menu bar item for three
+        // toggles would be the ribbon mistake in menu form.
+        let text = NSMenu(title: "Text")
+        add(to: text, "Bold", #selector(AppCommands.toggleBold(_:)), "b")
+        add(to: text, "Italic", #selector(AppCommands.toggleItalic(_:)), "i")
+        add(to: text, "Underline", #selector(AppCommands.toggleUnderline(_:)), "u")
+        let textItem = NSMenuItem(title: "Text", action: nil, keyEquivalent: "")
+        textItem.submenu = text
+        menu.addItem(textItem)
 
         menu.addItem(.separator())
         add(to: menu, "Swap Colours", #selector(AppCommands.swapColours(_:)), "x")
@@ -322,6 +338,9 @@ enum MainMenuBuilder {
 @objc protocol AppCommands {
     func showSettings(_ sender: Any?)
     func swapColours(_ sender: Any?)
+    func toggleBold(_ sender: Any?)
+    func toggleItalic(_ sender: Any?)
+    func toggleUnderline(_ sender: Any?)
     func pasteFitting(_ sender: Any?)
     func deselect(_ sender: Any?)
     func invertSelection(_ sender: Any?)
@@ -329,6 +348,7 @@ enum MainMenuBuilder {
     func cropToSelection(_ sender: Any?)
     func trimBorders(_ sender: Any?)
     func showSizeSheet(_ sender: Any?)
+    func showRotateSheet(_ sender: Any?)
     func zoomIn(_ sender: Any?)
     func zoomOut(_ sender: Any?)
     func zoomActual(_ sender: Any?)

@@ -72,16 +72,39 @@ public struct FloatingSelection: Equatable, Sendable {
 
     // MARK: - Resize handles
 
+    /// Resize handles live on `PixelRect`, because a floating selection is not
+    /// the only thing that gets dragged by its corners — the text box does too,
+    /// and two implementations of "which handle is under this point" is two
+    /// places for the grab tolerance to disagree.
+    public typealias Handle = PixelRect.Handle
+
+    public func handleCentres() -> [(handle: Handle, centre: PixelPoint)] {
+        frame.handleCentres()
+    }
+
+    public func handle(at point: PixelPoint, tolerance: Int) -> Handle? {
+        frame.handle(at: point, tolerance: tolerance)
+    }
+
+    public func frame(draggingHandle handle: Handle, to point: PixelPoint, uniform: Bool) -> PixelRect {
+        frame.dragging(handle, to: point, uniform: uniform)
+    }
+}
+
+// MARK: - Handles on any rectangle
+
+extension PixelRect {
+
     public enum Handle: CaseIterable, Sendable {
         case topLeft, top, topRight
         case left, right
         case bottomLeft, bottom, bottomRight
 
         /// Which edges this handle moves.
-        var movesLeft: Bool { self == .topLeft || self == .left || self == .bottomLeft }
-        var movesRight: Bool { self == .topRight || self == .right || self == .bottomRight }
-        var movesTop: Bool { self == .topLeft || self == .top || self == .topRight }
-        var movesBottom: Bool { self == .bottomLeft || self == .bottom || self == .bottomRight }
+        public var movesLeft: Bool { self == .topLeft || self == .left || self == .bottomLeft }
+        public var movesRight: Bool { self == .topRight || self == .right || self == .bottomRight }
+        public var movesTop: Bool { self == .topLeft || self == .top || self == .topRight }
+        public var movesBottom: Bool { self == .bottomLeft || self == .bottom || self == .bottomRight }
     }
 
     /// Handle centres in canvas coordinates, in a fixed order.
@@ -91,19 +114,19 @@ public struct FloatingSelection: Equatable, Sendable {
     /// and left ties between two equidistant handles to hash order, so which
     /// one you grabbed could differ between runs.
     public func handleCentres() -> [(handle: Handle, centre: PixelPoint)] {
-        let midX = frame.minX + frame.width / 2
-        let midY = frame.minY + frame.height / 2
-        let maxX = frame.maxX - 1
-        let maxY = frame.maxY - 1
+        let midX = minX + width / 2
+        let midY = minY + height / 2
+        let farX = maxX - 1
+        let farY = maxY - 1
         return [
-            (.topLeft, PixelPoint(x: frame.minX, y: frame.minY)),
-            (.top, PixelPoint(x: midX, y: frame.minY)),
-            (.topRight, PixelPoint(x: maxX, y: frame.minY)),
-            (.left, PixelPoint(x: frame.minX, y: midY)),
-            (.right, PixelPoint(x: maxX, y: midY)),
-            (.bottomLeft, PixelPoint(x: frame.minX, y: maxY)),
-            (.bottom, PixelPoint(x: midX, y: maxY)),
-            (.bottomRight, PixelPoint(x: maxX, y: maxY)),
+            (.topLeft, PixelPoint(x: minX, y: minY)),
+            (.top, PixelPoint(x: midX, y: minY)),
+            (.topRight, PixelPoint(x: farX, y: minY)),
+            (.left, PixelPoint(x: minX, y: midY)),
+            (.right, PixelPoint(x: farX, y: midY)),
+            (.bottomLeft, PixelPoint(x: minX, y: farY)),
+            (.bottom, PixelPoint(x: midX, y: farY)),
+            (.bottomRight, PixelPoint(x: farX, y: farY)),
         ]
     }
 
@@ -114,11 +137,11 @@ public struct FloatingSelection: Equatable, Sendable {
     /// subpixel target at 25% would be unusable.
     ///
     /// It is then capped at a third of the shorter side. Without that cap the
-    /// handles of a small selection overlap in the middle and swallow it
+    /// handles of a small rectangle overlap in the middle and swallow it
     /// entirely: every click lands on a handle, and the content can be resized
     /// but never moved.
     public func handle(at point: PixelPoint, tolerance: Int) -> Handle? {
-        let limit = max(1, min(frame.width, frame.height) / 3)
+        let limit = max(1, min(width, height) / 3)
         let effective = min(tolerance, limit)
 
         var best: (handle: Handle, distance: Int)?
@@ -134,38 +157,38 @@ public struct FloatingSelection: Equatable, Sendable {
         return best?.handle
     }
 
-    /// Frame produced by dragging `handle` to `point`.
+    /// The rectangle produced by dragging `handle` to `point`.
     ///
     /// Edges are clamped so they can never cross: dragging the left edge past
     /// the right one keeps a 1px sliver rather than inverting the content.
-    public func frame(draggingHandle handle: Handle, to point: PixelPoint, uniform: Bool) -> PixelRect {
-        var minX = frame.minX
-        var minY = frame.minY
-        var maxX = frame.maxX
-        var maxY = frame.maxY
+    public func dragging(_ handle: Handle, to point: PixelPoint, uniform: Bool) -> PixelRect {
+        var left = minX
+        var top = minY
+        var right = maxX
+        var bottom = maxY
 
-        if handle.movesLeft { minX = min(point.x, maxX - 1) }
-        if handle.movesRight { maxX = max(point.x + 1, minX + 1) }
-        if handle.movesTop { minY = min(point.y, maxY - 1) }
-        if handle.movesBottom { maxY = max(point.y + 1, minY + 1) }
+        if handle.movesLeft { left = min(point.x, right - 1) }
+        if handle.movesRight { right = max(point.x + 1, left + 1) }
+        if handle.movesTop { top = min(point.y, bottom - 1) }
+        if handle.movesBottom { bottom = max(point.y + 1, top + 1) }
 
-        var result = PixelRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        var result = PixelRect(x: left, y: top, width: right - left, height: bottom - top)
 
-        if uniform, frame.width > 0, frame.height > 0 {
+        if uniform, width > 0, height > 0 {
             // Preserve the original aspect ratio, driven by whichever axis the
             // user pulled further.
-            let aspect = Double(frame.width) / Double(frame.height)
-            let byWidth = Double(result.width) / Double(frame.width)
-            let byHeight = Double(result.height) / Double(frame.height)
+            let aspect = Double(width) / Double(height)
+            let byWidth = Double(result.width) / Double(width)
+            let byHeight = Double(result.height) / Double(height)
             let scale = max(byWidth, byHeight)
-            let width = max(1, Int((Double(frame.width) * scale).rounded()))
-            let height = max(1, Int((Double(width) / aspect).rounded()))
+            let newWidth = max(1, Int((Double(width) * scale).rounded()))
+            let newHeight = max(1, Int((Double(newWidth) / aspect).rounded()))
 
             result = PixelRect(
-                x: handle.movesLeft ? maxX - width : minX,
-                y: handle.movesTop ? maxY - height : minY,
-                width: width,
-                height: height
+                x: handle.movesLeft ? right - newWidth : left,
+                y: handle.movesTop ? bottom - newHeight : top,
+                width: newWidth,
+                height: newHeight
             )
         }
         return result

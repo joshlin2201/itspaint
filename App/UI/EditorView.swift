@@ -6,13 +6,14 @@ import SwiftUI
 /// **Artwork to all four edges, one glass rail over it, and the active tool's
 /// own controls expanded beside the button you pressed.** The rail is on the
 /// left by default and can move to the bottom; everything that matters —
-/// every tool, both loaded colours, the whole palette — is on screen at once,
-/// because the app it descends from was learnable precisely because nothing
-/// was hidden.
+/// every tool, both loaded colours, a palette — is on screen at once, because
+/// the app it descends from was learnable precisely because nothing was hidden.
 ///
-/// The trade, stated honestly: the rail costs about 90pt of window. That is the
-/// price of never making someone hunt for a swatch, and it buys back the
-/// discoverability a floating cluster spends.
+/// The trade, stated honestly: the rail costs 48pt of window on whichever edge
+/// it is on. That is the price of never making someone hunt for a tool, and it
+/// buys back the discoverability a floating cluster spends. It used to cost
+/// nearly twice that, on a rail that ran the full height of the window; the
+/// difference was two extra columns of cells nothing needed.
 struct EditorView: View {
     @Bindable var model: EditorModel
 
@@ -21,6 +22,9 @@ struct EditorView: View {
     @State private var tooltips = TooltipController()
     /// Which cell the options panel should point at, in rail order.
     @State private var anchoredIndex: Int = 0
+    /// The panel's measured length along the rail's axis, so it can be kept
+    /// inside the window without guessing how tall its content is.
+    @State private var panelSpan: CGFloat = 0
 
     var body: some View {
         ZStack {
@@ -31,13 +35,13 @@ struct EditorView: View {
             // is behind it, which is the opposite of having the tools to hand.
             CanvasScrollView(model: model)
                 .padding(.leading, model.chromeEdge.isVertical
-                    ? Tokens.Chrome.railFootprint(for: model.chromeEdge)
+                    ? Tokens.Chrome.railFootprint
                     : Tokens.Chrome.frameGap)
                 .padding(.trailing, Tokens.Chrome.frameGap)
                 .padding(.top, Tokens.Chrome.titleReserve)
                 .padding(.bottom, model.chromeEdge.isVertical
                     ? Tokens.Chrome.frameGap
-                    : Tokens.Chrome.railFootprint(for: model.chromeEdge))
+                    : Tokens.Chrome.railFootprint)
                 .animation(Tokens.Motion.pillResize, value: model.chromeEdge)
 
             TitlebarScrim()
@@ -88,6 +92,9 @@ struct EditorView: View {
         .sheet(isPresented: $model.isSizeSheetPresented) {
             SizeSheet(model: model)
         }
+        .sheet(isPresented: $model.isRotateSheetPresented) {
+            RotateSheet(model: model)
+        }
         .alert(item: $model.presentedError) { error in
             Alert(
                 title: Text(error.message),
@@ -123,7 +130,7 @@ struct EditorView: View {
     @ViewBuilder
     private func chromeStack(isVertical: Bool, in size: CGSize) -> some View {
         let available = isVertical
-            ? size.height - Tokens.Chrome.titleReserve - Tokens.Chrome.railInset
+            ? size.height - Tokens.Chrome.titleReserve - Tokens.Space.safeInset
             : size.width - Tokens.Chrome.railInset * 2
 
         Group {
@@ -131,9 +138,8 @@ struct EditorView: View {
                 HStack(alignment: .top, spacing: Tokens.Space.tight) {
                     scrollingRail(maxLength: available, isVertical: true)
                     if model.isOptionsExpanded {
-                        ToolOptions(model: model)
-                            .fixedSize()
-                            .padding(.top, min(panelOffset, max(0, available - 120)))
+                        optionsPanel(isVertical: true)
+                            .padding(.top, clampedPanelOffset(within: available))
                             .transition(.opacity.combined(with: .move(edge: .leading)))
                     }
                 }
@@ -144,9 +150,8 @@ struct EditorView: View {
             } else {
                 VStack(alignment: .leading, spacing: Tokens.Space.tight) {
                     if model.isOptionsExpanded {
-                        ToolOptions(model: model)
-                            .fixedSize()
-                            .padding(.leading, min(panelOffset, max(0, available - 220)))
+                        optionsPanel(isVertical: false)
+                            .padding(.leading, clampedPanelOffset(within: available))
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
                     scrollingRail(maxLength: available, isVertical: false)
@@ -160,8 +165,8 @@ struct EditorView: View {
             if tooltips.isVisible {
                 Tooltip(title: tooltips.title, shortcut: tooltips.shortcut)
                     .offset(
-                        x: isVertical ? Tokens.Rail.verticalThickness + Tokens.Space.snug : 0,
-                        y: isVertical ? Tokens.Chrome.titleReserve : -Tokens.Rail.horizontalThickness
+                        x: isVertical ? Tokens.Rail.thickness + Tokens.Space.snug : 0,
+                        y: isVertical ? Tokens.Chrome.titleReserve : -Tokens.Rail.thickness
                     )
                     .allowsHitTesting(false)
             }
@@ -178,35 +183,99 @@ struct EditorView: View {
         }
     }
 
-    /// The rail, scrolling only when the window is too small to hold it.
+    /// The options panel, reporting how long it is along the rail's axis.
+    ///
+    /// Measured rather than assumed. The panel's height is entirely content —
+    /// the shape tool alone carries a fifteen-cell gallery, three segmented
+    /// controls and a slider — so the fixed 120pt guess the clamp used to make
+    /// let exactly the tallest panels hang off the bottom of a short window.
+    @ViewBuilder
+    private func optionsPanel(isVertical: Bool) -> some View {
+        ToolOptions(model: model)
+            .fixedSize()
+            .background {
+                GeometryReader { proxy in
+                    let span = isVertical ? proxy.size.height : proxy.size.width
+                    Color.clear
+                        .onAppear { panelSpan = span }
+                        .onChange(of: span) { _, new in panelSpan = new }
+                }
+            }
+    }
+
+    /// Where the panel may start, so its far end still lands inside the window.
+    private func clampedPanelOffset(within available: CGFloat) -> CGFloat {
+        max(0, min(panelOffset, available - panelSpan))
+    }
+
+    /// The rail, shedding swatches before it ever scrolls.
+    ///
+    /// A short window used to clip the rail: the colour block was cut in half
+    /// and the edge toggle was simply gone, below the fold of a scroll view
+    /// with hidden indicators — so there was no way to tell that anything was
+    /// missing, let alone reach it. **The tools and the loaded colours are the
+    /// part that must never be cut**, and the palette is the part that can give
+    /// ground, because every swatch it drops is still in the popover.
+    ///
+    /// Only once the palette is gone entirely and the window is still too short
+    /// does it fall back to scrolling.
     @ViewBuilder
     private func scrollingRail(maxLength: CGFloat, isVertical: Bool) -> some View {
         ScrollView(isVertical ? .vertical : .horizontal, showsIndicators: false) {
-            ToolRail(model: model) { model.selectTool($0) }
+            ToolRail(
+                model: model,
+                swatchPairs: isVertical ? Self.swatchPairs(fitting: maxLength) : Palette.columns
+            ) { model.selectTool($0) }
                 .fixedSize()
         }
         .frame(
-            maxWidth: isVertical ? Tokens.Rail.verticalThickness : maxLength,
-            maxHeight: isVertical ? maxLength : Tokens.Rail.horizontalThickness + 2
+            maxWidth: isVertical ? Tokens.Rail.thickness : maxLength,
+            maxHeight: isVertical ? maxLength : Tokens.Rail.thickness + 2
         )
         .fixedSize(horizontal: isVertical, vertical: !isVertical)
     }
 
+    /// How many columns of the palette the side rail can show in `height`.
+    ///
+    /// Everything above the palette is fixed, so this is one subtraction rather
+    /// than a layout pass — which matters, because the answer feeds a view that
+    /// is being laid out.
+    private static func swatchPairs(fitting height: CGFloat) -> Int {
+        let cell = Tokens.Size.toolCell + Tokens.Space.hair
+        let tools = ToolKind.groups.reduce(CGFloat.zero) { $0 + CGFloat($1.count) * cell }
+        let separators = CGFloat(ToolKind.groups.count) * (1 + Tokens.Rail.sectionSpacing * 2)
+        let pair = Tokens.Size.colourWell * 1.42 + Tokens.Space.hair + Tokens.Size.colourSwap
+        let toggle = Tokens.Rail.sectionSpacing + Tokens.Size.toolCell
+        let fixed = Tokens.Rail.padding * 2 + tools + separators
+            + pair + Tokens.Space.tight + Tokens.Rail.colourInset * 2 + toggle
+
+        let forSwatches = height - fixed
+        let row = Tokens.Size.swatch + Tokens.Rail.swatchGap
+        return max(0, min(Tokens.Rail.swatchPairs, Int(forSwatches / row)))
+    }
+
     /// Distance from the rail's leading edge to the selected cell, so the panel
     /// starts level with the button it came from.
+    ///
+    /// Counted per group rather than by dividing the rail-wide index: each
+    /// group starts its own grid, so a group whose cell count is not a multiple
+    /// of the column count leaves a short final row. The old arithmetic
+    /// (`index / 2`) silently assumed groups packed continuously and drifted a
+    /// full row low by the time it reached the eyedropper.
     private var panelOffset: CGFloat {
         let cell = Tokens.Size.toolCell + Tokens.Space.hair
-        if model.chromeEdge.isVertical {
-            // Two cells per row, plus a separator between each group above.
-            let index = anchoredIndex
-            let row = CGFloat(index / 2)
-            let groupsAbove = CGFloat(Self.groupIndex(of: model.tool))
-            return Tokens.Rail.padding + row * cell
-                + groupsAbove * (1 + Tokens.Rail.sectionSpacing * 2)
+        let group = Self.groupIndex(of: model.tool)
+        let separators = CGFloat(group) * (1 + Tokens.Rail.sectionSpacing * 2)
+
+        guard model.chromeEdge.isVertical else {
+            return Tokens.Rail.padding + CGFloat(anchoredIndex) * cell + separators
         }
-        return Tokens.Rail.padding + CGFloat(anchoredIndex) * cell
-            + CGFloat(Self.groupIndex(of: model.tool))
-                * (1 + Tokens.Rail.sectionSpacing * 2)
+
+        let columns = Tokens.Rail.toolColumns
+        let rowsAbove = ToolKind.groups.prefix(group)
+            .reduce(0) { $0 + ($1.count + columns - 1) / columns }
+        let row = rowsAbove + Self.indexWithinGroup(of: model.tool) / columns
+        return Tokens.Rail.padding + CGFloat(row) * cell + separators
     }
 
     /// Position of a tool within the rail's own ordering.
@@ -223,16 +292,27 @@ struct EditorView: View {
         ToolKind.groups.firstIndex { $0.contains(tool) } ?? 0
     }
 
+    private static func indexWithinGroup(of tool: ToolKind) -> Int {
+        ToolKind.groups.compactMap { $0.firstIndex(of: tool) }.first ?? 0
+    }
+
     // MARK: - Rows
 
     private var titleRow: some View {
-        HStack(spacing: Tokens.Space.base) {
+        HStack(spacing: Tokens.Space.comfortable) {
             // Clear the traffic lights.
             Color.clear.frame(width: Tokens.Chrome.trafficLightClearance, height: 1)
 
-            TitleChip(name: model.documentName, isEdited: model.isEdited)
+            DocumentTitle(
+                name: model.documentName,
+                isEdited: model.isEdited,
+                size: model.canvasSize
+            )
+            // The title yields before the controls do. A long filename should
+            // truncate in the middle, not push Undo off the window.
+            .layoutPriority(-1)
 
-            Spacer(minLength: Tokens.Space.comfortable)
+            Spacer(minLength: Tokens.Space.base)
 
             WindowActions(model: model)
                 .fixedSize()
@@ -242,10 +322,10 @@ struct EditorView: View {
     }
 
     private var readOutRow: some View {
-        StatusStrip(model: model)
-            .padding(.trailing, Tokens.Space.safeInset)
+        PointerReadout(model: model)
+            .padding(.trailing, Tokens.Space.comfortable)
             .padding(.bottom, model.chromeEdge.isVertical
-                ? Tokens.Space.safeInset
-                : Tokens.Space.safeInset + Tokens.Rail.horizontalThickness + Tokens.Space.base)
+                ? Tokens.Space.snug
+                : Tokens.Space.snug + Tokens.Rail.thickness + Tokens.Space.base)
     }
 }

@@ -263,3 +263,71 @@ struct SelectionInteractionTests {
         #expect(engine.canvas == pristine)
     }
 }
+
+/// The handle model, now that it lives on `PixelRect` and serves both the
+/// floating selection and the text box.
+///
+/// Two implementations of "which handle is under this point" is two places for
+/// the grab tolerance, the tie-break and the edge-crossing clamp to disagree —
+/// and the text box's version would have been written from scratch.
+@Suite("Rectangle handles")
+struct RectangleHandleTests {
+
+    @Test("A selection resolves handles through the shared rectangle model")
+    func selectionForwardsToRect() {
+        let selection = FloatingSelection(
+            bitmap: Bitmap(width: 40, height: 30, fill: .white),
+            origin: PixelPoint(x: 5, y: 7)
+        )
+        let rect = selection.frame
+
+        #expect(selection.handleCentres().map(\.centre) == rect.handleCentres().map(\.centre))
+        for (handle, centre) in rect.handleCentres() {
+            #expect(selection.handle(at: centre, tolerance: 3) == handle)
+        }
+    }
+
+    @Test("Every corner is reachable and distinct")
+    func cornersAreDistinct() {
+        let rect = PixelRect(x: 0, y: 0, width: 60, height: 60)
+        let corners: [PixelRect.Handle] = [.topLeft, .topRight, .bottomLeft, .bottomRight]
+        var seen: Set<String> = []
+        for corner in corners {
+            let centre = rect.handleCentres().first { $0.handle == corner }!.centre
+            #expect(rect.handle(at: centre, tolerance: 4) == corner)
+            seen.insert("\(centre.x),\(centre.y)")
+        }
+        #expect(seen.count == 4, "two corners resolved to the same point")
+    }
+
+    @Test("Each handle moves only the edges it owns")
+    func handlesMoveTheirOwnEdges() {
+        let rect = PixelRect(x: 10, y: 10, width: 40, height: 40)
+
+        // Dragging the right edge leaves the left one alone, and vice versa.
+        let wider = rect.dragging(.right, to: PixelPoint(x: 80, y: 30), uniform: false)
+        #expect(wider.minX == rect.minX)
+        #expect(wider.minY == rect.minY)
+        #expect(wider.width > rect.width)
+
+        let taller = rect.dragging(.bottom, to: PixelPoint(x: 30, y: 90), uniform: false)
+        #expect(taller.minY == rect.minY)
+        #expect(taller.width == rect.width)
+
+        // A corner moves both.
+        let corner = rect.dragging(.topLeft, to: PixelPoint(x: 0, y: 0), uniform: false)
+        #expect(corner.minX == 0)
+        #expect(corner.minY == 0)
+        #expect(corner.maxX == rect.maxX)
+    }
+
+    @Test("Edges cannot cross")
+    func edgesNeverInvert() {
+        let rect = PixelRect(x: 10, y: 10, width: 40, height: 40)
+        // Drag the left edge far past the right one.
+        let crossed = rect.dragging(.left, to: PixelPoint(x: 900, y: 30), uniform: false)
+        #expect(crossed.width >= 1)
+        #expect(crossed.height >= 1)
+        #expect(crossed.minX < crossed.maxX)
+    }
+}

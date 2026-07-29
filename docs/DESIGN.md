@@ -31,18 +31,25 @@ This document is about how it looks and feels once that is settled.
 │ │ ▣ ▣  │                                                     │
 │ │ ──   │                                                     │
 │ │ 1 2 ⇄│  ← the two loaded colours, overlapped               │
-│ │ ▦▦▦▦ │  ← all 28 swatches, always                          │
+│ │ ▦▦   │  ← the palette, two swatches across                 │
 │ │ ──   │                                                     │
 │ │  ⊟   │  ← move the toolbar (⌥⌘T)                           │
 │ └──────┘                        [ ⊕ 412, 88 │ 1000×640 │ 90% ]│  status
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**One permanent surface.** The rail holds every tool, both colours and the whole
-palette. It lives on the left by default and moves to the bottom (⌥⌘T,
-remembered across launches). Both orientations render from the same components,
-but reflow for the available axis: colours stack in the side rail and become one
-compact row at the bottom.
+**One permanent surface, one cell thick.** The rail holds every tool, both
+colours and the palette. It lives on the left by default and moves to the bottom
+(⌥⌘T, remembered across launches). Both orientations render from the same
+components, transposed for the available axis: the tools are a single file of
+buttons either way, the swap button sits beside the colour pair at the bottom
+and beneath it at the side, and the palette is two swatches across the rail in
+both.
+
+**A side rail is thin or it is a panel.** Width taken from the artwork is taken
+permanently, on the axis a picture usually needs most — so the side rail is the
+bottom bar stood on its end, at exactly the same thickness, rather than a grid
+of cells that grows to the height of the window.
 
 **The options panel belongs to a button.** It expands beside the selected cell —
 which carries a chevron toward it — and dismisses the moment you touch the
@@ -65,14 +72,19 @@ with steppers. It is pure read-out, so it gets the lightest surface of anything.
 | **Spacing** | 2 hair · 5 tight · 8 base · 10 snug · 14 comfortable · 20 safe inset |
 | **Controls** | 16 swatch · 18 colour swap · 24 segment · 24 colour well · 26 pill action · 26 title chip · 34 tool cell |
 | **Radii** | 16 rail · 12 panel · 11 cell · 10 well · 8 chip · 7 segment track · 5 segment inner · 4 swatch |
-| **Rail** | run = 2 × 34 + 2 = **70pt**; side thickness **86pt**; bottom thickness **≈50pt** |
+| **Rail** | run = 1 × 34 = **34pt**; cross = **34.08pt** (the overlapped colour pair, the widest thing in it); **thickness ≈48pt on either edge** |
 | **Elevation** | 0.5pt hairline · 18pt shadow radius · 7pt y-offset |
 | **Motion** | 0.22s smooth (panel resize) · 0.12s ease-out (micro) · 0.07s (press) |
 
-**The side rail is built to the run width.** The palette
-(4 × 16 + 3 × 2 = 70) and the separators share one edge with the two-cell tool
-run. At the bottom those same controls reflow into one row, so the surface hugs
-its contents instead of inheriting the side rail's height.
+**Everything in the rail is built to `Rail.cross`.** The palette
+(2 × 16 + 2 = 34), the separators and the colour pair share one edge with the
+single-cell tool run, so the column has one edge rather than five.
+
+**One thickness serves both edges** — not two constants that happen to agree.
+The side rail and the bottom bar carry the same controls across their short
+axis, so a single number is the only version of this that cannot drift apart
+when one of them gains a row. `ToolbarGeometryTests` fails the build if it
+does.
 
 **Radii are concentric by construction.** A cell inside the rail is
 `16 − 5 = 11`, so the gap around each corner stays visually constant instead of
@@ -110,8 +122,19 @@ loaded colours with a ring in the swatch's *own* contrast colour rather than an
 accent border — an accent ring there would collide with "selected tool", and an
 outer ring would shift every neighbour by a pixel as selection moved.
 
-The **palette is fixed** at 28 swatches. They are muscle memory and must not
-move, so custom colours land in a short "recent" run instead of displacing them.
+The **palette is fixed** at 28 swatches in two rows of fourteen. They are muscle
+memory and must not move, so custom colours live in the popover instead of
+displacing them — and a rail narrower than fourteen columns truncates by
+*column*, never in reading order, so every swatch keeps its place and its muted
+partner. Truncating in reading order would show fourteen dark colours and no
+white at all.
+
+**The grid is always two swatches across the rail.** Not "as many rows as it
+needs": the rail's declared thickness is a constant the canvas inset is computed
+from before any layout pass runs, so a palette that grows a third row makes that
+constant describe a bar smaller than the one on screen and the artwork slides
+under it. That is exactly what used to happen the first time anyone picked a
+custom colour.
 
 The two loaded colours are **overlapped, front over back**, the way the original
 arranged them: it says "one is in front of the other" without a word of

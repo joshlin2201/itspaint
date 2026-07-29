@@ -72,6 +72,12 @@ final class EditorModel {
     var textAlignment: PaintKit.TextRenderer.Style.Alignment {
         didSet { engine.settings.textStyle.alignment = textAlignment }
     }
+
+    var isTextBold: Bool { didSet { engine.settings.textStyle.isBold = isTextBold } }
+    var isTextItalic: Bool { didSet { engine.settings.textStyle.isItalic = isTextItalic } }
+    var isTextUnderlined: Bool {
+        didSet { engine.settings.textStyle.isUnderlined = isTextUnderlined }
+    }
     var brushSize: Int { didSet { engine.settings.brushSize = brushSize } }
     var brushShape: Brush.Shape { didSet { engine.settings.brushShape = brushShape } }
     var shapeStyle: PaintKit.ShapeStyle { didSet { engine.settings.shapeStyle = shapeStyle } }
@@ -95,7 +101,10 @@ final class EditorModel {
     /// Colours used recently that are not already in the fixed palette.
     ///
     /// The 28 swatches are muscle memory and must not move, so custom colours
-    /// get their own short row instead of displacing them. Most recent first.
+    /// get their own short row in the popover instead of displacing them. Kept
+    /// out of the rail deliberately: they arrive unpredictably, and a toolbar
+    /// that changes size while you work moves the button you were reaching for.
+    /// Most recent first.
     private(set) var recentColours: [PaintColour] = []
 
     private func rememberColour(_ colour: PaintColour) {
@@ -216,6 +225,9 @@ final class EditorModel {
         self.textSize = engine.settings.textStyle.pointSize
         self.textFont = engine.settings.textStyle.fontName
         self.textAlignment = engine.settings.textStyle.alignment
+        self.isTextBold = engine.settings.textStyle.isBold
+        self.isTextItalic = engine.settings.textStyle.isItalic
+        self.isTextUnderlined = engine.settings.textStyle.isUnderlined
         self.foreground = engine.colours.foreground
         self.background = engine.colours.background
     }
@@ -324,6 +336,19 @@ final class EditorModel {
         default: 8
         }
         brushSize = min(ToolSettings.sizeRange.upperBound, max(ToolSettings.sizeRange.lowerBound, brushSize + (up ? step : -step)))
+    }
+
+    /// Flip a text trait, arming the text tool with it.
+    ///
+    /// Pressing ⌘B while holding the brush means "I am about to write something
+    /// bold", not nothing at all — the same reasoning that makes the shape
+    /// gallery a way *into* the shape tool.
+    func toggleTextTrait(_ trait: ReferenceWritableKeyPath<EditorModel, Bool>) {
+        self[keyPath: trait].toggle()
+        if tool != .text {
+            tool = .text
+            isOptionsExpanded = true
+        }
     }
 
     func swapColours() {
@@ -616,6 +641,26 @@ final class EditorModel {
     func rotate(_ rotation: ImageTransform.Rotation) {
         replace(ImageTransform.rotated(canvas, by: rotation), named: rotation.displayName)
     }
+
+    /// Straighten by an arbitrary angle, filling the exposed corners with the
+    /// back colour.
+    ///
+    /// The canvas grows to the rotated bounding box rather than cropping,
+    /// because cropping the picture someone asked to straighten is the one
+    /// outcome nobody wants.
+    func rotate(degrees: Double) {
+        guard degrees.truncatingRemainder(dividingBy: 360) != 0 else { return }
+        guard let rotated = ImageTransform.rotated(canvas, degrees: degrees, fill: background) else {
+            present(
+                message: "Couldn't rotate the image.",
+                recovery: "Rotating by that angle would make the canvas too large."
+            )
+            return
+        }
+        replace(rotated, named: "Rotate")
+    }
+
+    var isRotateSheetPresented: Bool = false
 
     func resizeCanvas(width: Int, height: Int) {
         guard Bitmap.isSizeSupported(width: width, height: height) else {

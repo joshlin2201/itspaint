@@ -235,6 +235,62 @@ public enum ImageTransform {
         return scaled(bitmap, to: (width, height), using: scaling)
     }
 
+    /// Rotate by an arbitrary angle, growing the canvas so no corner is cut off.
+    ///
+    /// The quarter turns in `rotated(_:by:)` stay separate and stay exact: they
+    /// are a pure index permutation, so every pixel survives untouched. This
+    /// one resamples, which is unavoidable at any other angle — a rotated pixel
+    /// grid does not land on a pixel grid — so it is deliberately *not* the
+    /// implementation of the 90° cases. Rotating by 90 twice through here would
+    /// soften the image; through `rotated` it is lossless.
+    ///
+    /// The canvas grows to the rotated bounding box and the corners it exposes
+    /// are filled, because the alternative is silently cropping the picture the
+    /// user asked to straighten.
+    public static func rotated(
+        _ bitmap: Bitmap,
+        degrees: Double,
+        fill: PaintColour = .white
+    ) -> Bitmap? {
+        // Anything landing on a quarter turn goes the lossless way.
+        let normalised = degrees.truncatingRemainder(dividingBy: 360)
+        let wrapped = normalised < 0 ? normalised + 360 : normalised
+        if wrapped.rounded() == wrapped, let quarter = Rotation(rawValue: Int(wrapped)) {
+            return rotated(bitmap, by: quarter)
+        }
+
+        let radians = wrapped * .pi / 180
+        let cosine = abs(cos(radians))
+        let sine = abs(sin(radians))
+        let rawWidth = Double(bitmap.width) * cosine + Double(bitmap.height) * sine
+        let rawHeight = Double(bitmap.width) * sine + Double(bitmap.height) * cosine
+
+        guard rawWidth.isFinite, rawHeight.isFinite else { return nil }
+        let newWidth = Int(rawWidth.rounded(.up))
+        let newHeight = Int(rawHeight.rounded(.up))
+        guard Bitmap.isSizeSupported(width: newWidth, height: newHeight),
+              let image = bitmap.makeCGImage()
+        else { return nil }
+
+        var out = Bitmap(width: newWidth, height: newHeight, fill: fill.rgba8)
+        out.drawWithCoreGraphics { context in
+            context.interpolationQuality = .high
+            // Rotate about the centre of the *new* canvas, then draw the source
+            // centred on that origin — so the growth is shared equally on all
+            // four sides instead of pushing the image into one corner.
+            context.translateBy(x: CGFloat(newWidth) / 2, y: CGFloat(newHeight) / 2)
+            context.rotate(by: CGFloat(radians))
+            // Counter-flip: the surrounding context is flipped for canvas
+            // coordinates, and a CGImage drawn through that lands upside down.
+            context.scaleBy(x: 1, y: -1)
+            context.draw(image, in: CGRect(
+                x: -Double(bitmap.width) / 2, y: -Double(bitmap.height) / 2,
+                width: Double(bitmap.width), height: Double(bitmap.height)
+            ))
+        }
+        return out
+    }
+
     /// Skew by degrees on each axis, growing the canvas to fit the result.
     public static func skewed(
         _ bitmap: Bitmap,

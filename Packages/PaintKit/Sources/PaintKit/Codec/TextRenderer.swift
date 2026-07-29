@@ -19,6 +19,14 @@ public enum TextRenderer {
         public var pointSize: Double
         public var colour: PaintColour
         public var alignment: Alignment
+        /// Bold and italic are applied as **symbolic traits**, so a face that
+        /// ships a real bold or italic cut is used rather than the synthesised
+        /// slant CoreText would otherwise fake. Where a face has no such cut,
+        /// `CTFontCreateCopyWithSymbolicTraits` returns nil and the request is
+        /// dropped — a missing italic is better than a sheared upright.
+        public var isBold: Bool
+        public var isItalic: Bool
+        public var isUnderlined: Bool
 
         public enum Alignment: String, CaseIterable, Codable, Sendable, Identifiable {
             case left, centre, right
@@ -44,12 +52,32 @@ public enum TextRenderer {
             fontName: String = "Helvetica",
             pointSize: Double = 36,
             colour: PaintColour = .black,
-            alignment: Alignment = .left
+            alignment: Alignment = .left,
+            isBold: Bool = false,
+            isItalic: Bool = false,
+            isUnderlined: Bool = false
         ) {
             self.fontName = fontName
             self.pointSize = max(6, pointSize)
             self.colour = colour
             self.alignment = alignment
+            self.isBold = isBold
+            self.isItalic = isItalic
+            self.isUnderlined = isUnderlined
+        }
+
+        /// The font these settings resolve to, traits and all.
+        ///
+        /// Shared with the app so the live editor and the rasteriser cannot
+        /// disagree about what you are about to get — the whole point of
+        /// editing in place is that the preview *is* the result.
+        public func makeFont() -> CTFont {
+            let base = CTFontCreateWithName(fontName as CFString, pointSize, nil)
+            var traits: CTFontSymbolicTraits = []
+            if isBold { traits.insert(.traitBold) }
+            if isItalic { traits.insert(.traitItalic) }
+            guard !traits.isEmpty else { return base }
+            return CTFontCreateCopyWithSymbolicTraits(base, pointSize, nil, traits, traits) ?? base
         }
 
         /// Faces that ship with every macOS install, so a document opened on
@@ -105,7 +133,7 @@ public enum TextRenderer {
     }
 
     private static func attributedString(_ string: String, style: Style) -> CFAttributedString {
-        let font = CTFontCreateWithName(style.fontName as CFString, style.pointSize, nil)
+        let font = style.makeFont()
 
         // The setting borrows the pointer, so it has to stay valid for the
         // whole `CTParagraphStyleCreate` call — `&alignment` inline would hand
@@ -122,11 +150,15 @@ public enum TextRenderer {
             return CTParagraphStyleCreate(settings, settings.count)
         }
 
-        let attributes: [NSAttributedString.Key: Any] = [
+        var attributes: [NSAttributedString.Key: Any] = [
             kCTFontAttributeName as NSAttributedString.Key: font,
             kCTForegroundColorAttributeName as NSAttributedString.Key: style.colour.cgColor,
             kCTParagraphStyleAttributeName as NSAttributedString.Key: paragraph,
         ]
+        if style.isUnderlined {
+            attributes[kCTUnderlineStyleAttributeName as NSAttributedString.Key] =
+                CTUnderlineStyle.single.rawValue
+        }
         return NSAttributedString(string: string, attributes: attributes) as CFAttributedString
     }
 }

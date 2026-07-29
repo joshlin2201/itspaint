@@ -29,8 +29,8 @@ clipboard out.png</code>.</sub>
 - **Twelve visible tools** for drawing, markup, text, selection, colour, and
   pixelation.
 - **Fifteen shapes** with solid, dashed, or dotted outlines and optional fills.
-- **A compact tool rail** that moves between the left and bottom edges of the
-  window.
+- **A 48pt tool rail** — one cell thick on either edge — that moves between the
+  left and bottom of the window.
 - **Precise canvas control** with pointer-centred zoom, nearest-neighbour display
   above 100%, pixel grids, and live tool footprints.
 - **Native documents and common exports** with no third-party dependencies,

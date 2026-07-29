@@ -34,6 +34,14 @@ extension DrawingDocument {
     @IBAction func increaseBrush(_ sender: Any?) { model.stepBrushSize(up: true) }
     @IBAction func decreaseBrush(_ sender: Any?) { model.stepBrushSize(up: false) }
 
+    // MARK: - Text style
+
+    /// ⌘B / ⌘I / ⌘U — arming the text tool as well as setting the trait, so
+    /// they work from anywhere rather than only once you are already typing.
+    @IBAction func toggleBold(_ sender: Any?) { model.toggleTextTrait(\.isTextBold) }
+    @IBAction func toggleItalic(_ sender: Any?) { model.toggleTextTrait(\.isTextItalic) }
+    @IBAction func toggleUnderline(_ sender: Any?) { model.toggleTextTrait(\.isTextUnderlined) }
+
     // MARK: - Colours
 
     @IBAction func swapColours(_ sender: Any?) { model.swapColours() }
@@ -75,6 +83,7 @@ extension DrawingDocument {
     @IBAction func cropToSelection(_ sender: Any?) { model.cropToSelection() }
     @IBAction func trimBorders(_ sender: Any?) { model.trimBorders() }
     @IBAction func showSizeSheet(_ sender: Any?) { model.isSizeSheetPresented = true }
+    @IBAction func showRotateSheet(_ sender: Any?) { model.isRotateSheetPresented = true }
     @IBAction func flipHorizontal(_ sender: Any?) { model.flipHorizontally() }
     @IBAction func flipVertical(_ sender: Any?) { model.flipVertically() }
     @IBAction func rotateRight(_ sender: Any?) { model.rotate(.clockwise90) }
@@ -149,6 +158,18 @@ extension DrawingDocument {
 
         case #selector(increaseBrush(_:)), #selector(decreaseBrush(_:)):
             return model.tool.usesBrushSize
+
+        // Ticked when armed, whichever tool is in hand — pressing ⌘B with the
+        // brush selected arms bold text, so the menu has to say so.
+        case #selector(toggleBold(_:)):
+            menuItem.state = model.isTextBold ? .on : .off
+            return true
+        case #selector(toggleItalic(_:)):
+            menuItem.state = model.isTextItalic ? .on : .off
+            return true
+        case #selector(toggleUnderline(_:)):
+            menuItem.state = model.isTextUnderlined ? .on : .off
+            return true
 
         case #selector(showSettings(_:)):
             return false

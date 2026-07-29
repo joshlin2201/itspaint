@@ -15,6 +15,18 @@ struct ToolOptions: View {
 
     private var isVertical: Bool { model.chromeEdge.isVertical }
 
+    /// **One column width, one label width, one control width.**
+    ///
+    /// The panel used to be a `VStack` of rows that each sized themselves, so
+    /// the slider row, the segmented rows and the shape gallery all ended at
+    /// different places and the panel took its width from whichever was
+    /// widest. Nothing lined up with anything, and a control's size carried no
+    /// meaning — "Round / Square / Soft" was three times the width of the fill
+    /// picker directly under it purely because those words are longer.
+    ///
+    /// Now the vertical panel is a fixed width, every label occupies the same
+    /// column, and every control fills what is left. Along the bottom bar the
+    /// same content lays out as a row, where a fixed width would be wrong.
     var body: some View {
         let layout = isVertical
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: Tokens.Space.tight + 1))
@@ -25,11 +37,13 @@ struct ToolOptions: View {
             controls
             if model.hasSelection { selectionActions }
         }
+        .environment(\.optionsAxisIsVertical, isVertical)
         .font(Tokens.Text.pillLabel)
         .lineLimit(1)
-        .fixedSize(horizontal: true, vertical: false)
+        .frame(width: isVertical ? Tokens.Rail.optionsContentWidth : nil, alignment: .leading)
+        .fixedSize(horizontal: !isVertical, vertical: false)
         .padding(.horizontal, Tokens.Space.snug)
-        .padding(.vertical, Tokens.Space.tight + 1)
+        .padding(.vertical, Tokens.Space.snug - 2)
         .chromeSurface(cornerRadius: Tokens.Radius.panel)
         .animation(Tokens.Motion.pillResize, value: model.tool)
         .animation(Tokens.Motion.pillResize, value: model.hasSelection)
@@ -37,16 +51,42 @@ struct ToolOptions: View {
 
     // MARK: - Header
 
+    /// The tool's name, with its gesture hint on its own line.
+    ///
+    /// The hint used to sit beside the name, which made the header the widest
+    /// row in the panel — the Shape tool's polygon hint alone is 44 characters,
+    /// and every other control was then laid out inside a panel sized for a
+    /// sentence.
     private var header: some View {
-        HStack(spacing: Tokens.Space.tight) {
-            Text(model.tool.displayName)
-                .font(.system(size: 11.5, weight: .semibold))
-            if let hint {
-                Text(hint)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.primary.opacity(0.45))
+        Group {
+            if isVertical {
+                VStack(alignment: .leading, spacing: 1) {
+                    title
+                    if let hint {
+                        Text(hint)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.primary.opacity(0.45))
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.bottom, 1)
+            } else {
+                HStack(spacing: Tokens.Space.tight) {
+                    title
+                    if let hint {
+                        Text(hint)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.primary.opacity(0.45))
+                    }
+                }
             }
         }
+    }
+
+    private var title: some View {
+        Text(model.tool.displayName)
+            .font(.system(size: 11.5, weight: .semibold))
     }
 
     /// One line saying how the tool is driven, for the tools whose gesture is
@@ -79,29 +119,33 @@ struct ToolOptions: View {
 
         case .brush:
             sizeControl
-            OptionSegment(selection: $model.brushShape, options: [
-                .init(value: .round, label: "Round"),
-                .init(value: .square, label: "Square"),
-                .init(value: .soft, label: "Soft"),
-            ])
+            OptionRow("Tip") {
+                OptionSegment(selection: $model.brushShape, options: [
+                    .init(value: .round, label: "Round"),
+                    .init(value: .square, label: "Square"),
+                    .init(value: .soft, label: "Soft"),
+                ])
+            }
 
         case .airbrush:
             sizeControl
-            OptionSlider(
-                title: "Flow",
-                value: $model.sprayDensity,
-                range: 0.02...0.6,
-                readout: "\(Int(model.sprayDensity * 100))%"
-            )
+            OptionRow("Flow") {
+                OptionSlider(
+                    value: $model.sprayDensity,
+                    range: 0.02...0.6,
+                    readout: "\(Int(model.sprayDensity * 100))%"
+                )
+            }
 
         case .highlighter:
             sizeControl
-            OptionSlider(
-                title: "Ink",
-                value: $model.highlighterOpacity,
-                range: 0.1...0.8,
-                readout: "\(Int(model.highlighterOpacity * 100))%"
-            )
+            OptionRow("Ink") {
+                OptionSlider(
+                    value: $model.highlighterOpacity,
+                    range: 0.1...0.8,
+                    readout: "\(Int(model.highlighterOpacity * 100))%"
+                )
+            }
 
         case .eraser:
             sizeControl
@@ -110,89 +154,116 @@ struct ToolOptions: View {
             ShapeGallery(model: model, columns: isVertical ? 5 : 8)
             sizeControl(title: "Stroke")
             if model.shapeKind.isClosed {
-                OptionSegment(selection: $model.shapeStyle, options: [
-                    .init(value: .outline, symbol: "square", help: "Outline"),
-                    .init(value: .filled, symbol: "square.fill", help: "Fill"),
-                    .init(value: .outlineAndFill, symbol: "square.inset.filled", help: "Outline and fill"),
-                ])
+                OptionRow("Fill") {
+                    OptionSegment(selection: $model.shapeStyle, options: [
+                        .init(value: .outline, symbol: "square", help: "Outline"),
+                        .init(value: .filled, symbol: "square.fill", help: "Fill"),
+                        .init(value: .outlineAndFill, symbol: "square.inset.filled", help: "Outline and fill"),
+                    ])
+                }
             }
-            OptionSegment(selection: $model.strokeDash, options: Raster.Dash.allCases.map {
-                .init(value: $0, symbol: $0.symbolName, help: $0.displayName)
-            })
+            OptionRow("Line") {
+                OptionSegment(selection: $model.strokeDash, options: Raster.Dash.allCases.map {
+                    .init(value: $0, symbol: $0.symbolName, help: $0.displayName)
+                })
+            }
             if model.shapeKind == .roundedRectangle || model.shapeKind == .callout {
-                OptionSlider(
-                    title: "Corner",
-                    value: Binding(
-                        get: { Double(model.cornerRadius) },
-                        set: { model.cornerRadius = Int($0.rounded()) }
-                    ),
-                    range: 0...48,
-                    readout: "\(model.cornerRadius)"
-                )
+                OptionRow("Corner") {
+                    OptionSlider(
+                        value: Binding(
+                            get: { Double(model.cornerRadius) },
+                            set: { model.cornerRadius = Int($0.rounded()) }
+                        ),
+                        range: 0...48,
+                        readout: "\(model.cornerRadius)"
+                    )
+                }
             }
 
         case .text:
-            OptionSlider(
-                title: "Size",
-                value: $model.textSize,
-                range: 8...200,
-                readout: "\(Int(model.textSize))",
-                gamma: 2
-            )
-            Picker("", selection: $model.textFont) {
-                ForEach(Self.fonts, id: \.self) { Text($0).tag($0) }
+            OptionRow("Size") {
+                OptionSlider(
+                    value: $model.textSize,
+                    range: 8...200,
+                    readout: "\(Int(model.textSize))",
+                    gamma: 2
+                )
             }
-            .labelsHidden()
-            .controlSize(.small)
-            .frame(width: 124)
-            OptionSegment(selection: $model.textAlignment, options: [
-                .init(value: .left, symbol: "text.alignleft", help: "Align left"),
-                .init(value: .centre, symbol: "text.aligncenter", help: "Align centre"),
-                .init(value: .right, symbol: "text.alignright", help: "Align right"),
-            ])
+            OptionRow("Font") {
+                Picker("", selection: $model.textFont) {
+                    ForEach(Self.fonts, id: \.self) { Text($0).tag($0) }
+                }
+                .labelsHidden()
+                .controlSize(.small)
+                .frame(maxWidth: isVertical ? .infinity : 124)
+            }
+            OptionRow("Style") {
+                SegmentTrack {
+                    OptionToggle(symbol: "bold", help: "Bold (⌘B)", isOn: $model.isTextBold)
+                    OptionToggle(symbol: "italic", help: "Italic (⌘I)", isOn: $model.isTextItalic)
+                    OptionToggle(
+                        symbol: "underline", help: "Underline (⌘U)",
+                        isOn: $model.isTextUnderlined
+                    )
+                }
+            }
+            OptionRow("Align") {
+                OptionSegment(selection: $model.textAlignment, options: [
+                    .init(value: .left, symbol: "text.alignleft", help: "Align left"),
+                    .init(value: .centre, symbol: "text.aligncenter", help: "Align centre"),
+                    .init(value: .right, symbol: "text.alignright", help: "Align right"),
+                ])
+            }
 
         case .badge:
             sizeControl
-            OptionButton("Restart at 1", symbol: "arrow.counterclockwise") {
-                model.resetBadgeNumbering()
+            OptionRow(nil) {
+                OptionButton("Restart at 1", symbol: "arrow.counterclockwise") {
+                    model.resetBadgeNumbering()
+                }
             }
 
         case .fill:
-            OptionSlider(
-                title: "Tolerance",
-                value: Binding(
-                    get: { Double(model.fillTolerance) },
-                    set: { model.fillTolerance = Int($0.rounded()) }
-                ),
-                range: 0...128,
-                readout: "\(model.fillTolerance)"
-            )
-
-        case .pixelate:
-            OptionSlider(
-                title: "Block",
-                value: Binding(
-                    get: { Double(model.pixelateBlockSize) },
-                    set: { model.pixelateBlockSize = Int($0.rounded()) }
-                ),
-                range: 4...48,
-                readout: "\(model.pixelateBlockSize)"
-            )
-
-        case .select:
-            OptionSegment(selection: $model.selectionKind, options: SelectionKind.allCases.map {
-                .init(value: $0, symbol: $0.symbolName, help: $0.displayName)
-            })
-            if model.selectionKind == .instantAlpha {
+            OptionRow("Match") {
                 OptionSlider(
-                    title: "Tolerance",
                     value: Binding(
-                        get: { Double(model.selectionTolerance) },
-                        set: { model.selectionTolerance = Int($0.rounded()) }
+                        get: { Double(model.fillTolerance) },
+                        set: { model.fillTolerance = Int($0.rounded()) }
                     ),
                     range: 0...128,
-                    readout: "\(model.selectionTolerance)"
+                    readout: "\(model.fillTolerance)"
                 )
+            }
+
+        case .pixelate:
+            OptionRow("Block") {
+                OptionSlider(
+                    value: Binding(
+                        get: { Double(model.pixelateBlockSize) },
+                        set: { model.pixelateBlockSize = Int($0.rounded()) }
+                    ),
+                    range: 4...48,
+                    readout: "\(model.pixelateBlockSize)"
+                )
+            }
+
+        case .select:
+            OptionRow("Mode") {
+                OptionSegment(selection: $model.selectionKind, options: SelectionKind.allCases.map {
+                    .init(value: $0, symbol: $0.symbolName, help: $0.displayName)
+                })
+            }
+            if model.selectionKind == .instantAlpha {
+                OptionRow("Match") {
+                    OptionSlider(
+                        value: Binding(
+                            get: { Double(model.selectionTolerance) },
+                            set: { model.selectionTolerance = Int($0.rounded()) }
+                        ),
+                        range: 0...128,
+                        readout: "\(model.selectionTolerance)"
+                    )
+                }
             }
 
         case .eyedropper:
@@ -214,10 +285,15 @@ struct ToolOptions: View {
     /// picks and makes 2px versus 5px a subpixel decision. Squaring the input
     /// puts ~24px at the halfway point, and the stops cover the four weights
     /// the classic Size dropdown offered.
+    ///
+    /// The stops now sit on their own line, inside a real segmented track. As
+    /// four bare capsules trailing a slider they read as decoration — four
+    /// dashes of different lengths with no container, no baseline and no
+    /// indication they were clickable at all.
+    @ViewBuilder
     private func sizeControl(title: String) -> some View {
-        HStack(spacing: Tokens.Space.tight) {
+        OptionRow(title) {
             OptionSlider(
-                title: title,
                 value: Binding(
                     get: { Double(model.brushSize) },
                     set: { model.brushSize = Int($0.rounded()) }
@@ -226,19 +302,31 @@ struct ToolOptions: View {
                 readout: "\(model.brushSize)",
                 gamma: 2
             )
-            ForEach(Self.sizeStops, id: \.self) { stop in
-                Button {
-                    model.brushSize = stop
-                } label: {
-                    Capsule()
-                        .fill(model.brushSize == stop ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary.opacity(0.45)))
-                        .frame(width: 16, height: max(1, min(7, CGFloat(stop) / 4)))
-                        .frame(width: 20, height: 16)
-                        .contentShape(Rectangle())
+        }
+        OptionRow(nil) {
+            SegmentTrack {
+                ForEach(Self.sizeStops, id: \.self) { stop in
+                    let isSelected = model.brushSize == stop
+                    Button {
+                        model.brushSize = stop
+                    } label: {
+                        Capsule()
+                            .fill(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary.opacity(0.55)))
+                            .frame(height: max(1.5, min(7, CGFloat(stop) / 4)))
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 6)
+                            .frame(height: Tokens.Size.segment)
+                            .background {
+                                RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
+                                    .fill(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.clear))
+                            }
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("\(stop) px")
+                    .accessibilityLabel("\(stop) pixel \(title.lowercased())")
+                    .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
                 }
-                .buttonStyle(.plain)
-                .help("\(stop) px")
-                .accessibilityLabel("\(stop) pixel \(title.lowercased())")
             }
         }
     }
@@ -285,20 +373,25 @@ private struct ShapeGallery: View {
     @Bindable var model: EditorModel
     let columns: Int
 
+    @Environment(\.optionsAxisIsVertical) private var isVertical
+
     var body: some View {
+        // Fifteen shapes over five columns is three exact rows — no orphan
+        // cell, and the grid ends on the same edge as every control below it.
         FixedGrid(ShapeKind.allCases, columns: columns, spacing: 2) { kind in
             let isSelected = model.shapeKind == kind
             Button {
-                    model.selectShape(kind)
-                } label: {
-                    Image(systemName: kind.symbolName)
-                        .font(.system(size: 11))
-                        .frame(width: 24, height: 22)
-                        .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.8))
-                        .background {
-                            RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                                .fill(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.clear))
-                        }
+                model.selectShape(kind)
+            } label: {
+                Image(systemName: kind.symbolName)
+                    .font(.system(size: 12))
+                    .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.8))
+                    .frame(maxWidth: isVertical ? .infinity : 26)
+                    .frame(height: 26)
+                    .background {
+                        RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
+                            .fill(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.clear))
+                    }
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -306,39 +399,108 @@ private struct ShapeGallery: View {
             .accessibilityLabel(kind.displayName)
             .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
         }
+        .padding(2)
+        .frame(maxWidth: isVertical ? .infinity : nil)
+        .background {
+            RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
+                .fill(.primary.opacity(0.12))
+        }
     }
 }
 
 // MARK: - Controls
 
-/// A labelled slider with a live read-out.
+/// Which way the panel is laid out, so a control can fill the column in the
+/// side panel and size to its content along the bottom bar without every one
+/// of them taking a parameter for it.
+private struct OptionsAxisKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var optionsAxisIsVertical: Bool {
+        get { self[OptionsAxisKey.self] }
+        set { self[OptionsAxisKey.self] = newValue }
+    }
+}
+
+/// One row of the panel: a label in the shared column, then its control.
+///
+/// Pass `nil` for a row that continues the one above it — the label column is
+/// still reserved, so the control stays aligned with the one it belongs to
+/// rather than sliding back to the panel's edge.
+struct OptionRow<Content: View>: View {
+    let title: String?
+    @ViewBuilder let content: Content
+
+    @Environment(\.optionsAxisIsVertical) private var isVertical
+
+    init(_ title: String?, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(spacing: Tokens.Space.tight) {
+            if isVertical {
+                Text(title ?? "")
+                    .foregroundStyle(.primary.opacity(0.6))
+                    .frame(width: Tokens.Size.optionLabel, alignment: .leading)
+            } else if let title {
+                Text(title)
+                    .foregroundStyle(.primary.opacity(0.6))
+                    .fixedSize()
+            }
+            content
+        }
+        .frame(maxWidth: isVertical ? .infinity : nil, alignment: .leading)
+    }
+}
+
+/// The recessed track a segmented control sits in.
+struct SegmentTrack<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    @Environment(\.optionsAxisIsVertical) private var isVertical
+
+    var body: some View {
+        HStack(spacing: 1) {
+            content
+        }
+        .padding(2)
+        .frame(maxWidth: isVertical ? .infinity : nil)
+        .background {
+            RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
+                .fill(.primary.opacity(0.12))
+        }
+    }
+}
+
+/// A slider with a live read-out, filling whatever column it is given.
 ///
 /// `gamma` bends the travel: 2 squares the input, which is what turns a 1–96
 /// range from "everything useful in the first centimetre" into a control you
 /// can actually land 6px with.
 struct OptionSlider: View {
-    let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
     let readout: String
-    var width: CGFloat = 68
     var gamma: Double = 1
+
+    @Environment(\.optionsAxisIsVertical) private var isVertical
 
     var body: some View {
         HStack(spacing: Tokens.Space.tight) {
-            Text(title)
-                .foregroundStyle(.primary.opacity(0.6))
-                .fixedSize()
             Slider(value: curved, in: 0...1)
                 .controlSize(.mini)
-                .frame(width: width)
+                .frame(maxWidth: isVertical ? .infinity : 68)
                 .labelsHidden()
             Text(readout)
                 .font(Tokens.Text.pillValue)
-                .frame(minWidth: 24, alignment: .trailing)
+                .foregroundStyle(.primary.opacity(0.85))
+                .frame(minWidth: 26, alignment: .trailing)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(title)
         .accessibilityValue(readout)
     }
 
@@ -384,8 +546,10 @@ struct OptionSegment<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [Option]
 
+    @Environment(\.optionsAxisIsVertical) private var isVertical
+
     var body: some View {
-        HStack(spacing: 1) {
+        SegmentTrack {
             ForEach(options) { option in
                 let isSelected = option.value == selection
                 Button {
@@ -398,11 +562,17 @@ struct OptionSegment<Value: Hashable>: View {
                             Text(option.label ?? "")
                         }
                     }
+                    .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.8))
+                    // Equal shares of the row in the side panel, intrinsic
+                    // width along the bottom bar. Padding-driven widths were
+                    // why "Round / Square / Soft" was three times the size of
+                    // the icon picker directly beneath it.
+                    .frame(maxWidth: isVertical ? .infinity : nil)
+                    .padding(.horizontal, isVertical ? 2 : (option.symbol == nil ? 8 : 7))
                     .frame(height: Tokens.Size.segment)
-                    .padding(.horizontal, option.symbol == nil ? Tokens.Space.snug : 7)
                     .background {
                         RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                            .fill(isSelected ? AnyShapeStyle(.primary.opacity(0.20)) : AnyShapeStyle(.clear))
+                            .fill(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.clear))
                     }
                     .contentShape(Rectangle())
                 }
@@ -412,11 +582,41 @@ struct OptionSegment<Value: Hashable>: View {
                 .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
             }
         }
-        .padding(2)
-        .background {
-            RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
-                .fill(.primary.opacity(0.12))
+    }
+}
+
+/// An independently on/off cell inside a segment track.
+///
+/// Distinct from `OptionSegment`, which picks exactly one of a set: bold,
+/// italic and underline combine, so they are three toggles that happen to share
+/// a track rather than three states of one control.
+struct OptionToggle: View {
+    let symbol: String
+    let help: String
+    @Binding var isOn: Bool
+
+    @Environment(\.optionsAxisIsVertical) private var isVertical
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 11))
+                .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.8))
+                .frame(maxWidth: isVertical ? .infinity : nil)
+                .padding(.horizontal, isVertical ? 2 : 7)
+                .frame(height: Tokens.Size.segment)
+                .background {
+                    RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
+                        .fill(isOn ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.clear))
+                }
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(help)
+        .accessibilityAddTraits(isOn ? [.isSelected, .isButton] : .isButton)
     }
 }
 

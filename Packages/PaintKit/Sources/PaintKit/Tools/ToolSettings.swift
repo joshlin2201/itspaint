@@ -29,9 +29,15 @@ public struct ToolSettings: Equatable, Sendable {
     public var textStyle: TextRenderer.Style
 
     public init(
-        tool: ToolKind = .pencil,
+        // Brush, not pencil. A one-pixel hard nib is the right *tool* to have,
+        // but it is the wrong thing to hand someone on a Retina screen the
+        // first time they drag — at any zoom below 100% a single pixel is a
+        // faint dotted line, and the app reads as broken before it reads as
+        // precise.
+        tool: ToolKind = .brush,
         shapeKind: ShapeKind = .rectangle,
-        brushSize: Int = 4,
+        // Small enough to draw with, thick enough to see.
+        brushSize: Int = 2,
         brushShape: Brush.Shape = .round,
         shapeStyle: ShapeStyle = .outline,
         fillTolerance: Int = 0,

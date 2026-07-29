@@ -71,6 +71,38 @@ public struct Palette: Equatable, Codable, Sendable {
     public static let columns = 14
     public var rows: Int { Int((Double(swatches.count) / Double(Self.columns)).rounded(.up)) }
 
+    /// The leading `count` columns of the grid, both rows kept.
+    ///
+    /// A narrow toolbar shows fewer *columns* of the same palette rather than
+    /// the first `n` swatches in reading order. That distinction is the whole
+    /// point: truncating in reading order would show fourteen dark colours and
+    /// no white, whereas truncating by column keeps the row pairing — muted on
+    /// top, saturated below — so a swatch is in the place the eye expects it at
+    /// every rail width.
+    public func leadingColumns(_ count: Int) -> [PaintColour] {
+        let take = max(0, min(count, Self.columns))
+        guard take > 0 else { return [] }
+        return (0..<rows).flatMap { row -> ArraySlice<PaintColour> in
+            let start = row * Self.columns
+            guard start < swatches.count else { return [] }
+            return swatches[start..<min(start + take, swatches.count)]
+        }
+    }
+
+    /// The same leading columns walked column-first, so each pair of swatches
+    /// is one column of the grid rather than one row.
+    ///
+    /// This is what a thin side rail renders: the palette turned on its side,
+    /// two swatches across instead of two deep, with every muted colour still
+    /// next to the saturated one it is paired with.
+    public func leadingColumnPairs(_ count: Int) -> [PaintColour] {
+        let take = max(0, min(count, Self.columns))
+        guard take > 0 else { return [] }
+        return (0..<take).flatMap { column in
+            (0..<rows).compactMap { self[$0 * Self.columns + column] }
+        }
+    }
+
     public subscript(index: Int) -> PaintColour? {
         swatches.indices.contains(index) ? swatches[index] : nil
     }

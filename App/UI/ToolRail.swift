@@ -1,20 +1,33 @@
 import PaintKit
 import SwiftUI
 
-/// The permanent chrome: every tool, both colours, the whole palette.
+/// The permanent chrome: every tool, both colours, the palette.
 ///
 /// **Nothing here is hidden.** The classic app put its tools, its two loaded
-/// colours and all twenty-eight swatches on screen at once, and that is the
-/// single reason people who had never read a manual could use it. A popover you
-/// have to know about is a worse control than a swatch you can already see.
+/// colours and its swatches on screen at once, and that is the single reason
+/// people who had never read a manual could use it. A popover you have to know
+/// about is a worse control than a swatch you can already see.
+///
+/// **The rail is one cell thick, on either edge.** A side rail is width taken
+/// away from the artwork permanently, on the axis a picture usually needs most,
+/// so it has to stay as thin as the bottom bar is short — a single file of
+/// buttons, not a panel. Everything in it is built to `Rail.cross`, so the
+/// column has one edge rather than five.
 ///
 /// The rail is vertical on the left by default — the layout every paint tool
-/// has used since 1985, and the one that leaves the window's full width to the
-/// artwork — and flips to a bottom bar on request. Both orientations render the
-/// same pieces from the same code, so neither can drift into being the
-/// second-class one.
+/// has used since 1985 — and flips to a bottom bar on request. Both
+/// orientations render the same pieces from the same code, transposed, so
+/// neither can drift into being the second-class one.
+///
+/// The one place they differ is palette breadth: the bottom bar has the window's
+/// width and carries all fourteen columns, and the side rail has the window's
+/// height and carries the leading seven. Both are two swatches across. The rest
+/// is one click away in the colour popover.
 struct ToolRail: View {
     @Bindable var model: EditorModel
+    /// Columns of the palette this rail has room for. The side rail hands down
+    /// what the window's height allows; the bottom bar always has all fourteen.
+    var swatchPairs: Int = Tokens.Rail.swatchPairs
     /// Fires when a tool cell is clicked, so the options panel can point at it.
     var onSelect: (ToolKind) -> Void = { _ in }
 
@@ -28,8 +41,7 @@ struct ToolRail: View {
                 VStack(alignment: .center, spacing: Tokens.Rail.sectionSpacing) {
                     toolGroups
                     separator
-                    colourBlock(columns: 4)
-                    separator
+                    colourBlock
                     edgeToggle
                 }
                 .padding(Tokens.Rail.padding)
@@ -37,8 +49,7 @@ struct ToolRail: View {
                 HStack(alignment: .center, spacing: Tokens.Rail.sectionSpacing) {
                     toolGroups
                     separator
-                    colourBlock(columns: 14)
-                    separator
+                    colourBlock
                     edgeToggle
                 }
                 .padding(Tokens.Rail.padding)
@@ -51,26 +62,23 @@ struct ToolRail: View {
 
     // MARK: - Tools
 
-    /// Tool cells in their three runs, two abreast when vertical so the rail
-    /// stays a rail rather than a column you scroll.
+    /// Tool cells in their three runs, one abreast — a single file of buttons
+    /// along the rail, whichever edge it is on.
     @ViewBuilder
     private var toolGroups: some View {
-        if isVertical {
-            VStack(spacing: Tokens.Rail.sectionSpacing) {
-                ForEach(Array(ToolKind.groups.enumerated()), id: \.offset) { index, group in
-                    if index > 0 { separator }
-                    FixedGrid(group, columns: 2, spacing: Tokens.Space.hair) {
-                        cell(for: $0)
-                    }
-                }
-            }
-        } else {
-            HStack(spacing: Tokens.Rail.sectionSpacing) {
-                ForEach(Array(ToolKind.groups.enumerated()), id: \.offset) { index, group in
-                    if index > 0 { separator }
-                    FixedGrid(group, columns: group.count, spacing: Tokens.Space.hair) {
-                        cell(for: $0)
-                    }
+        let layout = isVertical
+            ? AnyLayout(VStackLayout(spacing: Tokens.Rail.sectionSpacing))
+            : AnyLayout(HStackLayout(spacing: Tokens.Rail.sectionSpacing))
+
+        layout {
+            ForEach(Array(ToolKind.groups.enumerated()), id: \.offset) { index, group in
+                if index > 0 { separator }
+                FixedGrid(
+                    group,
+                    columns: isVertical ? Tokens.Rail.toolColumns : group.count,
+                    spacing: Tokens.Space.hair
+                ) {
+                    cell(for: $0)
                 }
             }
         }
@@ -98,26 +106,26 @@ struct ToolRail: View {
     /// Grouped because they are one idea: *these* are loaded, *those* are what
     /// you can load. Separated, the pair reads as a preview and the grid as
     /// decoration.
+    ///
+    /// The grid runs *along* the rail and is two swatches across it, so the
+    /// block is the same thickness as a tool cell on either edge.
     @ViewBuilder
-    private func colourBlock(columns: Int) -> some View {
-        Group {
-            if isVertical {
-                VStack(spacing: Tokens.Space.tight) {
-                    ColourControls(model: model, isVertical: true)
-                    PaletteGrid(model: model, columns: columns)
-                }
-            } else {
-                HStack(spacing: Tokens.Space.tight) {
-                    ColourControls(model: model, isVertical: false)
-                    PaletteGrid(model: model, columns: columns)
-                }
+    private var colourBlock: some View {
+        let layout = isVertical
+            ? AnyLayout(VStackLayout(spacing: Tokens.Space.tight))
+            : AnyLayout(HStackLayout(spacing: Tokens.Space.tight))
+
+        layout {
+            ColourControls(model: model, isVertical: isVertical)
+            if swatchPairs > 0 {
+                PaletteGrid(model: model, isVertical: isVertical, pairs: swatchPairs)
             }
         }
-            .padding(Tokens.Rail.colourInset)
-            .background {
-                RoundedRectangle(cornerRadius: Tokens.Radius.well, style: .continuous)
-                    .fill(.primary.opacity(0.06))
-            }
+        .padding(Tokens.Rail.colourInset)
+        .background {
+            RoundedRectangle(cornerRadius: Tokens.Radius.well, style: .continuous)
+                .fill(.primary.opacity(0.06))
+        }
     }
 
     /// A hairline between runs. Sized to the run it divides rather than to the
@@ -126,7 +134,7 @@ struct ToolRail: View {
         Rectangle()
             .fill(.primary.opacity(0.12))
             .frame(
-                width: isVertical ? Tokens.Rail.run : 1,
+                width: isVertical ? Tokens.Rail.cross : 1,
                 height: isVertical ? 1 : Tokens.Size.toolCell - Tokens.Space.base
             )
     }
@@ -269,7 +277,14 @@ private struct ColourControls: View {
     @State private var isPopoverPresented = false
 
     var body: some View {
-        HStack(spacing: Tokens.Space.tight) {
+        // Swap sits beside the pair along the bottom bar and beneath it in the
+        // side rail: it follows the rail's long axis, so neither orientation
+        // has to widen for it.
+        let layout = isVertical
+            ? AnyLayout(VStackLayout(spacing: Tokens.Space.hair))
+            : AnyLayout(HStackLayout(spacing: Tokens.Space.tight))
+
+        layout {
             // Overlapped, front over back — the arrangement the original used,
             // and the one that says "one is in front of the other" without a
             // word of explanation.
@@ -288,7 +303,10 @@ private struct ColourControls: View {
             } label: {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 10, weight: .medium))
-                    .frame(width: Tokens.Size.colourSwap, height: Tokens.Size.colourWell)
+                    .frame(
+                        width: isVertical ? Tokens.Rail.run : Tokens.Size.colourSwap,
+                        height: isVertical ? Tokens.Size.colourSwap : Tokens.Size.colourWell
+                    )
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -300,7 +318,7 @@ private struct ColourControls: View {
             }
             .accessibilityLabel("Swap the front and back colours")
         }
-        .frame(width: Tokens.Rail.run, alignment: .leading)
+        .frame(width: isVertical ? Tokens.Rail.cross : nil, alignment: .center)
         .popover(isPresented: $isPopoverPresented, arrowEdge: isVertical ? .trailing : .top) {
             ColourPopover(model: model)
         }
@@ -348,18 +366,43 @@ private struct ColourControls: View {
     }
 }
 
-/// Every swatch, always visible.
+/// The palette, always exactly two rows.
+///
+/// Two rows is the whole formatting rule for this block. The grid used to take
+/// as many rows as it needed — seven of them beside a narrow rail, and an extra
+/// one the moment a custom colour was used — which made the rail as tall as the
+/// window and left `Rail.horizontalThickness` describing a bar 18pt shorter
+/// than the one actually on screen. Now the *columns* flex with the rail and
+/// the row count never does, so the declared thickness is the real thickness.
+///
+/// Recent custom colours moved to the popover for the same reason: they arrive
+/// unpredictably, and a toolbar that changes height while you work is a toolbar
+/// that moves the button you were reaching for.
 ///
 /// Click loads the front colour, right-click loads the back one — the same
 /// button mapping as the canvas, so the palette teaches the canvas.
 private struct PaletteGrid: View {
     @Bindable var model: EditorModel
-    let columns: Int
-
-    private var swatches: [PaintColour] { model.palette.swatches + model.recentColours }
+    let isVertical: Bool
+    let pairs: Int
 
     var body: some View {
-        FixedGrid(swatches, columns: columns, spacing: 2) { swatch($0) }
+        if isVertical {
+            // Column-first, two across: each row is one classic column, so the
+            // muted swatch and its saturated partner sit side by side instead
+            // of fourteen rows apart.
+            FixedGrid(
+                model.palette.leadingColumnPairs(pairs),
+                columns: Tokens.Rail.swatchColumns,
+                spacing: Tokens.Rail.swatchGap
+            ) { swatch($0) }
+        } else {
+            FixedGrid(
+                model.palette.leadingColumns(pairs),
+                columns: Palette.columns,
+                spacing: Tokens.Rail.swatchGap
+            ) { swatch($0) }
+        }
     }
 
     private func swatch(_ colour: PaintColour) -> some View {

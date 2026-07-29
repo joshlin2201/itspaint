@@ -27,14 +27,22 @@ people mostly want to draw on a screenshot rather than paint a picture.
 
 ### 1. Nothing that matters is hidden
 
-Twelve tools, both colours and all 28 swatches are on screen at all times. A
+Twelve tools, both loaded colours and a palette are on screen at all times. A
 popover you have to know about is a worse control than a swatch you can already
 see.
 
-**The cost, stated plainly:** the rail takes ~90pt of window that a floating
-cluster would have given back to the artwork. That is the price of never making
-someone hunt for a swatch, and it is worth it — an earlier revision of this app
-put the palette behind a popover and it was measurably harder to use.
+**The cost, stated plainly:** the rail takes 48pt of window on whichever edge it
+is on. That is the price of never making someone hunt for a tool, and it is
+worth it — an earlier revision of this app put the palette behind a popover and
+it was measurably harder to use.
+
+**Where the rule bends, and why.** The bottom bar has the window's width and
+carries all 28 swatches; the side rail has only its own 48pt of width and
+carries the leading 14. The alternative was a rail three cells thick and the
+full height of the window — which is a panel, and a panel that permanently eats
+width is a worse trade than fourteen swatches one click away. Both orientations
+still show two swatches across, and both keep the classic column pairing, so a
+colour is always where the eye expects it.
 
 ### 2. The rail lists jobs; a tool's options list its variations
 

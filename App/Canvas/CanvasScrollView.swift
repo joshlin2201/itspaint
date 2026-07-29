@@ -53,8 +53,12 @@ struct CanvasScrollView: NSViewRepresentable {
         // done here — re-laying out and rebuilding cursor rects on every stroke
         // segment, which is work proportional to input rate for no benefit.
         canvas.repaintIfChanged(revision: model.revision)
+        canvas.refreshCursorIfNeeded()
         canvas.invalidateCanvasSize()
         fitToViewport(scrollView, canvas: canvas)
+        // After the fit, so the reveal scrolls against the zoom the content
+        // will actually be drawn at.
+        canvas.revealFloatingIfNeeded()
     }
 
     /// Keep the whole artwork in the viewport until the user picks a zoom.

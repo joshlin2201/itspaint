@@ -95,6 +95,32 @@ final class CanvasNSView: NSView {
         needsDisplay = true
     }
 
+    /// Scroll newly floating content into view.
+    ///
+    /// Paste and drop place content at the engine's own origin, which on a
+    /// zoomed or scrolled canvas is routinely nowhere near what the user is
+    /// looking at — and a paste you cannot see is indistinguishable from a
+    /// paste that did not happen. Only the *arrival* of floating content
+    /// scrolls; dragging it changes the origin every frame, and chasing that
+    /// would take the canvas away from under the pointer mid-gesture.
+    func revealFloatingIfNeeded() {
+        let floating = model?.floating
+        defer { wasFloating = floating != nil }
+        guard !wasFloating, let floating else { return }
+
+        let frame = floating.frame
+        scrollToVisible(NSRect(
+            x: Double(frame.minX) * zoom,
+            y: Double(frame.minY) * zoom,
+            width: Double(frame.width) * zoom,
+            height: Double(frame.height) * zoom
+        ).insetBy(dx: -Self.revealMargin, dy: -Self.revealMargin))
+    }
+
+    private var wasFloating = false
+    /// Enough room around revealed content for its resize handles.
+    private static let revealMargin: CGFloat = 24
+
     /// Repaint for a change that did not come through this view — a menu
     /// command, an undo, a document revert.
     ///
@@ -160,13 +186,21 @@ final class CanvasNSView: NSView {
         }
 
         drawMarquee(context: context, model: model)
-        // The text box while it is being dragged out; once the editor is up it
-        // draws its own caret and the ants would only fight it.
-        if let textBox, textEditor == nil {
-            drawAnts(around: CGRect(
+        if let textBox {
+            let frame = CGRect(
                 x: Double(textBox.minX) * zoom, y: Double(textBox.minY) * zoom,
                 width: Double(textBox.width) * zoom, height: Double(textBox.height) * zoom
-            ), context: context)
+            )
+            // Ants only while the box is being dragged out — once the editor is
+            // up it draws its own caret and the ants would fight it. The
+            // **handles stay**, because they are the only thing saying the box
+            // can be resized, which is the whole reason it reads as an object
+            // rather than a place where letters happen to appear.
+            if textEditor == nil {
+                drawAnts(around: frame, context: context)
+            } else {
+                drawHandles(around: frame, context: context)
+            }
         }
         drawBrushPreview(context: context, model: model)
         drawPixelCursor(context: context, model: model)
@@ -178,16 +212,26 @@ final class CanvasNSView: NSView {
     /// system colours keeps the grid legible in both appearances without adding
     /// another accent to the canvas.
     private func drawTransparencyGrid(in dirtyRect: NSRect, context: CGContext) {
+        // Clipped to the view's own bounds, not painted across the whole dirty
+        // rect. The layer deliberately does not mask — that is what lets the
+        // sheet shadow fall outside the artwork — and AppKit pads the dirty
+        // rect to cover that shadow, so filling it directly laid a band of
+        // checkerboard along the top and bottom edges of every document,
+        // outside the canvas, where there is no transparency to report.
+        let rect = dirtyRect.intersection(bounds)
+        guard !rect.isEmpty else { return }
+
         let tile = Tokens.Size.transparencyTile
         context.saveGState()
+        context.clip(to: rect)
         context.setFillColor(NSColor.controlBackgroundColor.cgColor)
-        context.fill(dirtyRect)
+        context.fill(rect)
         context.setFillColor(NSColor.separatorColor.withAlphaComponent(0.22).cgColor)
 
-        let startColumn = Int(floor(dirtyRect.minX / tile))
-        let endColumn = Int(ceil(dirtyRect.maxX / tile))
-        let startRow = Int(floor(dirtyRect.minY / tile))
-        let endRow = Int(ceil(dirtyRect.maxY / tile))
+        let startColumn = Int(floor(rect.minX / tile))
+        let endColumn = Int(ceil(rect.maxX / tile))
+        let startRow = Int(floor(rect.minY / tile))
+        let endRow = Int(ceil(rect.maxY / tile))
         for row in startRow..<endRow {
             for column in startColumn..<endColumn where (row + column).isMultiple(of: 2) {
                 context.fill(CGRect(
@@ -307,14 +351,17 @@ final class CanvasNSView: NSView {
         context.restoreGState()
 
         drawAnts(around: frame, context: context)
-        drawHandles(around: frame, context: context, selection: floating)
+        drawHandles(around: frame, context: context)
     }
 
     /// Resize handles: white squares with a dark outline, drawn at a constant
     /// **screen** size so they stay grabbable at any zoom.
-    private func drawHandles(
-        around frame: CGRect, context: CGContext, selection: FloatingSelection
-    ) {
+    ///
+    /// Derived from the on-screen rect rather than from a selection, because
+    /// the text box gets the same eight handles and the same look — a box you
+    /// can drag by its corners should not be signalled two different ways
+    /// depending on which tool made it.
+    private func drawHandles(around frame: CGRect, context: CGContext) {
         // Below this the handles would cover the content they resize; the
         // engine's hit-testing caps its tolerance the same way.
         guard frame.width > Self.handleScreenSize * 3,
@@ -323,11 +370,18 @@ final class CanvasNSView: NSView {
         context.saveGState()
         context.setShouldAntialias(true)
         let size = Self.handleScreenSize
+        let midX = frame.midX
+        let midY = frame.midY
+        let centres = [
+            CGPoint(x: frame.minX, y: frame.minY), CGPoint(x: midX, y: frame.minY),
+            CGPoint(x: frame.maxX, y: frame.minY), CGPoint(x: frame.minX, y: midY),
+            CGPoint(x: frame.maxX, y: midY), CGPoint(x: frame.minX, y: frame.maxY),
+            CGPoint(x: midX, y: frame.maxY), CGPoint(x: frame.maxX, y: frame.maxY),
+        ]
 
-        for (_, centre) in selection.handleCentres() {
+        for centre in centres {
             let rect = CGRect(
-                x: Double(centre.x) * zoom - size / 2,
-                y: Double(centre.y) * zoom - size / 2,
+                x: centre.x - size / 2, y: centre.y - size / 2,
                 width: size, height: size
             )
             let path = CGPath(
@@ -873,10 +927,16 @@ final class CanvasNSView: NSView {
             x: Double(rect.minX) * zoom, y: Double(rect.minY) * zoom,
             width: Double(rect.width) * zoom, height: Double(rect.height) * zoom
         ))
-        let pointSize = style.pointSize * zoom
-        editor.font = NSFont(name: style.fontName, size: pointSize)
-            ?? .systemFont(ofSize: pointSize)
+        // The editor renders through the *same* font resolution the rasteriser
+        // uses, traits and all, so what is on screen while you type is what
+        // lands. A live editor showing an upright face and committing an italic
+        // one is worse than no preview at all.
+        var scaled = style
+        scaled.pointSize = style.pointSize * zoom
+        editor.font = scaled.makeFont() as NSFont
         editor.textColor = NSColor(cgColor: model.foreground.cgColor) ?? .textColor
+        editor.typingAttributes[.underlineStyle] =
+            style.isUnderlined ? NSUnderlineStyle.single.rawValue : 0
         editor.alignment = switch style.alignment {
         case .left: .left
         case .centre: .center
@@ -884,19 +944,80 @@ final class CanvasNSView: NSView {
         }
         editor.drawsBackground = false
         editor.isRichText = false
-        editor.isVerticallyResizable = false
+        // Vertically resizable, because the box grows with the text. Fixed, it
+        // let the caret move to a second line that the box had no room for —
+        // so Return appeared to work and everything typed after it was invisible
+        // both in the editor and, because `CTFrameDraw` clips to the box path,
+        // in the committed pixels.
+        editor.isVerticallyResizable = true
         editor.textContainerInset = .zero
         editor.textContainer?.lineFragmentPadding = 0
+        editor.textContainer?.widthTracksTextView = true
         editor.delegate = self
         editor.onCancel = { [weak self] in self?.cancelText() }
         editor.onCommit = { [weak self] in self?.commitText() }
         editor.onMove = { [weak self] delta in self?.moveTextBox(by: delta) }
+        editor.onResize = { [weak self] handle, point in
+            self?.resizeTextBox(handle, to: point)
+        }
+        editor.handleTolerance = { [weak self] in
+            CGFloat(self?.canvasHandleTolerance ?? 8) * (self?.zoom ?? 1)
+        }
 
         addSubview(editor)
         textEditor = editor
         window?.makeFirstResponder(editor)
-        invalidate(rect.insetBy(-2))
+        invalidate(rect.insetBy(-handleInset))
     }
+
+    /// Grow the box to hold what has been typed.
+    ///
+    /// The width is the user's — they dragged it out, or resized it by a
+    /// handle — so only the height follows the text. Growing the width too
+    /// would fight the wrap they asked for.
+    private func growTextBoxToFit() {
+        guard let editor = textEditor, let box = textBox, let model else { return }
+        var style = model.engine.settings.textStyle
+        style.colour = model.foreground
+
+        let needed = TextRenderer.measure(editor.string, style: style, maxWidth: box.width)
+        // One line of slack, so the caret on a freshly opened line is inside
+        // the box rather than sitting on its bottom edge.
+        let lineHeight = max(1, Int((style.pointSize * 1.35).rounded()))
+        let height = max(lineHeight, needed.height + lineHeight / 3)
+        guard height != box.height else { return }
+
+        let grown = PixelRect(x: box.minX, y: box.minY, width: box.width, height: height)
+        let previous = box
+        textBox = grown
+        editor.frame.size.height = Double(height) * zoom
+        invalidate(previous.union(grown).insetBy(-handleInset))
+    }
+
+    /// Drag one of the box's own handles.
+    private func resizeTextBox(_ handle: PixelRect.Handle, to windowPoint: NSPoint) {
+        guard let editor = textEditor, let box = textBox, let model else { return }
+        let point = pixelPoint(from: convert(windowPoint, from: nil))
+        let resized = box.dragging(handle, to: point, uniform: false)
+
+        // A box narrower than one character renders nothing, and a box dragged
+        // off-canvas can never be typed into again.
+        guard resized.width >= 8, resized.height >= 8,
+              resized.intersection(model.canvas.bounds).width > 4 else { return }
+
+        let previous = box
+        textBox = resized
+        editor.frame = NSRect(
+            x: Double(resized.minX) * zoom, y: Double(resized.minY) * zoom,
+            width: Double(resized.width) * zoom, height: Double(resized.height) * zoom
+        )
+        invalidate(previous.union(resized).insetBy(-handleInset))
+        // Rewrapping at the new width can need more or fewer lines than before.
+        growTextBoxToFit()
+    }
+
+    /// Room around the box for its handles, in canvas pixels.
+    private var handleInset: Int { max(2, Int((Self.handleScreenSize / max(zoom, 0.01)).rounded())) }
 
     /// Rasterise the open box. Called on ⌘↩, on a click elsewhere, on a tool or
     /// zoom change, and whenever the editor loses focus — text that vanished
@@ -1208,6 +1329,43 @@ final class CanvasNSView: NSView {
         addCursorRect(bounds, cursor: cursorForCurrentTool())
     }
 
+    /// Rebuild the cursor when the thing it depends on has changed.
+    ///
+    /// Cursor rects are deliberately *not* rebuilt on every mouse-moved event —
+    /// that is layout work proportional to input rate. But nothing rebuilt them
+    /// on a **tool change** either, so picking a tool left the pointer showing
+    /// the previous tool's cursor until something unrelated happened to
+    /// invalidate it. Every tool was affected; the pencil was simply the one
+    /// whose cursor is most obviously wrong when it does not appear.
+    ///
+    /// Keyed on everything `cursorForCurrentTool` actually reads, so it cannot
+    /// go stale again when a new dependency is added there without thinking.
+    func refreshCursorIfNeeded() {
+        guard let model else { return }
+        let key = CursorKey(
+            tool: model.tool,
+            nib: model.engine.settings.nib.size,
+            zoomStep: Int(max(zoom, 1)),
+            hasFloating: model.floating != nil,
+            hasPendingShape: model.engine.hasPendingShape,
+            isSpaceHeld: isSpaceHeld
+        )
+        guard key != cursorKey else { return }
+        cursorKey = key
+        window?.invalidateCursorRects(for: self)
+    }
+
+    private struct CursorKey: Equatable {
+        var tool: ToolKind
+        var nib: Int
+        var zoomStep: Int
+        var hasFloating: Bool
+        var hasPendingShape: Bool
+        var isSpaceHeld: Bool
+    }
+
+    private var cursorKey: CursorKey?
+
     private func cursorForCurrentTool() -> NSCursor {
         guard let model else { return .arrow }
         if model.engine.hasPendingShape { return .crosshair }
@@ -1314,15 +1472,78 @@ final class CanvasNSView: NSView {
         return NSCursor(image: image, hotSpot: .zero)
     }()
 
-    private static func cursor(for handle: FloatingSelection.Handle) -> NSCursor {
-        // AppKit ships no public diagonal resize cursors, so corners fall back
-        // to the nearer axis rather than to a wrong-looking arrow.
+    /// The double-headed arrow for a resize handle, at that handle's own angle.
+    ///
+    /// AppKit publishes no diagonal resize cursor, and the private
+    /// `_windowResizeNorthWestSouthEastCursor` is not something a sandboxed app
+    /// heading for the App Store should depend on. So all four are drawn here
+    /// from one generator: corners genuinely point at the corner they resize,
+    /// and the axis pair matches them rather than being system art next to
+    /// hand-drawn art.
+    static func cursor(for handle: PixelRect.Handle) -> NSCursor {
         switch handle {
-        case .left, .right: .resizeLeftRight
-        case .top, .bottom: .resizeUpDown
-        case .topLeft, .bottomRight, .topRight, .bottomLeft: .crosshair
+        case .left, .right: resizeCursor(degrees: 0)
+        case .top, .bottom: resizeCursor(degrees: 90)
+        // The cursor image is drawn unflipped, so its space is y-**up**. A
+        // positive rotation of the horizontal arrow therefore points up and to
+        // the right — the top-right / bottom-left diagonal — and the top-left
+        // corner is the negative one. Getting this backwards is invisible in
+        // code review and obvious the first time you grab a corner.
+        case .topRight, .bottomLeft: resizeCursor(degrees: 45)
+        case .topLeft, .bottomRight: resizeCursor(degrees: -45)
         }
     }
+
+    /// A white double-headed arrow with a black outline — the macOS resize
+    /// cursor's own construction, so it reads correctly on any artwork.
+    private static func resizeCursor(degrees: CGFloat) -> NSCursor {
+        if let cached = resizeCursorCache[degrees] { return cached }
+
+        let side: CGFloat = 24
+        let centre = side / 2
+        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            context.translateBy(x: centre, y: centre)
+            context.rotate(by: degrees * .pi / 180)
+
+            // One horizontal shaft with an arrowhead at each end, built as a
+            // single path so the outline traces the whole silhouette rather
+            // than seaming where the pieces meet.
+            let reach: CGFloat = 9
+            let head: CGFloat = 4.5
+            let shaft: CGFloat = 1.6
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: -reach, y: 0))
+            path.addLine(to: CGPoint(x: -reach + head, y: head))
+            path.addLine(to: CGPoint(x: -reach + head, y: shaft))
+            path.addLine(to: CGPoint(x: reach - head, y: shaft))
+            path.addLine(to: CGPoint(x: reach - head, y: head))
+            path.addLine(to: CGPoint(x: reach, y: 0))
+            path.addLine(to: CGPoint(x: reach - head, y: -head))
+            path.addLine(to: CGPoint(x: reach - head, y: -shaft))
+            path.addLine(to: CGPoint(x: -reach + head, y: -shaft))
+            path.addLine(to: CGPoint(x: -reach + head, y: -head))
+            path.closeSubpath()
+
+            context.setShouldAntialias(true)
+            context.addPath(path)
+            context.setStrokeColor(NSColor.black.cgColor)
+            context.setLineWidth(2.5)
+            context.setLineJoin(.round)
+            context.strokePath()
+
+            context.addPath(path)
+            context.setFillColor(NSColor.white.cgColor)
+            context.fillPath()
+            return true
+        }
+
+        let cursor = NSCursor(image: image, hotSpot: NSPoint(x: centre, y: centre))
+        resizeCursorCache[degrees] = cursor
+        return cursor
+    }
+
+    private static var resizeCursorCache: [CGFloat: NSCursor] = [:]
 
     /// Handle grab radius expressed in canvas pixels, derived from zoom so the
     /// target stays a constant on-screen size.
@@ -1337,6 +1558,11 @@ extension CanvasNSView: NSTextViewDelegate {
     func textDidEndEditing(_ notification: Notification) {
         commitText()
     }
+
+    /// Every keystroke can change how many lines the text needs.
+    func textDidChange(_ notification: Notification) {
+        growTextBoxToFit()
+    }
 }
 
 /// The in-canvas text box.
@@ -1349,35 +1575,101 @@ private final class TextEntryView: NSTextView {
     var onCancel: (() -> Void)?
     var onCommit: (() -> Void)?
     var onMove: ((NSPoint) -> Void)?
+    /// Reports a handle drag, in window coordinates.
+    var onResize: ((PixelRect.Handle, NSPoint) -> Void)?
+    /// Grab radius in this view's own points, supplied by the canvas so it
+    /// tracks zoom the same way the floating selection's does.
+    var handleTolerance: (() -> CGFloat)?
 
     override func cancelOperation(_ sender: Any?) { onCancel?() }
 
-    /// ⌘-drag moves the box. The modifier rather than a grab handle: a handle
-    /// would sit over the artwork you are annotating, and ⌘-drag is already
-    /// what moves an object in half the apps on the machine.
+    /// A handle drag, a ⌘-drag to move, or ordinary text selection.
+    ///
+    /// The handles are hit-tested **here** rather than on the canvas because
+    /// the text view sits on top of the box and would otherwise eat every
+    /// click on it. Testing in one place also means the text box and the
+    /// floating selection resolve a grab through the same
+    /// `PixelRect.handle(at:tolerance:)` — one tolerance, one tie-break, one
+    /// set of edge-crossing rules.
     override func mouseDown(with event: NSEvent) {
+        if let handle = handle(at: convert(event.locationInWindow, from: nil)) {
+            track(event) { [weak self] point in self?.onResize?(handle, point) }
+            return
+        }
+        // ⌘-drag moves the box. The modifier as well as the handles, because
+        // grabbing the middle of a text box has to keep meaning "select text".
         guard event.modifierFlags.contains(.command) else { return super.mouseDown(with: event) }
         var last = event.locationInWindow
-        // Track the drag here rather than through the responder chain: the text
-        // view would otherwise be selecting text with the same gesture.
-        while let next = window?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
-            if next.type == .leftMouseUp { break }
-            let here = next.locationInWindow
-            onMove?(NSPoint(x: here.x - last.x, y: last.y - here.y))
-            last = here
+        track(event) { [weak self] point in
+            self?.onMove?(NSPoint(x: point.x - last.x, y: last.y - point.y))
+            last = point
         }
     }
 
+    /// Follow a drag to its mouse-up, reporting each position in window space.
+    ///
+    /// Tracked here rather than through the responder chain: the text view
+    /// would otherwise be selecting text with the same gesture.
+    private func track(_ event: NSEvent, _ step: (NSPoint) -> Void) {
+        while let next = window?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            if next.type == .leftMouseUp { break }
+            step(next.locationInWindow)
+        }
+    }
+
+    /// The handle under a point in this view's coordinates.
+    ///
+    /// The box's own geometry is its bounds, so the shared rectangle model is
+    /// asked in points and the answer is in the same handle vocabulary the
+    /// canvas already draws and picks cursors for.
+    private func handle(at point: NSPoint) -> PixelRect.Handle? {
+        let tolerance = Int((handleTolerance?() ?? 8).rounded())
+        let box = PixelRect(
+            x: 0, y: 0,
+            width: max(1, Int(bounds.width.rounded())),
+            height: max(1, Int(bounds.height.rounded()))
+        )
+        return box.handle(
+            at: PixelPoint(x: Int(point.x.rounded()), y: Int(point.y.rounded())),
+            tolerance: tolerance
+        )
+    }
+
+    /// I-beam in the middle, resize arrows on the edges — the same cursors the
+    /// canvas shows for a floating selection's handles.
     override func resetCursorRects() {
+        discardCursorRects()
         addCursorRect(bounds, cursor: .iBeam)
+
+        let reach = max(3, (handleTolerance?() ?? 8).rounded())
+        let box = PixelRect(
+            x: 0, y: 0,
+            width: max(1, Int(bounds.width.rounded())),
+            height: max(1, Int(bounds.height.rounded()))
+        )
+        for (handle, centre) in box.handleCentres() {
+            let rect = NSRect(
+                x: CGFloat(centre.x) - reach, y: CGFloat(centre.y) - reach,
+                width: reach * 2, height: reach * 2
+            ).intersection(bounds)
+            guard !rect.isEmpty else { continue }
+            addCursorRect(rect, cursor: CanvasNSView.cursor(for: handle))
+        }
     }
 
     override func keyDown(with event: NSEvent) {
-        // 36 = Return.
+        // 36 = Return. ⌘↩ lands the box; a bare Return is a new line, which
+        // needs the box to grow — see `growTextBoxToFit`.
         if event.keyCode == 36, event.modifierFlags.contains(.command) {
             onCommit?()
             return
         }
         super.keyDown(with: event)
+    }
+
+    /// The frame changing means the handle rects moved with it.
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        window?.invalidateCursorRects(for: self)
     }
 }

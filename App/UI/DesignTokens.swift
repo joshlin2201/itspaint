@@ -41,12 +41,20 @@ enum Tokens {
     enum Size {
         /// Inner element of a segmented control.
         static let segment: CGFloat = 24
+        /// The options panel's label column.
+        ///
+        /// Fixed, so "Size", "Stroke", "Flow" and "Corner" all end at the same
+        /// x and every control in the panel starts at the same x. This one
+        /// number is the difference between a panel and a stack of unrelated
+        /// rows that happen to share a background.
+        static let optionLabel: CGFloat = 46
         /// An action button inside the options panel.
         static let pillAction: CGFloat = 26
         /// A tool cell in the rail.
         static let toolCell: CGFloat = 34
-        /// One of the two loaded colours. Sized with the swap button so the
-        /// colour block is exactly as wide as the two-cell tool grid above it.
+        /// One of the two loaded colours. Overlapped with its partner, the pair
+        /// is 34.08pt across — fractionally wider than a tool cell, and so the
+        /// widest thing in the rail. `Rail.cross` is measured from it.
         static let colourWell: CGFloat = 24
         static let colourSwap: CGFloat = 18
         /// Glyph inside a tool cell — optically sized, not mathematically.
@@ -132,31 +140,64 @@ enum Tokens {
     // MARK: - The rail
 
     enum Rail {
-        /// The width of a two-cell run: everything in the rail — the colour
-        /// block, the palette, the separators — is built to this so the column
-        /// has one edge rather than five.
-        static let run: CGFloat = Size.toolCell * 2 + Space.hair
+        /// **One cell across, whichever edge it is on.**
+        ///
+        /// The bottom bar is a single row of tools; the side rail is the same
+        /// bar stood on its end, and it has to stay as *thin* as the bottom one
+        /// is *short*. A multi-column side rail turns a toolbar into a panel —
+        /// it is width taken away from the artwork, permanently, on the axis a
+        /// picture usually needs most.
+        static let run: CGFloat = Size.toolCell
+        static let toolColumns = 1
+
+        /// The palette is two swatches across a side rail and two swatches deep
+        /// along the bottom bar: the same grid, transposed with the rail.
+        static let swatchColumns = 2
+        static let swatchGap: CGFloat = 2
+
+        /// Columns of the classic grid a side rail carries.
+        ///
+        /// Half of them. A thin rail spends its length on tools, and the full
+        /// fourteen pairs would run past the bottom of the window on a laptop
+        /// screen. The other half is one click away in the colour popover, and
+        /// the pairs kept are the leading ones, so a swatch is where it always
+        /// was.
+        static let swatchPairs = 7
 
         /// Chrome should hug its controls. The old shared 90pt thickness made
         /// the bottom layout inherit the side rail's proportions and read as a
         /// dock. Each orientation now sizes to the content it actually carries.
-        static let padding: CGFloat = 6
+        static let padding: CGFloat = 5
         static let sectionSpacing: CGFloat = Space.tight
         static let colourInset: CGFloat = Space.hair
-        static let verticalThickness: CGFloat =
-            run + colourInset * 2 + padding * 2
-        static let horizontalThickness: CGFloat =
-            max(Size.colourWell * 1.42, Size.swatch * 2 + Space.hair)
-            + colourInset * 2 + padding * 2
 
-        static func thickness(for edge: EditorModel.ChromeEdge) -> CGFloat {
-            edge.isVertical ? verticalThickness : horizontalThickness
-        }
+        /// The widest thing the rail carries across its short axis. The loaded
+        /// colour pair, overlapped, is fractionally wider than a tool cell —
+        /// which is why the rail is 48pt and not 44.
+        static let cross: CGFloat = max(
+            run,
+            Size.colourWell * 1.42,
+            Size.swatch * CGFloat(swatchColumns) + swatchGap * CGFloat(swatchColumns - 1)
+        )
+
+        /// **One thickness, both orientations.**
+        ///
+        /// Not two constants that happen to agree: the side rail and the bottom
+        /// bar carry the same controls across their short axis, so a single
+        /// number is the only version of this that cannot drift apart when one
+        /// of them gains a row.
+        static let thickness: CGFloat = cross + colourInset * 2 + padding * 2
 
         /// The options panel beside it. Fixed, so the chrome never resizes with
         /// the window: a toolbar that grows with the frame is a toolbar you
         /// have to re-learn at every size.
+        ///
+        /// It is also what lets the panel's rows share a grid. A panel that
+        /// sizes to its widest row cannot align anything, because every tool
+        /// gives it a different width to align to.
         static let optionsWidth: CGFloat = 258
+        /// Inside the panel's own padding.
+        static let optionsContentWidth: CGFloat = optionsWidth - Space.snug * 2
     }
 
     // MARK: - Chrome geometry
@@ -178,14 +219,14 @@ enum Tokens {
         /// Leading room reserved for the native macOS traffic lights.
         static let trafficLightClearance: CGFloat = 68
 
-        /// How far the rail sits from the window edge. Small: the rail is part
-        /// of the window's furniture, not a panel hovering inside it.
-        static let railInset: CGFloat = Space.base
+        /// How far the rail sits from the window edge. Matched to `frameGap`
+        /// so the rail and the artwork share one margin instead of the rail
+        /// sitting on a wider inset than everything around it.
+        static let railInset: CGFloat = frameGap
 
-        /// Space the rail actually takes away from the artwork.
-        static func railFootprint(for edge: EditorModel.ChromeEdge) -> CGFloat {
-            Rail.thickness(for: edge) + railInset + Space.tight
-        }
+        /// Space the rail actually takes away from the artwork. The same on
+        /// either edge, because the rail is.
+        static let railFootprint: CGFloat = Rail.thickness + railInset + Space.tight
 
         /// Canvas area available inside a window of `contentSize`.
         ///
@@ -196,8 +237,8 @@ enum Tokens {
             // The rail is opaque and permanent, so it genuinely takes its
             // space; only the options panel floats.
             CGSize(
-                width: max(0, contentSize.width - frameGap * 2 - (edge.isVertical ? railFootprint(for: edge) : 0)),
-                height: max(0, contentSize.height - frameGap * 2 - (edge.isVertical ? 0 : railFootprint(for: edge)))
+                width: max(0, contentSize.width - frameGap * 2 - (edge.isVertical ? railFootprint : 0)),
+                height: max(0, contentSize.height - frameGap * 2 - (edge.isVertical ? 0 : railFootprint))
             )
         }
     }

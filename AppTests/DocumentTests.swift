@@ -628,10 +628,15 @@ struct MenuCommandTests {
         // canvas dismisses it on the first click, and the armed tool brings it
         // back.
         let model = EditorModel(canvas: Bitmap(width: 32, height: 32))
-        model.selectTool(.brush)
+        // Deliberately *not* a hardcoded tool: the point is "a tool you are not
+        // already holding", and naming one couples the test to whichever tool
+        // happens to be the default.
+        let other = ToolKind.allCases.first { $0 != model.tool }!
+
+        model.selectTool(other)
         #expect(model.isOptionsExpanded)
 
-        model.selectTool(.brush)
+        model.selectTool(other)
         #expect(!model.isOptionsExpanded)
 
         model.selectTool(.eraser)
@@ -655,17 +660,22 @@ struct MenuCommandTests {
         #expect(EditorModel.ChromeEdge.remembered == original)
     }
 
-    @Test("Each toolbar orientation reserves only the space its content needs")
+    @Test("The toolbar is equally thin on either edge")
     func toolbarGeometryFitsItsOrientation() {
-        #expect(Tokens.Rail.horizontalThickness < Tokens.Rail.verticalThickness)
+        // One thickness, both orientations: the side rail is the bottom bar
+        // stood on its end, so it has to be as thin as that bar is short.
+        #expect(Tokens.Rail.thickness < 60)
 
         let window = CGSize(width: 1_000, height: 700)
         let besideLeftRail = Tokens.Chrome.canvasArea(in: window, rail: .left)
         let aboveBottomRail = Tokens.Chrome.canvasArea(in: window, rail: .bottom)
 
+        // The rail takes its thickness off whichever axis it sits on, and
+        // nothing off the other one.
         #expect(besideLeftRail.width < aboveBottomRail.width)
         #expect(aboveBottomRail.height < besideLeftRail.height)
-        #expect(Tokens.Rail.horizontalThickness < 60)
+        #expect(aboveBottomRail.width - besideLeftRail.width
+            == besideLeftRail.height - aboveBottomRail.height)
     }
 
     @Test("The top header uses one centred control line")
