@@ -59,17 +59,16 @@ struct PaintDemoCommand {
                 printSceneUsage()
                 return 2
             }
-            return write(scene, to: url(for: arguments[2], currentDirectory: currentDirectory))
+            return write(scene.render(), to: url(for: arguments[2], currentDirectory: currentDirectory))
         }
 
         let output = arguments.first.map { url(for: $0, currentDirectory: currentDirectory) }
             ?? currentDirectory.appendingPathComponent("itspaint-sample.png")
-        return write(.clipboard, to: output)
+        return write(LegacyClipboardDemo.render(), to: output)
     }
 
     @MainActor
-    private static func write(_ scene: DemoScene, to output: URL) -> Int32 {
-        let canvas = scene.render()
+    private static func write(_ canvas: DemoCanvas, to output: URL) -> Int32 {
         do {
             try ImageCodec.write(canvas.engine.canvas, to: output, as: .png)
             print("Wrote \(canvas.engine.canvas.width)×\(canvas.engine.canvas.height) to \(output.path)")
