@@ -2,10 +2,11 @@
 
 # ItsPaint
 
-### Draw on your screenshots. Sketch a thing. Close the window.
+### A focused paint app for macOS.
 
-**A native Mac paint app that keeps every tool in sight, stays out of your way,
-and has zero third-party dependencies.**
+Open an image, make a quick edit, and export it without setting up a workspace.
+ItsPaint keeps its drawing tools, colours, and palette visible in one native Mac
+window.
 
 [![CI](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml/badge.svg)](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/joshlin2201/itspaint?include_prereleases&sort=semver&label=beta)](https://github.com/joshlin2201/itspaint/releases)
@@ -15,213 +16,142 @@ and has zero third-party dependencies.**
 
 <br>
 
-![The ItsPaint editor with a marked-up sketch open](docs/images/editor-window.png)
+![ItsPaint showing a feature tour drawn with the app](docs/images/editor-window.png)
 
-<sub>Everything in that canvas — dashed box, numbered badges, speech bubble, star,
-airbrush spatter, bent curve — was drawn by the engine itself in
-<a href="Packages/PaintKit/Sources/PaintDemo">PaintDemo</a>, which builds the sample
-by driving the same gesture API the canvas does.
+<sub>The artwork in this screenshot was produced by PaintKit, the same engine
+used by the editor. The sample is reproducible with
 <code>swift run --package-path Packages/PaintKit paint-demo out.png</code>.</sub>
 
 </div>
 
----
+## Highlights
 
-<div align="center">
-
-| **12** | **15** | **up to 9** | **293** |
-|:--:|:--:|:--:|:--:|
-| tools | shapes | export formats | tests |
-
-</div>
-
----
-
-## 60 seconds
-
-```bash
-# Download the beta .dmg from Releases and drag it to Applications.
-# Control-click ItsPaint, choose Open, then confirm Open (notarisation note below).
-
-# Or build it, which takes one command:
-git clone https://github.com/joshlin2201/itspaint.git && cd itspaint
-open ItsPaint.xcodeproj    # ⌘R
-```
-
-Then: paste a screenshot with **⌘V**, hit **N** and click three times to drop
-numbered badges, **R** to mosaic a distracting detail, **⌘⇧E** to export.
-Close the window. That is the whole product.
-
----
-
-## The argument
-
-Preview can mark up an image, and a full editor can do almost anything. ItsPaint
-sits between them: open an image, draw directly on it, and finish before the
-editor becomes a project. The app this descends from was learnable in five
-minutes because it hid nothing — every tool, both colours and the whole palette
-on screen at once, and the mouse buttons did the obvious thing.
-
-That is worth rebuilding properly. So:
-
-**Nothing is hidden.** Twelve tools, both loaded colours and all 28 swatches,
-visible always, in a rail that lives left or bottom (⌥⌘T). A tool's variations
-expand from the button you pressed — fifteen shapes behind one Shape button — so
-the rail stays a list you read at a glance. *A test fails the build if it grows
-past fourteen buttons.*
-
-**It respects the pixel.** Integer coordinates end to end: the pixel you clicked
-is the pixel that changed. Nearest-neighbour above 100%. A live footprint ring
-shows exactly which pixels the next stroke will cover, and past 4× the single
-pixel under the pointer gets outlined.
-
-**It gets out of the way.** No account, no telemetry, no cloud, no Electron, no
-update nag, no splash screen. Sandboxed, and it touches only the files you open.
-
----
-
-## What's in it
-
-| | |
-|---|---|
-| **Draw** | Pencil · Brush · **Airbrush** · Highlighter · Eraser |
-| **Insert** | **Shape** (15 kinds) · Text · **Step badges** · Fill · Eyedropper |
-| **Select** | Select — rectangle · ellipse · lasso · **Instant Alpha** · **Pixelate** mosaic |
-
-**Fifteen shapes, one button.** Line, curve *(drag it, then bend it)*, arrow,
-rectangle, rounded rectangle, ellipse, triangle, right triangle, diamond,
-pentagon, hexagon, five- and six-point star, speech bubble, click-corner
-polygon — each solid, **dashed** or dotted, outlined, filled, or both.
-
-**Built for markup, not nostalgia.** A highlighter that refuses to darken where
-a stroke crosses itself. Arrows. Crop and trim-borders. Numbered step badges for
-walkthroughs. Clipboard paste that lands as *movable* floating content. And a
-block-size-controlled mosaic for de-emphasising part of a screenshot.
-
-**Pixelate is a visual effect, not secure redaction.** Do not use it to hide
-passwords, tokens or personal data. Cover secrets with an opaque filled shape
-before exporting a flattened image.
-
-**Up to nine export formats** — PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF,
-ICO — with the exact list matched to the encoders built into your version of
-macOS. The save panel includes format and scale pickers, and ICO is fitted to a
-legal icon square instead of failing. Documents save as `.itspaint`: a lossless
-PNG plus JSON, so your artwork opens in anything even if this app disappears.
-
-### Keyboard
-
-| | | | |
-|---|---|---|---|
-| `P` pencil | `B` brush | `A` airbrush | `H` highlighter |
-| `E` eraser | `U` shape | `T` text | `N` step badge |
-| `K` fill | `I` eyedropper | `M` select | `R` pixelate |
-| `X` swap colours | `[` `]` size | `⌥1`–`⌥9` shape | `Space` pan |
-
-Pinch or ⌘-scroll zooms continuously **around the pointer**; ⌘+/⌘− snap to the
-ramp. Hold `⌥` to sample a colour with any tool. Right-drag paints your second
-colour; right-*click* opens the canvas menu. **Escape gets you out of
-everything** — half-drawn shape, open text box, selection, floating paste.
-
----
-
-## Under the hood
-
-```
-Packages/PaintKit/      the engine — no UI, no dependencies, 211 tests
-  Pixels/               RGBA8, geometry, brushes, rasterisers
-  Colour/ Tools/        colour model, palette, tool set, selection, engine
-  Undo/ Codec/          rect-scoped patches; Core Graphics + ImageIO bridge
-App/                    the shell — AppKit lifecycle, SwiftUI chrome, 82 tests
-  Canvas/ Document/     NSView canvas, zoom, cursors; NSDocument + .itspaint
-  Model/ UI/            engine ⇄ SwiftUI bridge; rail, options, palette
-```
-
-`PaintKit` is UI-free and dependency-free on purpose: it is why the entire tool
-matrix is testable in milliseconds without launching an app, and why a UI
-redesign is a view-layer change rather than a rewrite.
-
-Decisions that each cost a bug to learn:
-
-- **Every mutating call returns its dirty rect.** Redraw *and* undo capture scope
-  to it. It is the single reason a big canvas stays smooth.
-- **Undo is bounded by bytes, not steps** — fifty dots and fifty full-canvas
-  fills differ by four orders of magnitude — and bridged to `NSUndoManager` by
-  registering the inverse from inside each replay, so the two histories cannot
-  drift apart.
-- **RGBA8 premultiplied sRGB**, chosen so the same buffer serves both our own
-  scanline rasterisers and Core Graphics with no conversion.
-- **The canvas repaints only what changed.** SwiftUI re-runs a representable on
-  every observed change — including the pointer moving — so the view tracks the
-  revision it has already painted instead of redrawing everything per mouse-move.
-- **Text rasterises on commit**, because a document format carrying live text
-  that the PNG export silently flattens is a lie.
-
-### Tests
-
-```bash
-swift test --package-path Packages/PaintKit             # engine
-swift test -c release --package-path Packages/PaintKit  # + throughput guards
-xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
-           -destination 'platform=macOS' test           # app integration (82)
-```
-
-They assert **pixels, not screenshots**: `#expect(canvas.pixel(at: p) == …)`
-names the pixel that moved, where an image diff hands you two similar-looking
-PNGs and wishes you luck. The six throughput guards assert only in release
-builds, because unoptimised timings measure the compiler, not the algorithm.
-
----
+- **Twelve visible tools** for drawing, markup, text, selection, colour, and
+  pixelation.
+- **Fifteen shapes** with solid, dashed, or dotted outlines and optional fills.
+- **A compact tool rail** that moves between the left and bottom edges of the
+  window.
+- **Precise canvas control** with pointer-centred zoom, nearest-neighbour display
+  above 100%, pixel grids, and live tool footprints.
+- **Native documents and common exports** with no third-party dependencies,
+  accounts, telemetry, or cloud service.
 
 ## Install
 
-**Beta `.dmg`** → [Releases](https://github.com/joshlin2201/itspaint/releases).
-Drag to Applications. The current beta is **ad-hoc signed, not notarised**, so
-Control-click the app → **Open** → **Open** on first launch. If macOS still
-blocks it, clear the download quarantine once:
+Download the latest beta from [Releases](https://github.com/joshlin2201/itspaint/releases),
+open the disk image, and drag **ItsPaint** to Applications.
+
+The beta is ad-hoc signed and is not yet notarised. On first launch,
+Control-click **ItsPaint**, choose **Open**, then confirm **Open**. If macOS
+continues to block the app, clear its download quarantine once:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/ItsPaint.app
 ```
 
-Every download is listed with a SHA-256 in `checksums.txt`. Prefer not to trust
-a binary? Building takes one command,
-and the CI that produces the release is [right here](.github/workflows/release.yml).
+Each release includes `checksums.txt` with SHA-256 hashes for the downloads.
+ItsPaint requires macOS 14 Sonoma or later.
 
-**Requires macOS 14 (Sonoma) or later.** Building needs Xcode 16+.
+To build from source:
 
----
+```bash
+git clone https://github.com/joshlin2201/itspaint.git
+cd itspaint
+open ItsPaint.xcodeproj
+```
 
-## Status: beta, and honest about it
+Build and run the **ItsPaint** scheme with `⌘R`. Xcode 16 or later is required.
 
-It builds, it runs, the suite is green, and it is what I use for day-to-day
-markup. It has not been near the App Store, and released binaries are not
-notarised. Known limits, stated plainly:
+## Tools
 
-- **No WebP export** — macOS reads WebP but ships no encoder, and a third-party
-  one is a dependency this app refuses to take. AVIF covers the same need.
-- **Text is pixels once committed.** Re-editing means undo and retype.
-- **The lasso mask rebuilds from the whole path** on each pointer move. Fine for
-  paths people actually trace; incremental extension is the upgrade if a very
-  long one ever stutters.
-- **Next up:** a loupe, adjust-colour sliders, a fuller image dimensions
-  dialog, separate border/fill wells.
+| Group | Tools |
+|---|---|
+| **Draw** | Pencil, Brush, Airbrush, Highlighter, Eraser |
+| **Insert** | Shape, Text, Step Badge, Fill, Eyedropper |
+| **Select** | Rectangle, Ellipse, Lasso, Instant Alpha |
+| **Effects** | Pixelate |
 
-[`CHANGELOG.md`](CHANGELOG.md) has what changed, and
-**[`docs/`](docs/README.md)** has the rest:
-[philosophy](docs/PHILOSOPHY.md) · [anatomy](docs/ARCHITECTURE.md) ·
-[design language](docs/DESIGN.md) · [feature reference](docs/FEATURES.md) ·
-[testing protocol](docs/TESTING.md) · [roadmap](docs/ROADMAP.md) — plus the
-original [plan of record](docs/PLAN.md), kept with its own critique because the
-reasoning is the useful part.
+The Shape tool includes line, curve, arrow, rectangle, rounded rectangle,
+ellipse, triangle, right triangle, diamond, pentagon, hexagon, five- and
+six-point stars, speech bubble, and polygon.
+
+Instant Alpha selects connected pixels by colour. Use `⇧`-click to add to the
+selection, `⌥`-click to subtract, then choose **Make transparent**.
+
+Pixelate is intended for visual de-emphasis, not secure redaction. Use an opaque
+filled shape to cover private information before exporting a flattened image.
+
+## Everyday workflow
+
+Paste an image with `⌘V` or open it from Finder. Add arrows, shapes, text, step
+badges, highlights, or freehand marks. Floating pasted content and selections can
+be moved or resized before they are placed. Export with `⇧⌘E`, or save an
+editable `.itspaint` document.
+
+| Shortcut | Action | Shortcut | Action |
+|---|---|---|---|
+| `P` | Pencil | `B` | Brush |
+| `A` | Airbrush | `H` | Highlighter |
+| `E` | Eraser | `U` | Shape |
+| `T` | Text | `N` | Step Badge |
+| `K` | Fill | `I` | Eyedropper |
+| `M` | Select | `R` | Pixelate |
+| `X` | Swap colours | `[` / `]` | Change tool size |
+| `Space` | Pan | `⌥1`–`⌥9` | Choose a shape |
+
+Pinch or `⌘`-scroll to zoom around the pointer. Hold `⌥` to sample a colour
+without changing tools. Right-drag uses the second colour. `Esc` cancels the
+current shape, text box, selection, floating paste, or options panel.
+
+## Files and export
+
+ItsPaint documents use the `.itspaint` package format: a lossless PNG with JSON
+metadata for the canvas, colours, and palette.
+
+Export supports PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF, and ICO when the
+corresponding encoder is available in the installed macOS version. The export
+panel includes format and scale controls. Formats without alpha are flattened
+onto the second colour.
+
+## Design and implementation
+
+ItsPaint has two layers:
+
+```text
+Packages/PaintKit/   UI-free drawing engine, raster operations, undo, and codecs
+App/                 AppKit document lifecycle, canvas, and SwiftUI interface
+```
+
+PaintKit stores pixels as premultiplied RGBA8 and returns the changed rectangle
+from every edit. The canvas redraws only that area, and undo history is bounded
+by memory rather than by a fixed number of steps.
+
+Run the test suites with:
+
+```bash
+swift test --package-path Packages/PaintKit
+swift test -c release --package-path Packages/PaintKit
+xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
+  -destination 'platform=macOS' test
+```
+
+## Release notes
+
+ItsPaint is in public beta. Released builds are ad-hoc signed and not notarised.
+Text becomes pixels when committed, and WebP export is not available because
+macOS does not provide a WebP encoder.
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and
+[docs/README.md](docs/README.md) for the design, architecture, feature reference,
+testing guide, and roadmap.
 
 ## Contributing
 
-Issues and PRs welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) covers the two rules
-that matter — *the engine stays UI-free*, and *the rail lists jobs, not
-variations* — plus how to run the tests. Good first issues are tagged.
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains
+the project structure, design constraints, and test requirements.
 
 <div align="center">
 
-**[MIT](LICENSE)** · Built by [Josh Lin](https://github.com/joshlin2201) · If it saved you a trip to Photoshop, star it.
+[MIT License](LICENSE) · Built by [Josh Lin](https://github.com/joshlin2201)
 
 </div>

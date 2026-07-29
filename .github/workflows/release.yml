@@ -161,9 +161,10 @@ jobs:
             dist/ItsPaint-${{ steps.release.outputs.version }}.zip
             dist/checksums.txt
           body: |
-            **Beta.** Built from `${{ steps.release.outputs.tag }}` by GitHub Actions.
+            ItsPaint `${{ steps.release.outputs.version }}` for macOS 14 or later.
+            Built from `${{ steps.release.outputs.tag }}` by GitHub Actions.
 
-            ### Install
+            ## Install
             1. Download the `.dmg`, open it, drag **ItsPaint** to Applications.
             2. The beta is ad-hoc signed, not notarised. Control-click the app,
                choose **Open**, then confirm **Open**. If macOS still blocks it,
@@ -172,6 +173,5 @@ jobs:
                xattr -dr com.apple.quarantine /Applications/ItsPaint.app
                ```
 
-            Requires macOS 14 (Sonoma) or later. Verify your download against
-            `checksums.txt`. Full notes in
+            Verify your download against `checksums.txt`. Full notes are in
             [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.release.outputs.tag }}/CHANGELOG.md).
