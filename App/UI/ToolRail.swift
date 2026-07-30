@@ -330,39 +330,57 @@ private struct ColourControls: View {
     }
 
     private func chip(_ colour: PaintColour, role: EditorModel.ColourRole, label: String) -> some View {
-        Button {
-            model.presentSystemColourPicker(for: role)
-        } label: {
-            RoundedRectangle(cornerRadius: Tokens.Radius.swatch, style: .continuous)
-                .fill(Color(cgColor: colour.cgColor))
-                .frame(width: Tokens.Size.colourWell, height: Tokens.Size.colourWell)
-                .overlay {
-                    RoundedRectangle(cornerRadius: Tokens.Radius.swatch, style: .continuous)
-                        .strokeBorder(.black.opacity(0.35), lineWidth: 0.5)
-                }
-                .overlay(alignment: .bottomTrailing) {
-                    Text(label)
-                        .font(.system(size: 7.5, weight: .bold))
-                        .foregroundStyle(colour.prefersDarkContrast ? .black.opacity(0.55) : .white.opacity(0.75))
-                        .padding(1.5)
-                }
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            hovering
-                ? tooltips.hover(
-                    key: "colour\(label)",
-                    title: role == .foreground ? "Colour 1 — \(colour.hexString)" : "Colour 2 — \(colour.hexString)",
-                    shortcut: nil
-                )
-                : tooltips.endHover(key: "colour\(label)")
-        }
-        .accessibilityLabel(
-            role == .foreground
-                ? "Colour 1, front, \(colour.hexString)"
-                : "Colour 2, back, \(colour.hexString)"
-        )
+        // **One click rule everywhere: left loads Colour 1, right loads Colour 2.**
+        //
+        // That is already how the palette and the canvas behave, and the two
+        // loaded chips were the one place it did not hold — clicking the "2"
+        // chip opened a picker for slot 2, so the same gesture meant "set the
+        // front colour" over a swatch and "edit the back colour" two
+        // millimetres above it.
+        //
+        // Left-clicking the back chip now promotes its colour to the front,
+        // which is the common move: you had it a moment ago and you want it
+        // again. Double-click still opens the system picker for that slot.
+        RoundedRectangle(cornerRadius: Tokens.Radius.swatch, style: .continuous)
+            .fill(Color(cgColor: colour.cgColor))
+            .frame(width: Tokens.Size.colourWell, height: Tokens.Size.colourWell)
+            .overlay {
+                RoundedRectangle(cornerRadius: Tokens.Radius.swatch, style: .continuous)
+                    .strokeBorder(.black.opacity(0.35), lineWidth: 0.5)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                Text(label)
+                    .font(.system(size: 7.5, weight: .bold))
+                    .foregroundStyle(colour.prefersDarkContrast ? .black.opacity(0.55) : .white.opacity(0.75))
+                    .padding(1.5)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) { model.presentSystemColourPicker(for: role) }
+            .onTapGesture { model.applySwatch(colour, to: .foreground) }
+            .contextMenu {
+                Button("Set as Colour 1") { model.applySwatch(colour, to: .foreground) }
+                Button("Set as Colour 2") { model.applySwatch(colour, to: .background) }
+                Divider()
+                Button("Other colour…") { model.presentSystemColourPicker(for: role) }
+            }
+            .onHover { hovering in
+                hovering
+                    ? tooltips.hover(
+                        key: "colour\(label)",
+                        title: role == .foreground
+                            ? "Colour 1 — \(colour.hexString) · double-click to change"
+                            : "Colour 2 — \(colour.hexString) · click to use as Colour 1",
+                        shortcut: nil
+                    )
+                    : tooltips.endHover(key: "colour\(label)")
+            }
+            .accessibilityElement()
+            .accessibilityLabel(
+                role == .foreground
+                    ? "Colour 1, front, \(colour.hexString)"
+                    : "Colour 2, back, \(colour.hexString)"
+            )
+            .accessibilityHint("Click to load as Colour 1. Double-click to choose another colour.")
     }
 }
 

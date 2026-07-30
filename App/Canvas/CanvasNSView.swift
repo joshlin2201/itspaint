@@ -932,10 +932,7 @@ final class CanvasNSView: NSView {
         guard rect.width > 1, rect.height > 1 else { textBox = nil; return }
         textBox = rect
 
-        let editor = TextEntryView(frame: NSRect(
-            x: Double(rect.minX) * zoom, y: Double(rect.minY) * zoom,
-            width: Double(rect.width) * zoom, height: Double(rect.height) * zoom
-        ))
+        let editor = TextEntryView(frame: .zero)
         // The editor renders through the *same* font resolution the rasteriser
         // uses, traits and all, so what is on screen while you type is what
         // lands. A live editor showing an upright face and committing an italic
@@ -953,12 +950,16 @@ final class CanvasNSView: NSView {
         }
         editor.drawsBackground = false
         editor.isRichText = false
-        // Vertically resizable, because the box grows with the text. Fixed, it
-        // let the caret move to a second line that the box had no room for —
-        // so Return appeared to work and everything typed after it was invisible
-        // both in the editor and, because `CTFrameDraw` clips to the box path,
-        // in the committed pixels.
-        editor.applyUnboundedVerticalLayout()
+        // Sized last, because the frame carries the handle margin and the text
+        // container has to be configured against it. Vertically unbounded too:
+        // a container fixed at the frame height let the caret move to a second
+        // line whose text was then clipped — so Return appeared to work and
+        // everything after it was invisible, in the editor and in the committed
+        // pixels alike.
+        editor.setBoxFrame(NSRect(
+            x: Double(rect.minX) * zoom, y: Double(rect.minY) * zoom,
+            width: Double(rect.width) * zoom, height: Double(rect.height) * zoom
+        ))
         editor.delegate = self
         editor.onCancel = { [weak self] in self?.cancelText() }
         editor.onCommit = { [weak self] in self?.commitText() }
@@ -996,7 +997,10 @@ final class CanvasNSView: NSView {
         let grown = PixelRect(x: box.minX, y: box.minY, width: box.width, height: height)
         let previous = box
         textBox = grown
-        editor.setFrameSize(NSSize(width: editor.frame.width, height: Double(height) * zoom))
+        editor.setBoxFrame(NSRect(
+            x: Double(grown.minX) * zoom, y: Double(grown.minY) * zoom,
+            width: Double(grown.width) * zoom, height: Double(grown.height) * zoom
+        ))
         invalidate(previous.union(grown).insetBy(-handleInset))
     }
 
@@ -1013,13 +1017,10 @@ final class CanvasNSView: NSView {
 
         let previous = box
         textBox = resized
-        editor.frame = NSRect(
+        editor.setBoxFrame(NSRect(
             x: Double(resized.minX) * zoom, y: Double(resized.minY) * zoom,
             width: Double(resized.width) * zoom, height: Double(resized.height) * zoom
-        )
-        // The container tracks the view's width, but only if it is told the
-        // width changed; a stale container keeps wrapping at the old one.
-        editor.applyUnboundedVerticalLayout()
+        ))
         invalidate(previous.union(resized).insetBy(-handleInset))
         // Rewrapping at the new width can need more or fewer lines than before.
         growTextBoxToFit()
@@ -1059,8 +1060,16 @@ final class CanvasNSView: NSView {
         // Kept reachable: a box dragged entirely off-canvas could never be
         // typed into again.
         guard moved.intersection(model.canvas.bounds).width > 4 else { return }
+        let previous = box
         textBox = moved
-        editor.frame.origin = NSPoint(x: Double(moved.minX) * zoom, y: Double(moved.minY) * zoom)
+        editor.setBoxFrame(NSRect(
+            x: Double(moved.minX) * zoom, y: Double(moved.minY) * zoom,
+            width: Double(moved.width) * zoom, height: Double(moved.height) * zoom
+        ))
+        // **Redraw the frame.** Without this only the editor moved: the border
+        // and the handles are drawn by the canvas and stayed where they were, so
+        // dragging the box looked like dragging the text and caret out of it.
+        invalidate(previous.union(moved).insetBy(-handleInset))
     }
 
     /// Escape: throw the box away without marking the canvas.
@@ -1592,6 +1601,29 @@ final class TextEntryView: NSTextView {
 
     override func cancelOperation(_ sender: Any?) { onCancel?() }
 
+    /// Room around the editable box for its resize handles.
+    ///
+    /// **The view is deliberately larger than the text box.** Handles are
+    /// centred on the box's edges, so half of each one fell outside the view and
+    /// could not be clicked — worst at the bottom-right, the corner people reach
+    /// for first. Worse, some of those misses landed on the canvas underneath,
+    /// which begins a *move*: that is why a resize sometimes dragged the whole
+    /// box instead.
+    ///
+    /// `textContainerInset` pushes the text back into place, so the margin costs
+    /// nothing visually.
+    var handleMargin: CGFloat = 9
+
+    /// The text box itself, inside the margin.
+    var boxBounds: NSRect { bounds.insetBy(dx: handleMargin, dy: handleMargin) }
+
+    /// Place the box, outsetting the frame so the margin is real grab area.
+    func setBoxFrame(_ rect: NSRect) {
+        frame = rect.insetBy(dx: -handleMargin, dy: -handleMargin)
+        applyUnboundedVerticalLayout()
+        window?.invalidateCursorRects(for: self)
+    }
+
     /// Let the text lay out to any height, and wrap to the current width.
     ///
     /// **`isVerticallyResizable` is not enough on its own.** With no enclosing
@@ -1602,11 +1634,13 @@ final class TextEntryView: NSTextView {
     /// view's width changes or it keeps wrapping at the old one.
     func applyUnboundedVerticalLayout() {
         isVerticallyResizable = true
-        textContainerInset = .zero
+        // Inset by the handle margin, so the text sits where the box is rather
+        // than where the enlarged view is.
+        textContainerInset = NSSize(width: handleMargin, height: handleMargin)
         textContainer?.lineFragmentPadding = 0
         textContainer?.widthTracksTextView = true
         textContainer?.containerSize = NSSize(
-            width: frame.width, height: .greatestFiniteMagnitude
+            width: max(1, boxBounds.width), height: .greatestFiniteMagnitude
         )
         minSize = NSSize(width: 0, height: frame.height)
         maxSize = NSSize(
@@ -1659,11 +1693,10 @@ final class TextEntryView: NSTextView {
 
     /// Whether a point is in the draggable frame around the editable area.
     private func isOnBorder(_ point: NSPoint) -> Bool {
-        let reach = max(4, (handleTolerance?() ?? 8).rounded())
-        let inner = bounds.insetBy(dx: reach, dy: reach)
+        let inner = boxBounds.insetBy(dx: handleMargin, dy: handleMargin)
         // An inset that has eaten the whole box would make every click a drag
         // and leave no way to type into a short one.
-        guard inner.width > reach, inner.height > reach else { return false }
+        guard inner.width > 4, inner.height > 4 else { return false }
         return bounds.contains(point) && !inner.contains(point)
     }
 
@@ -1684,16 +1717,19 @@ final class TextEntryView: NSTextView {
     /// asked in points and the answer is in the same handle vocabulary the
     /// canvas already draws and picks cursors for.
     private func handle(at point: NSPoint) -> PixelRect.Handle? {
-        let tolerance = Int((handleTolerance?() ?? 8).rounded())
-        let box = PixelRect(
+        let box = boxBounds
+        let rect = PixelRect(
             x: 0, y: 0,
-            width: max(1, Int(bounds.width.rounded())),
-            height: max(1, Int(bounds.height.rounded()))
+            width: max(1, Int(box.width.rounded())),
+            height: max(1, Int(box.height.rounded()))
         )
-        return box.handle(
-            at: PixelPoint(x: Int(point.x.rounded()), y: Int(point.y.rounded())),
-            tolerance: tolerance
+        // Measured from the box rather than the view, so the margin is grab area
+        // on all four sides instead of dead space on two of them.
+        let local = PixelPoint(
+            x: Int((point.x - box.minX).rounded()),
+            y: Int((point.y - box.minY).rounded())
         )
+        return rect.handle(at: local, tolerance: Int(handleMargin.rounded()))
     }
 
     /// I-beam in the middle, an open hand on the draggable border, resize arrows
@@ -1704,33 +1740,47 @@ final class TextEntryView: NSTextView {
     /// I-beam, and the handles sit over the border.
     override func resetCursorRects() {
         discardCursorRects()
-        addCursorRect(bounds, cursor: .iBeam)
+        let box = boxBounds
 
-        let reach = max(4, (handleTolerance?() ?? 8).rounded())
-        // The border, as four strips rather than one inverted rect — cursor
-        // rects cannot have holes.
-        let edges = [
-            NSRect(x: 0, y: 0, width: bounds.width, height: reach),
-            NSRect(x: 0, y: bounds.maxY - reach, width: bounds.width, height: reach),
-            NSRect(x: 0, y: 0, width: reach, height: bounds.height),
-            NSRect(x: bounds.maxX - reach, y: 0, width: reach, height: bounds.height),
-        ]
-        for edge in edges where !edge.intersection(bounds).isEmpty {
-            addCursorRect(edge.intersection(bounds), cursor: .openHand)
+        // I-beam only where you can actually type.
+        let typing = box.insetBy(dx: handleMargin, dy: handleMargin)
+        if typing.width > 4, typing.height > 4 {
+            addCursorRect(typing, cursor: .iBeam)
         }
 
-        let box = PixelRect(
+        // The draggable frame: everything from the view's edge in to the typing
+        // area, as four strips because a cursor rect cannot have a hole.
+        let frameStrips = [
+            NSRect(x: 0, y: 0, width: bounds.width, height: box.minY + handleMargin),
+            NSRect(
+                x: 0, y: box.maxY - handleMargin,
+                width: bounds.width, height: bounds.maxY - box.maxY + handleMargin
+            ),
+            NSRect(x: 0, y: 0, width: box.minX + handleMargin, height: bounds.height),
+            NSRect(
+                x: box.maxX - handleMargin, y: 0,
+                width: bounds.maxX - box.maxX + handleMargin, height: bounds.height
+            ),
+        ]
+        for strip in frameStrips {
+            let clipped = strip.intersection(bounds)
+            if !clipped.isEmpty { addCursorRect(clipped, cursor: .openHand) }
+        }
+
+        // Handles last, so they win over the frame they sit on.
+        let rect = PixelRect(
             x: 0, y: 0,
-            width: max(1, Int(bounds.width.rounded())),
-            height: max(1, Int(bounds.height.rounded()))
+            width: max(1, Int(box.width.rounded())),
+            height: max(1, Int(box.height.rounded()))
         )
-        for (handle, centre) in box.handleCentres() {
-            let rect = NSRect(
-                x: CGFloat(centre.x) - reach, y: CGFloat(centre.y) - reach,
-                width: reach * 2, height: reach * 2
+        for (handle, centre) in rect.handleCentres() {
+            let spot = NSRect(
+                x: box.minX + CGFloat(centre.x) - handleMargin,
+                y: box.minY + CGFloat(centre.y) - handleMargin,
+                width: handleMargin * 2, height: handleMargin * 2
             ).intersection(bounds)
-            guard !rect.isEmpty else { continue }
-            addCursorRect(rect, cursor: CanvasNSView.cursor(for: handle))
+            guard !spot.isEmpty else { continue }
+            addCursorRect(spot, cursor: CanvasNSView.cursor(for: handle))
         }
     }
 

@@ -40,14 +40,17 @@ enum Tokens {
 
     enum Size {
         /// Inner element of a segmented control.
-        static let segment: CGFloat = 24
+        static let segment: CGFloat = 21
+        /// Height of one row in the options panel, so the rhythm is one
+        /// number rather than whatever each control happens to be.
+        static let optionRow: CGFloat = 25
         /// The options panel's label column.
         ///
         /// Fixed, so "Size", "Stroke", "Flow" and "Corner" all end at the same
         /// x and every control in the panel starts at the same x. This one
         /// number is the difference between a panel and a stack of unrelated
         /// rows that happen to share a background.
-        static let optionLabel: CGFloat = 46
+        static let optionLabel: CGFloat = 42
         /// An action button inside the options panel.
         static let pillAction: CGFloat = 26
         /// A tool cell in the rail.

@@ -29,7 +29,7 @@ struct ToolOptions: View {
     /// same content lays out as a row, where a fixed width would be wrong.
     var body: some View {
         let layout = isVertical
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Tokens.Space.tight + 1))
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
             : AnyLayout(HStackLayout(spacing: Tokens.Space.snug))
 
         layout {
@@ -43,7 +43,7 @@ struct ToolOptions: View {
         .frame(width: isVertical ? Tokens.Rail.optionsContentWidth : nil, alignment: .leading)
         .fixedSize(horizontal: !isVertical, vertical: false)
         .padding(.horizontal, Tokens.Space.snug)
-        .padding(.vertical, Tokens.Space.snug - 2)
+        .padding(.vertical, Tokens.Space.base - 1)
         .chromeSurface(cornerRadius: Tokens.Radius.panel)
         .animation(Tokens.Motion.pillResize, value: model.tool)
         .animation(Tokens.Motion.pillResize, value: model.hasSelection)
@@ -64,13 +64,13 @@ struct ToolOptions: View {
                     title
                     if let hint {
                         Text(hint)
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(.primary.opacity(0.45))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.primary.opacity(0.42))
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .padding(.bottom, 1)
+                .padding(.bottom, 2)
             } else {
                 HStack(spacing: Tokens.Space.tight) {
                     title

@@ -18,11 +18,13 @@ import Testing
 @MainActor
 struct TextEditorLayoutTests {
 
+    /// `width`/`height` are the **box**, not the view: the view is outset by the
+    /// handle margin so the whole handle ring is inside it and clickable.
     private func editor(width: CGFloat = 240, height: CGFloat = 44) -> TextEntryView {
-        let view = TextEntryView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        let view = TextEntryView(frame: .zero)
         view.font = NSFont(name: "Helvetica", size: 24) ?? .systemFont(ofSize: 24)
         view.isRichText = false
-        view.applyUnboundedVerticalLayout()
+        view.setBoxFrame(NSRect(x: 0, y: 0, width: width, height: height))
         return view
     }
 
@@ -31,8 +33,45 @@ struct TextEditorLayoutTests {
         let view = editor()
         let container = try! #require(view.textContainer)
         #expect(container.size.height > 10_000, "the container is still capped at the frame height")
-        #expect(container.size.width == view.frame.width)
+        // The box's width, not the view's — the view carries the handle margin.
+        #expect(container.size.width == view.boxBounds.width)
         #expect(view.isVerticallyResizable)
+    }
+
+    @Test("The view is outset so the whole handle ring is inside it")
+    func handleRingIsInsideTheView() {
+        let view = editor(width: 240, height: 44)
+        let box = view.boxBounds
+
+        #expect(box.width == 240, "the box is not the size it was asked for")
+        #expect(box.height == 44)
+        // Outset on every side by the margin.
+        #expect(view.frame.width == 240 + view.handleMargin * 2)
+        #expect(view.frame.height == 44 + view.handleMargin * 2)
+
+        // Every handle centre, plus the margin around it, lies inside the view —
+        // which is what makes the corner grabbable. Half of each handle used to
+        // fall outside, and clicks that missed hit the canvas and began a move.
+        let rect = PixelRect(
+            x: 0, y: 0, width: Int(box.width), height: Int(box.height)
+        )
+        for (_, centre) in rect.handleCentres() {
+            let spot = NSRect(
+                x: box.minX + CGFloat(centre.x) - view.handleMargin,
+                y: box.minY + CGFloat(centre.y) - view.handleMargin,
+                width: view.handleMargin * 2, height: view.handleMargin * 2
+            )
+            #expect(view.bounds.contains(spot), "handle at \(centre) is not fully inside the view")
+        }
+    }
+
+    @Test("The text is inset back to where the box is")
+    func textSitsInTheBox() {
+        // The margin must not shift the text, or the preview stops matching the
+        // committed pixels.
+        let view = editor()
+        #expect(view.textContainerInset.width == view.handleMargin)
+        #expect(view.textContainerInset.height == view.handleMargin)
     }
 
     @Test("A second line lays out taller rather than being clipped")
@@ -68,8 +107,7 @@ struct TextEditorLayoutTests {
         view.string = "wrap this sentence onto several lines"
         let narrow = view.laidOutTextHeight
 
-        view.setFrameSize(NSSize(width: 400, height: 44))
-        view.applyUnboundedVerticalLayout()
+        view.setBoxFrame(NSRect(x: 0, y: 0, width: 400, height: 44))
         let wide = view.laidOutTextHeight
 
         #expect(wide < narrow, "a wider box did not rewrap: \(wide) vs \(narrow)")
@@ -84,6 +122,7 @@ struct TextEditorLayoutTests {
         let view = TextEntryView(frame: NSRect(x: 0, y: 0, width: 240, height: 44))
         view.font = NSFont(name: "Helvetica", size: 24) ?? .systemFont(ofSize: 24)
         view.isRichText = false
+        view.handleMargin = 0
         view.isVerticallyResizable = true
         view.textContainerInset = .zero
         view.textContainer?.lineFragmentPadding = 0
