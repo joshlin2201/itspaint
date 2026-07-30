@@ -57,15 +57,19 @@ clipboard out.png</code>.</sub>
 Download the latest beta from [Releases](https://github.com/joshlin2201/itspaint/releases),
 open the disk image, and drag **ItsPaint** to Applications.
 
-The beta is ad-hoc signed and is not yet notarised. On first launch,
-Control-click **ItsPaint**, choose **Open**, then confirm **Open**. If macOS
-continues to block the app, clear its download quarantine once:
+Releases are signed with a Developer ID and notarised by Apple, so Gatekeeper
+opens them with no extra steps — no Control-click, and nothing to clear from the
+Terminal.
+
+Each release includes `checksums.txt` with SHA-256 hashes. The notarisation
+ticket is stapled to both the disk image and the app inside it, so a first
+launch works offline:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/ItsPaint.app
+shasum -a 256 -c checksums.txt
+xcrun stapler validate ItsPaint-0.11.0.dmg
 ```
 
-Each release includes `checksums.txt` with SHA-256 hashes for the downloads.
 ItsPaint requires macOS 14 Sonoma or later.
 
 To build from source:
@@ -153,9 +157,9 @@ xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
 
 ## Release notes
 
-ItsPaint is in public beta. Released builds are ad-hoc signed and not notarised.
-Text becomes pixels when committed, and WebP export is not available because
-macOS does not provide a WebP encoder.
+ItsPaint is in public beta. Released builds are signed with a Developer ID and
+notarised. Text becomes pixels when committed, and WebP export is not available
+because macOS does not provide a WebP encoder.
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and
 [docs/README.md](docs/README.md) for the design, architecture, feature reference,

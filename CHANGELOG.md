@@ -9,6 +9,10 @@ version may still carry breaking changes to the document format.
 
 ## [0.11.0] — 2026-07-29
 
+**Releases are now signed with a Developer ID and notarised.** The ticket is
+stapled to both the disk image and the app inside it, so a first launch works
+offline and the install needs no Control-click and no `xattr`.
+
 ### Added
 - **Bold, italic and underline** for text, in the options panel and on
   `⌘B` / `⌘I` / `⌘U`. Applied as real symbolic traits, so a face with a genuine

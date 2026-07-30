@@ -11,24 +11,24 @@ Researched 2026-07-29. Sources at the bottom.
 
 Both are conversion killers and neither is a marketing problem.
 
-### 1. The app is not notarised
+### 1. ~~The app is not notarised~~ — done
 
-Today's install path asks a stranger to Control-click, choose Open, confirm, and
-possibly run `xattr -dr com.apple.quarantine` in a terminal. That is a
-catastrophic funnel. Most people who click a Show HN link and hit that screen
-close the tab and assume the app is broken or unsafe.
+**Shipped in 0.11.0.** Releases are signed with a Developer ID and notarised,
+and the ticket is stapled to both the disk image and the app inside it, so a
+first launch works with no network. Gatekeeper opens them with no Control-click
+and nothing to clear from a terminal.
 
-**Fix, and it is cheaper than it looks:** the Apple Developer Program membership
-is already paid. What is missing is a **Developer ID Application** certificate
-issued under that paid team — not the membership itself. The certificate that
-exists locally belongs to a *free personal team*, which can only ever issue
-Apple Development certs, and those cannot be notarised.
+This was the item every other line on this page multiplied against, and the
+diagnosis in the original version of this section was wrong in an instructive
+way: the membership was already paid, and the blocker was a certificate. Worse,
+the *first* submissions each sat over an hour in Apple's queue and CI threw away
+three green builds treating a ran-out wait as a rejection. Once one submission
+was through, the rest came back in under two minutes. Nothing needed buying and
+nothing needed a longer wait — it needed a first submission to clear.
 
-So the remaining work is a certificate, a `.p12` in CI secrets, and `notarytool`
-plus `stapler` in the release workflow — an afternoon, not a purchase decision.
-Full steps in [MAC_ESSENTIALS](MAC_ESSENTIALS.md) § *Getting off ad-hoc
-signing*. It is listed under *Later* in [ROADMAP](ROADMAP.md); it belongs in
-*Now*, because every other item on this page multiplies against it.
+Kept here rather than deleted, because "the funnel-breaking item was a
+certificate and a wrong assumption about a timeout" is the sort of thing worth
+not rediscovering.
 
 ### 2. There is no `brew install`
 
@@ -39,11 +39,11 @@ updates automatic.
 
 **Requirements:** a stable versioned download URL (the GitHub release already
 provides this), a published SHA-256 (`checksums.txt` already exists), and
-notarisation — casks for unsigned apps are accepted but the user still hits
-Gatekeeper, so this depends on the item above.
+notarisation — all three now hold, so **this is unblocked and is the next thing
+to do.**
 
-Do these two and the rest of this document starts working. Skip them and it
-does not.
+With notarisation done, the cask is the last mechanical step between the project
+and every channel below.
 
 ---
 

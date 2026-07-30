@@ -83,17 +83,16 @@ already exists.
 
 ## Later — the last mile
 
-- **Notarised releases. Move this to *Now*.** Every install today asks a
-  stranger to Control-click, confirm, and possibly run `xattr` in a terminal,
-  which is where most first-time users leave. It also gates a Homebrew cask and
-  any paid build. The membership is already paid; what is missing is a
-  **Developer ID Application** certificate issued under that team — the identity
-  currently in the keychain belongs to a free personal team and cannot be
-  notarised. Steps in [MAC_ESSENTIALS](MAC_ESSENTIALS.md) § *Getting off ad-hoc
-  signing*.
+- ~~**Notarised releases.**~~ **Shipped in 0.11.0.** Signed with a Developer ID,
+  notarised, and the ticket stapled to both the disk image and the app inside it
+  so a first launch works offline. The install needs no Control-click and no
+  `xattr`. What made it slow was not configuration: the first submissions sat
+  over an hour in Apple's queue while CI treated a ran-out wait as a rejection,
+  and once one had cleared the rest took under two minutes.
 - **A Homebrew cask.** `brew install --cask itspaint` is how Mac developers
   install Mac software. One small PR, permanent discoverability, automatic
-  updates. Depends on notarisation.
+  updates. **Unblocked now that releases are notarised** — this is the next
+  distribution step.
 - **PaintKit published as a standalone package.** It is already separate,
   dependency-free and covered by 211 of its own tests. A README and a tag turn
   it into something other people can build on — and into the thing that
@@ -165,7 +164,8 @@ still carry breaking changes to the document format.
    Both signing and notarisation degrade rather than lie: without the
    certificate the build is ad-hoc and the verification asserts *ad-hoc*, and
    the install instructions in the release notes are composed from what
-   actually happened.
+   actually happened — so a build can never tell people to clear a quarantine
+   flag it does not set.
 
    **Notarisation is a queue at Apple**, not work the workflow controls, and
    the first submission from a newly issued Developer ID is routinely the

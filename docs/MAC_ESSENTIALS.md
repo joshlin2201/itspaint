@@ -148,6 +148,8 @@ missing.
 
 | Item | Status |
 |---|---|
+| Developer ID signing | On for releases, with a secure timestamp |
+| Notarisation | On, stapled to the disk image **and** the app inside it |
 | App Sandbox | On, with only `files.user-selected.read-write` and app-scoped bookmarks |
 | Hardened Runtime | On for Release builds |
 | Privacy manifest | `PrivacyInfo.xcprivacy`, declaring file-timestamp and UserDefaults reason codes |
@@ -164,16 +166,19 @@ missing.
 screenshots (16:10 at 2880×1800), and submission. Those need the Apple Developer
 account and interactive steps.
 
-### Getting off ad-hoc signing
+### Signing and notarisation
 
-Releases are ad-hoc signed (`CODE_SIGN_IDENTITY: "-"`, `DEVELOPMENT_TEAM: ""`).
-That is correct for a local build — the sandbox and its entitlements work, and
-it needs no provisioning profile — but Gatekeeper rejects it on anyone else's
-Mac, which is why the README has to tell people to clear the quarantine flag by
-hand.
+Releases are signed with a Developer ID and notarised, as of 0.11.0. Local
+builds stay ad-hoc (`CODE_SIGN_IDENTITY: "-"`, `DEVELOPMENT_TEAM: ""`), which is
+correct for one: the sandbox and its entitlements work and it needs no
+provisioning profile.
 
-The membership is not the blocker. What is missing is a **Developer ID
-Application** certificate issued under the *paid* team.
+The rest of this section is the path that was taken, kept because every step of
+it was a place to go wrong.
+
+**A paid membership is not the same as having the certificate.** What was
+missing was a **Developer ID Application** certificate issued under the *paid*
+team.
 
 The distinction that costs people an afternoon: a free personal team and a paid
 Developer Program team are different teams with different IDs, and a personal
