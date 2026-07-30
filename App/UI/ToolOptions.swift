@@ -337,28 +337,85 @@ struct ToolOptions: View {
 
     /// What a selection can do. Crop and Copy are on the rail because they are
     /// the common case; the rest live here, one glance away.
+    ///
+    /// **Icons only in the side panel.** Four labelled buttons plus a size
+    /// read-out do not fit 258pt, and the panel is a fixed width, so they
+    /// truncated to `In…` and `D…` — a button whose label is one letter and an
+    /// ellipsis is worse than one with no label, because it looks broken rather
+    /// than deliberate. Each still carries its tooltip and accessibility label.
+    /// The bottom bar has the window's width and keeps the words.
+    @ViewBuilder
     private var selectionActions: some View {
-        HStack(spacing: Tokens.Space.tight) {
-            if let size = model.selectionSize {
+        if isVertical {
+            OptionRow("Size") {
                 HStack(spacing: 3) {
                     if model.selection?.isRectangular == false {
                         Image(systemName: "lasso")
                             .font(.system(size: 9.5))
                             .foregroundStyle(.primary.opacity(0.5))
                     }
-                    Text("\(size.width) × \(size.height)")
+                    Text(model.selectionSize.map { "\($0.width) × \($0.height)" } ?? "—")
                         .font(Tokens.Text.pillValue)
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.7))
+                    Spacer(minLength: 0)
                 }
             }
-            OptionButton("Crop", symbol: "crop") { model.cropToSelection() }
-            OptionButton("Invert", symbol: "square.righthalf.filled") { model.invertSelection() }
+            OptionRow(nil) {
+                SegmentTrack {
+                    selectionActionButtons(labelled: false)
+                }
+            }
+        } else {
+            HStack(spacing: Tokens.Space.tight) {
+                if let size = model.selectionSize {
+                    HStack(spacing: 3) {
+                        if model.selection?.isRectangular == false {
+                            Image(systemName: "lasso")
+                                .font(.system(size: 9.5))
+                                .foregroundStyle(.primary.opacity(0.5))
+                        }
+                        Text("\(size.width) × \(size.height)")
+                            .font(Tokens.Text.pillValue)
+                            .foregroundStyle(.primary.opacity(0.6))
+                    }
+                }
+                selectionActionButtons(labelled: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func selectionActionButtons(labelled: Bool) -> some View {
+        let actions: [(String, String, () -> Void)] = {
+            var list: [(String, String, () -> Void)] = [
+                ("Crop", "crop", { model.cropToSelection() }),
+                ("Invert", "square.righthalf.filled", { model.invertSelection() }),
+            ]
             if model.selectionKind == .instantAlpha {
-                OptionButton("Make transparent", symbol: "eraser.line.dashed") {
-                    model.makeSelectionTransparent()
-                }
+                list.append(
+                    ("Make transparent", "eraser.line.dashed", { model.makeSelectionTransparent() })
+                )
             }
-            OptionButton("Delete", symbol: "trash") { model.deleteSelection() }
+            list.append(("Delete", "trash", { model.deleteSelection() }))
+            return list
+        }()
+
+        ForEach(actions, id: \.0) { title, symbol, action in
+            if labelled {
+                OptionButton(title, symbol: symbol, action: action)
+            } else {
+                Button(action: action) {
+                    Image(systemName: symbol)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.primary.opacity(0.85))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Tokens.Size.segment)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(title)
+                .accessibilityLabel(title)
+            }
         }
     }
 }

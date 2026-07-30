@@ -112,11 +112,38 @@ struct EditorModelTests {
 @MainActor
 struct DrawingDocumentTests {
 
-    @Test("A new document opens a usable white canvas")
+    @Test("A new document opens a usable white canvas at the preferred size")
     func newDocumentDefaults() {
+        // Asserted against the *preference*, not the constant. A new document
+        // honours Settings now, so comparing to `defaultCanvasSize` passed only
+        // on a machine that had never changed it — this test failed the moment
+        // a preferred size was actually set, which is the wrong reason for a
+        // test to fail.
         let document = DrawingDocument()
-        #expect(document.model.canvas.width == DrawingDocument.defaultCanvasSize.width)
+        let preferred = Settings.shared.newCanvasSize
+        #expect(document.model.canvas.width == preferred.width)
+        #expect(document.model.canvas.height == preferred.height)
         #expect(document.model.canvas.pixels.allSatisfy { $0 == .white })
+    }
+
+    @Test("The preferred canvas size is clamped to what the engine can allocate")
+    func preferredSizeIsClamped() {
+        // A hand-edited or corrupt preference must not produce a document that
+        // cannot be created.
+        let settings = Settings.shared
+        let originalWidth = settings.newCanvasWidth
+        let originalHeight = settings.newCanvasHeight
+        defer {
+            settings.newCanvasWidth = originalWidth
+            settings.newCanvasHeight = originalHeight
+        }
+
+        settings.newCanvasWidth = -5
+        settings.newCanvasHeight = 10_000_000
+        let clamped = settings.newCanvasSize
+        #expect(clamped.width >= 1)
+        #expect(clamped.height <= Bitmap.maximumDimension)
+        #expect(Bitmap.isSizeSupported(width: clamped.width, height: clamped.height))
     }
 
     @Test("The app and native document use one stable public identity")

@@ -958,10 +958,7 @@ final class CanvasNSView: NSView {
         // so Return appeared to work and everything typed after it was invisible
         // both in the editor and, because `CTFrameDraw` clips to the box path,
         // in the committed pixels.
-        editor.isVerticallyResizable = true
-        editor.textContainerInset = .zero
-        editor.textContainer?.lineFragmentPadding = 0
-        editor.textContainer?.widthTracksTextView = true
+        editor.applyUnboundedVerticalLayout()
         editor.delegate = self
         editor.onCancel = { [weak self] in self?.cancelText() }
         editor.onCommit = { [weak self] in self?.commitText() }
@@ -999,7 +996,7 @@ final class CanvasNSView: NSView {
         let grown = PixelRect(x: box.minX, y: box.minY, width: box.width, height: height)
         let previous = box
         textBox = grown
-        editor.frame.size.height = Double(height) * zoom
+        editor.setFrameSize(NSSize(width: editor.frame.width, height: Double(height) * zoom))
         invalidate(previous.union(grown).insetBy(-handleInset))
     }
 
@@ -1020,6 +1017,9 @@ final class CanvasNSView: NSView {
             x: Double(resized.minX) * zoom, y: Double(resized.minY) * zoom,
             width: Double(resized.width) * zoom, height: Double(resized.height) * zoom
         )
+        // The container tracks the view's width, but only if it is told the
+        // width changed; a stale container keeps wrapping at the old one.
+        editor.applyUnboundedVerticalLayout()
         invalidate(previous.union(resized).insetBy(-handleInset))
         // Rewrapping at the new width can need more or fewer lines than before.
         growTextBoxToFit()
@@ -1580,7 +1580,7 @@ extension CanvasNSView: NSTextViewDelegate {
 /// something here: Escape (throw the box away) and ⌘↩ (land it). Everything
 /// else — selection, editing, dictation, the emoji palette — comes for free by
 /// using the real text view rather than drawing a fake caret.
-private final class TextEntryView: NSTextView {
+final class TextEntryView: NSTextView {
     var onCancel: (() -> Void)?
     var onCommit: (() -> Void)?
     var onMove: ((NSPoint) -> Void)?
@@ -1591,6 +1591,36 @@ private final class TextEntryView: NSTextView {
     var handleTolerance: (() -> CGFloat)?
 
     override func cancelOperation(_ sender: Any?) { onCancel?() }
+
+    /// Let the text lay out to any height, and wrap to the current width.
+    ///
+    /// **`isVerticallyResizable` is not enough on its own.** With no enclosing
+    /// scroll view the text container keeps whatever height it was created
+    /// with, so a second line is laid out and then *clipped* — which looks
+    /// exactly like the box failing to grow, and was mistaken for that. The
+    /// container has to be told it is unbounded, and told again whenever the
+    /// view's width changes or it keeps wrapping at the old one.
+    func applyUnboundedVerticalLayout() {
+        isVerticallyResizable = true
+        textContainerInset = .zero
+        textContainer?.lineFragmentPadding = 0
+        textContainer?.widthTracksTextView = true
+        textContainer?.containerSize = NSSize(
+            width: frame.width, height: .greatestFiniteMagnitude
+        )
+        minSize = NSSize(width: 0, height: frame.height)
+        maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+    }
+
+    /// Height the current text actually needs, for tests and for growth.
+    var laidOutTextHeight: CGFloat {
+        guard let layoutManager, let textContainer else { return 0 }
+        layoutManager.ensureLayout(for: textContainer)
+        return layoutManager.usedRect(for: textContainer).height
+    }
 
     /// A handle drag, a ⌘-drag to move, or ordinary text selection.
     ///
