@@ -32,149 +32,53 @@ not rediscovering.
 
 ### 2. There is no `brew install`
 
-`brew install --cask itspaint` is how Mac developers install Mac software. It
-gives permanent discoverability, carries trust we cannot manufacture, and makes
+`brew install --cask itspaint` is how Mac developers install Mac software. A
+cask is a single small PR to `homebrew/homebrew-cask`, it gives permanent
+discoverability, it carries trust we cannot manufacture ourselves, and it makes
 updates automatic.
 
-**The official repo will reject it today, and not for a technical reason.**
-Homebrew's [Package Acceptance Policy](https://docs.brew.sh/Package-Acceptance-Policy)
-gates on notability, and the numbers matter in a way that is easy to get wrong —
-they are joined by **or**, not *and*, and they **triple for a self-submission**:
+**Requirements:** a stable versioned download URL (the GitHub release already
+provides this), a published SHA-256 (`checksums.txt` already exists), and
+notarisation — all three now hold, so **this is unblocked and is the next thing
+to do.**
 
-| | forks | watchers | stars |
-|---|---|---|---|
-| Someone else submits it | 30 | 30 | **75** |
-| **You submit your own project** | 90 | 90 | **225** |
-
-Any *one* of the three is enough. And separately: *"A code repository less than 30
-days old is normally not eligible"*, plus it must be *"software with a public
-presence independent of Homebrew and a homepage that explains the project"*.
-
-This repository was created 2026-07-29 at 0 forks / 0 watchers / 0 stars, so it
-fails on age **and** on every metric. Earliest eligibility is around
-**2026-08-28**, and because Josh owns the repo the bar is the 225-star column
-unless a third party submits it.
-
-That inverts the order this document was written in. The cask is not what
-unblocks distribution; **distribution is what unblocks the cask**, and 225 stars
-is the concrete number the posting work below is aiming at.
-
-**A personal tap has no notability gate, and it is live now:**
-
-```bash
-brew install --cask joshlin2201/itspaint/itspaint
-```
-
-[joshlin2201/homebrew-itspaint](https://github.com/joshlin2201/homebrew-itspaint).
-The fully qualified name is deliberate — since Homebrew 6.0.0 third-party taps
-require explicit trust, and installing by fully qualified name trusts *only that
-cask* rather than the whole tap. `brew tap` followed by a bare name additionally
-needs `brew trust --cask`, which is a worse first instruction to give someone.
-
-The cask is the same one an eventual `homebrew-cask` submission will carry, so
-none of the work is wasted; only the venue changes.
-
-### Two things to fix before submitting upstream
-
-**Stop marking releases as pre-releases.** This is the larger of the two, and it
-is not about the version number — nothing in current policy requires 1.0. It is
-that `homebrew-cask`'s autobump and both of its GitHub livecheck strategies
-discard pre-releases outright (`github_releases.rb` does
-`next if release["draft"] || release["prerelease"]`). So the cask here has to
-read **git tags** instead, and submitting that upstream means asking maintainers
-to merge a non-standard livecheck block whose only purpose is to defeat the
-pre-release filter. Worse, the flag is a public statement that this is not the
-channel you recommend for most users, while the unversioned cask is supposed to
-track exactly that channel. Drop the flag and the cask simplifies to a bare
-`strategy :github_latest` and the objection disappears.
-
-**Disclose the AI assistance.** `homebrew-cask`'s CONTRIBUTING requires stating
-in the PR that an LLM was used and which one, requires that you have reviewed it
-yourself and can answer maintainer questions without one, forbids
-`Co-developed-by`/`Assisted-by` trailers, and limits non-maintainers to one
-AI-assisted PR open at a time.
+With notarisation done, the cask is the last mechanical step between the project
+and every channel below.
 
 ---
 
 ## Where to post, ranked
 
-**Read this first: three of these are one-shot.** Show HN explicitly excludes
-version bumps — *"New features and upgrades ('Foo 1.3.1 is out') generally
-aren't substantive enough to be Show HNs"* — so you get one, and it should be
-spent at the version you would call 1.0, not at 0.11. r/macapps permits
-*"not more than once per developer in 30 days"*. AlternativeTo makes new
-accounts wait a week before they can submit an app. Sequence accordingly; the
-order below is the order to do them in, not a ranking by value.
+### Tier 1 — worth real preparation
 
-### Now — free, and they compound
-
-| | Why | Effort |
+| Channel | Why | What it needs |
 |---|---|---|
-| **Repo `homepage` field** | Was null. It is the link GitHub surfaces in search, on topic pages and in the sidebar. | Done |
-| **A README GIF** | Every other channel resolves to the README, and the argument *is* the demo: auto-numbered step badges and token redaction, the two things Markup cannot do. | An hour |
-| **[awesome-mac](https://github.com/jaywcjlove/awesome-mac)** — 108k stars | Merges in **under a day**, measured across its last 28 merged PRs. **Paintbrush is already listed in the same section**, which makes the positioning legible to the maintainer for free. | 20 minutes |
-| **A personal Homebrew tap** | `brew tap joshlin2201/itspaint` — no notability gate, works today, same cask file the official PR will carry. | An hour |
-| **[AlternativeTo](https://alternativeto.net/software/paintbrush/about/) account** | One-week wait before you can submit, so the clock starts when the account does. The Paintbrush page already lists 33 alternatives — this is the channel that matches the positioning exactly, and it keeps paying for years rather than for a day. | 5 minutes |
+| **Show HN** | Highest ceiling for a native, no-network, open-source Mac tool. This audience specifically rewards "no accounts, no telemetry, no dependencies". | A working notarised DMG, a GIF above the fold in the README, and a first comment that says *why* rather than *what* |
+| **r/macapps** | ~high-intent Mac software audience, and new native apps do well there | The GIF, and answering every comment for 48h |
+| **Homebrew Cask** | Permanent, compounding, zero ongoing effort | See above |
+| **awesome-mac** ([jaywcjlove](https://github.com/jaywcjlove/awesome-mac)) and **open-source-mac-os-apps** ([serhii-londar](https://github.com/serhii-londar/open-source-mac-os-apps)) | Two of the highest-traffic Mac software lists on GitHub. A PR each. | One line each |
 
-### At 1.0 — the one-shots
+### Tier 2 — cheap, do them all in an afternoon
 
-**Show HN**, and the data is not what the blogs say. Across 167 macOS Show HN
-posts scoring ≥100 since January 2025: **41% were posted 06:00–09:59 PT**, 63%
-between 03:00 and 11:00 PT. Day of week is essentially flat — Thursday 30,
-Monday 25, Friday 25, Sunday 23 — so "never post on a Friday" does not survive
-contact with the numbers. **Hour is what matters; the day barely does.**
+- **AlternativeTo** — list as an alternative to Microsoft Paint, Paintbrush,
+  Skitch and Markup. Long-tail search traffic, permanently.
+- **r/opensource, r/swift, r/MacOS** — different framings of the same post.
+- **Lobste.rs** — smaller than HN, higher signal, likes native and dependency-free.
+- **Mastodon / Bluesky** with `#macos #swift #opensource`. The Swift and Mac dev
+  communities are genuinely active on both.
+- **Product Hunt** — save it for 1.0. Good sustained traffic, less credibility
+  with developers than HN, and it burns once.
+- **GitHub topics** — `macos`, `swift`, `swiftui`, `image-editor`,
+  `screenshot`, `mspaint`, `paint`. Free discovery inside GitHub search.
 
-The intro comment is not the differentiator either. HN does not allow text on a
-URL submission, and only 22% of high-scoring Mac Show HNs had a top-level
-comment from the author at all — but **98% commented somewhere, a median of 12
-times**. The job is being awake and answering for the following six to eight
-hours.
+### Tier 3 — once there is a 1.0 worth writing about
 
-Title, ≤80 characters (the cap is real; measured max across 296 posts is exactly
-80, median 66):
+One short, specific email each to MacStories, 9to5Mac, MacRumors and Six
+Colors. Not a press release — a two-paragraph note with the GIF and the
+"Paintbrush has been dead for a decade and nothing replaced it" angle, which is
+a genuine story rather than a launch announcement.
 
-> `Show HN: ItsPaint – native Mac paint and screenshot markup, no network, MIT`
-
-What kills these posts, from the same cohort: a pricing surprise mid-thread, and
-**unverifiable claims**. "No network code at all" will be stress-tested, so make
-it falsifiable in the README — no network entitlement in the sandbox
-entitlements, no `URLSession` or `NWConnection` anywhere in the source, and the
-`otool -L` output. A checkable claim is worth a hundred points; an unbacked one
-reads as marketing.
-
-**r/macapps** — 229k members, one post per developer per 30 days. Lead with
-free, MIT, no account, no telemetry: that subreddit is saturated with paid
-utilities and reacts well to the opposite.
-
-### Then — evergreen, once the assets exist
-
-- **AlternativeTo**, as an alternative on both the Paintbrush and Microsoft Paint
-  pages. Approval takes days to a week.
-- **[open-source-mac-os-apps](https://github.com/serhii-londar/open-source-mac-os-apps)**
-  — 49k stars, but edit `applications.json`, not the generated README, and expect
-  months: its most recent merge was 2026-03-25 with 150 PRs open. Submit and
-  forget. Its `applications.json` on `master` is currently invalid JSON — a
-  trailing comma — and fixing that in the same PR is a cheap way to get the
-  maintainer to open the tab.
-- **[awesome-native-macosx-apps](https://github.com/open-saas-directory/awesome-native-macosx-apps)**
-  — small, but "no Electron, truly native" is its entire thesis.
-- **[macapp.supply](https://macapp.supply/guidelines)**, and its siblings. Gated
-  on *assets*, not code: a sharp icon and three or four quality screenshots
-  unlock several directories at once.
-- **Michael Tsai's link blog** and **Six Colors** — low traffic, very high signal
-  among Mac developers, and links there propagate to MacStories and the podcasts.
-- **iOS Dev Weekly** — frame it as the engineering story (pure AppKit, zero
-  dependencies), not the product.
-
-### Deprioritise
-
-**Product Hunt.** Roughly 10% of daily launches get Featured, and Featured status
-drives most of the outcome. For a free, open-source, developer-facing Mac app,
-Show HN dominates — launch there as a same-week secondary at most.
-
-**Lobsters** is invitation-only and restricts the `show` tag for new accounts.
-The fastest legitimate way in is having authored something posted there, which a
-good Show HN can produce for you.
+---
 
 ## The pitch, per channel
 
@@ -279,22 +183,6 @@ entire positioning in [COMPETITIVE.md](COMPETITIVE.md) for a small amount of
 money.
 
 ---
-
-## What could not be verified
-
-Recorded because a plan built on unverified numbers is worse than one with gaps
-it knows about.
-
-- **r/opensource and r/swift**: no rules, subscriber counts or karma/age
-  requirements. Reddit 403s all unauthenticated access and the mirrors are
-  proof-of-work gated. Check the sidebar before posting.
-- **r/macapps**: the 229k members and the once-per-30-days rule are from a
-  third-party index dated 2026-06-04, not from Reddit. Verify in the composer.
-- **macapp.supply**: price and turnaround are not published.
-- **`apps@sixcolors.com`**: appears in Six Colors' own round-up boilerplate but
-  is not listed on their About page. Likely current, not confirmed.
-- **Product Hunt's 10% Featured rate**: secondary sources, methodology not
-  published.
 
 ## Sources
 

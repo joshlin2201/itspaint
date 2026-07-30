@@ -43,14 +43,8 @@ struct ToolOptions: View {
         .environment(\.optionsAxisIsVertical, isVertical)
         .font(Tokens.Text.pillLabel)
         .lineLimit(1)
-        // The fixed width exists to align controls with each other. A tool with
-        // no controls has nothing to align, and holding the full width for it
-        // just parks 258pt of empty glass over the artwork.
-        .frame(
-            width: isVertical && hasAlignedControls ? Tokens.Rail.optionsContentWidth : nil,
-            alignment: .leading
-        )
-        .fixedSize(horizontal: !(isVertical && hasAlignedControls), vertical: false)
+        .frame(width: isVertical ? Tokens.Rail.optionsContentWidth : nil, alignment: .leading)
+        .fixedSize(horizontal: !isVertical, vertical: false)
         .padding(.horizontal, Tokens.Space.snug)
         .padding(.vertical, Tokens.Space.base - 1)
         .chromeSurface(cornerRadius: Tokens.Radius.panel)
@@ -96,18 +90,6 @@ struct ToolOptions: View {
     private var title: some View {
         Text(model.tool.displayName)
             .font(.system(size: 11.5, weight: .semibold))
-    }
-
-    /// Whether this tool contributes any rows to the label/control grid.
-    ///
-    /// Kept beside `controls` deliberately: a tool that gains its first control
-    /// has to be removed from here in the same edit, and the two being adjacent
-    /// is the only thing that makes that likely.
-    private var hasAlignedControls: Bool {
-        switch model.tool {
-        case .pencil, .eyedropper: false
-        default: true
-        }
     }
 
     /// One line saying how the tool is driven, for the tools whose gesture is

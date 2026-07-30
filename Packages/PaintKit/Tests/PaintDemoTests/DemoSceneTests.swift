@@ -1,0 +1,130 @@
+import Foundation
+import PaintKit
+import Testing
+@testable import PaintDemo
+
+@Suite("PaintDemo scene contract")
+struct DemoSceneTests {
+    @Test("The public demo suite has stable CLI names and filenames")
+    func stableNames() {
+        #expect(DemoScene.allCases.map(\.rawValue) == [
+            "clipboard", "quick-sketch", "transparency",
+        ])
+        #expect(DemoScene.clipboard.defaultFilename == "clipboard-markup.png")
+        #expect(DemoScene.quickSketch.defaultFilename == "quick-sketch.png")
+        #expect(DemoScene.transparency.defaultFilename == "transparency.png")
+    }
+
+    @Test("Every named scene writes a valid distinct PNG")
+    @MainActor
+    func writesEveryScene() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var decoded: [Bitmap] = []
+        for scene in DemoScene.allCases {
+            let output = root.appendingPathComponent(scene.defaultFilename)
+            try scene.write(to: output)
+            let bitmap = try ImageCodec.decode(contentsOf: output)
+            #expect((bitmap.width, bitmap.height) == (1000, 640))
+            decoded.append(bitmap)
+        }
+        #expect(decoded[0] != decoded[1])
+        #expect(decoded[0] != decoded[2])
+        #expect(decoded[1] != decoded[2])
+    }
+
+    @Test("Clipboard markup is fixed, deterministic, and visibly annotated")
+    @MainActor
+    func clipboardMarkup() {
+        let unmarked = ClipboardMarkupScene.unmarkedSource()
+        let first = ClipboardMarkupScene.render()
+        let second = ClipboardMarkupScene.render()
+
+        #expect((first.width, first.height) == (1000, 640))
+        #expect(first == second)
+        #expect(first.pixel(at: PixelPoint(x: 618, y: 267)) !=
+                first.pixel(at: PixelPoint(x: 618, y: 232)))
+        #expect(first.pixel(at: PixelPoint(x: 350, y: 360)) !=
+                unmarked.pixel(at: PixelPoint(x: 350, y: 360)))
+        #expect(first.pixel(at: PixelPoint(x: 500, y: 361)) !=
+                unmarked.pixel(at: PixelPoint(x: 500, y: 361)))
+    }
+
+    @Test("Clipboard photo source has no poster-like horizon seam")
+    @MainActor
+    func clipboardMarkupPhotoSource() {
+        let source = ClipboardMarkupScene.unmarkedSource()
+        let abruptColumns = (48..<478).filter { x in
+            let above = source.pixel(at: PixelPoint(x: x, y: 291))!
+            let below = source.pixel(at: PixelPoint(x: x, y: 292))!
+            let difference = abs(Int(above.r) - Int(below.r))
+                + abs(Int(above.g) - Int(below.g))
+                + abs(Int(above.b) - Int(below.b))
+            return difference > 48
+        }.count
+
+        #expect(abruptColumns < 100)
+    }
+
+    @Test("Quick sketch stays a simple two-colour explanation")
+    @MainActor
+    func quickSketch() {
+        let first = QuickSketchScene.render()
+        let second = QuickSketchScene.render()
+
+        #expect((first.width, first.height) == (1000, 640))
+        #expect(first == second)
+        #expect(first.pixel(at: PixelPoint(x: 118, y: 122)) != .white)
+        #expect(first.pixel(at: PixelPoint(x: 500, y: 328)) != .white)
+        #expect(first.pixel(at: PixelPoint(x: 110, y: 95)) ==
+                RGBA8(r: 23, g: 50, b: 77))
+        #expect(first.pixel(at: PixelPoint(x: 500, y: 543)) ==
+                RGBA8(r: 47, g: 128, b: 237))
+        #expect(first.pixel(at: PixelPoint(x: 405, y: 188)) ==
+                RGBA8(r: 239, g: 106, b: 91))
+    }
+
+    @Test("Transparency removes the connected background through alpha")
+    @MainActor
+    func transparency() {
+        let image = TransparencyScene.render()
+
+        #expect((image.width, image.height) == (1000, 640))
+        #expect(image.pixel(at: TransparencyScene.backgroundSample) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 980, y: 600)) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 100, y: 500)) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 500, y: 310))?.a == 255)
+        #expect(image.pixel(at: PixelPoint(x: 500, y: 310)) != .clear)
+        #expect(image.pixel(at: PixelPoint(x: 632, y: 281)) == .white)
+        #expect(image.pixel(at: PixelPoint(x: 456, y: 230)) ==
+                RGBA8(r: 239, g: 106, b: 91))
+        #expect(image.pixel(at: PixelPoint(x: 414, y: 375)) ==
+                RGBA8(r: 47, g: 128, b: 237))
+        #expect(image.pixel(at: PixelPoint(x: 741, y: 298)) ==
+                RGBA8(r: 23, g: 50, b: 77))
+        #expect(image.pixel(at: PixelPoint(x: 623, y: 328)) ==
+                RGBA8(r: 181, g: 205, b: 214))
+        #expect(image == TransparencyScene.render())
+    }
+
+    @Test("Transparency keeps the full sticker in its centred 500 by 300 frame")
+    @MainActor
+    func transparencyFrame() {
+        let image = TransparencyScene.render()
+        let painted = image.pixels.enumerated().filter { $0.element.a > 0 }.map(\.offset)
+        let xs = painted.map { $0 % image.width }
+        let ys = painted.map { $0 / image.width }
+
+        #expect(xs.min() == 250)
+        #expect(xs.max() == 749)
+        #expect(ys.min() == 170)
+        #expect(ys.max() == 469)
+        #expect(image.pixel(at: PixelPoint(x: 249, y: 320)) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 750, y: 320)) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 500, y: 169)) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 500, y: 470)) == .clear)
+    }
+}
