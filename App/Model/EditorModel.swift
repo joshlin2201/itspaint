@@ -520,6 +520,22 @@ final class EditorModel {
 
     func invertSelection() { noteChange(engine.invertSelection()) }
 
+    /// True while something pasted or lifted is still floating, so the chrome
+    /// can offer what to do with it.
+    var hasFloatingContent: Bool { engine.floating != nil }
+
+    /// Write the floating content down where it sits.
+    func placeFloating() {
+        noteChange(engine.commitFloating())
+        syncFromEngine()
+    }
+
+    /// Throw the floating content away without marking the canvas.
+    func discardFloating() {
+        noteChange(engine.discardFloating())
+        syncFromEngine()
+    }
+
     // MARK: - State the canvas-first chrome reads
 
     /// Document name and dirty flag, mirrored so the title chip does not have
@@ -591,18 +607,33 @@ final class EditorModel {
     }
 
     func cropToSelection() {
-        guard engine.cropToSelection() else {
-            present(
-                message: hasSelection
-                    ? "That selection is already the whole image."
-                    : "Select an area to crop to first.",
-                recovery: hasSelection
-                    ? nil
-                    : "Press M and drag a rectangle, or L to trace a shape."
-            )
+        // Captured *before* the attempt, because cropping commits any floating
+        // content and so changes the answer. Reading it afterwards is how this
+        // ended up reporting "select an area first" immediately after pasting —
+        // the paste had just been consumed.
+        let hadRegion = hasSelection
+
+        if engine.cropToSelection() {
+            noteChange(canvas.bounds)
             return
         }
+
+        // The float was still placed even when there was nothing to crop to, so
+        // the canvas may have changed regardless.
         noteChange(canvas.bounds)
+
+        guard !hadRegion else {
+            // Already the whole canvas — which is the *normal* outcome of
+            // pasting an image larger than the document, since the canvas grew
+            // to fit it. Nothing to do is not an error, and an alert here was
+            // the app telling people off for a reasonable thing to try.
+            return
+        }
+
+        present(
+            message: "Select an area to crop to first.",
+            recovery: "Press M and drag a rectangle, or L to trace a shape."
+        )
     }
 
     /// Trim uniform borders. The common case is a screenshot with a slab of

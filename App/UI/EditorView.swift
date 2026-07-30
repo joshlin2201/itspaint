@@ -53,8 +53,24 @@ struct EditorView: View {
             readOutRow
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
 
+            // Bottom-centre, clear of the rail on either edge and of the
+            // pointer read-out in the corner.
+            if model.hasFloatingContent {
+                FloatingActions(model: model)
+                    .fixedSize()
+                    .padding(.bottom, model.chromeEdge.isVertical
+                        ? Tokens.Space.safeInset
+                        : Tokens.Space.safeInset + Tokens.Rail.thickness + Tokens.Space.base)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    // Out of the way while the content is actually being dragged.
+                    .opacity(model.isDragging ? 0 : 1)
+                    .animation(Tokens.Motion.micro, value: model.isDragging)
+            }
+
             chrome
         }
+        // The bar appears and disappears with the content it acts on.
+        .animation(Tokens.Motion.pillResize, value: model.hasFloatingContent)
         // The whole layout spans the window, titlebar included.
         //
         // `.fullSizeContentView` lets the content view extend under the

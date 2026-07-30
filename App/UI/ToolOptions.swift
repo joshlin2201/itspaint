@@ -35,7 +35,10 @@ struct ToolOptions: View {
         layout {
             header
             controls
-            if model.hasSelection { selectionActions }
+            // Not while something is floating: the action bar over the canvas is
+            // the primary affordance then, and showing Crop in both places at
+            // once is two answers to one question.
+            if model.hasSelection && !model.hasFloatingContent { selectionActions }
         }
         .environment(\.optionsAxisIsVertical, isVertical)
         .font(Tokens.Text.pillLabel)

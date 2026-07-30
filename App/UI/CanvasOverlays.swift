@@ -237,6 +237,73 @@ struct WindowActions: View {
     }
 }
 
+/// What to do with something that has just been pasted or lifted.
+///
+/// Floating content is a decision the app has already made for you — click
+/// anywhere and it lands. That is the right default and it stays the default,
+/// but it is invisible: nothing said the pixels were still movable, that the
+/// canvas had grown to hold them, or that cropping to them was one click away.
+/// People discovered Crop to Selection and got told to select something first.
+///
+/// So this states the choice and then gets out of the way. Placing is the
+/// primary action because it is what clicking off already does; the bar is a
+/// shortcut to the two things that are *not* obvious.
+struct FloatingActions: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
+        // Revision, so the size read-out follows a drag or a resize.
+        let _ = model.revision
+
+        HStack(spacing: Tokens.Space.tight) {
+            Image(systemName: "square.dashed.inset.filled")
+                .font(.system(size: 11))
+                .foregroundStyle(.primary.opacity(0.6))
+
+            if let size = model.selectionSize {
+                Text("\(size.width) × \(size.height)")
+                    .font(Tokens.Text.pillValue)
+                    .foregroundStyle(.primary.opacity(0.7))
+            }
+
+            HeaderDivider()
+
+            action("Place", symbol: "checkmark", prominent: true) { model.placeFloating() }
+            action("Crop to it", symbol: "crop") { model.cropToSelection() }
+            action("Discard", symbol: "xmark") { model.discardFloating() }
+        }
+        .padding(.horizontal, Tokens.Space.base)
+        .frame(height: Tokens.Size.headerControl)
+        .chromeSurface(cornerRadius: Tokens.Radius.chip)
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Pasted content. Place, crop to it, or discard.")
+    }
+
+    private func action(
+        _ title: String, symbol: String, prominent: Bool = false,
+        perform: @escaping () -> Void
+    ) -> some View {
+        Button(action: perform) {
+            HStack(spacing: 4) {
+                Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
+                Text(title).font(.system(size: 11.5))
+            }
+            .foregroundStyle(prominent ? Color.white : .primary.opacity(0.85))
+            .padding(.horizontal, Tokens.Space.base)
+            .frame(height: 22)
+            .background {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(prominent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary.opacity(0.12)))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(title)
+        .accessibilityLabel(title)
+    }
+}
+
 /// Where the pointer is, and how big the thing being dragged is.
 ///
 /// **The only readout that still has to be near the artwork**, because it is

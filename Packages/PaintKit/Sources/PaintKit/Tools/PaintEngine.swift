@@ -788,6 +788,10 @@ public final class PaintEngine {
             selection = nil
             lassoPath = []
             canvas.composite(floating.bitmap, at: placement)
+            lastPlacedFloatingFrame = PixelRect(
+                x: placement.x, y: placement.y,
+                width: floating.frame.width, height: floating.frame.height
+            )
             recordResize(name: "Paste", from: before)
             return canvas.bounds
         }
@@ -798,9 +802,17 @@ public final class PaintEngine {
     /// Whether committing floating content may enlarge the canvas.
     public var growsToFitFloating = true
 
+    /// Where the last committed float ended up, in the canvas it ended up in.
+    ///
+    /// Not the same as the frame it had before the commit: growing the canvas to
+    /// hold content dragged off the top-left shifts everything, so a caller that
+    /// wants to crop to what it just placed has to be told the post-growth rect.
+    public private(set) var lastPlacedFloatingFrame: PixelRect?
+
     private func compositeClipped(_ floating: FloatingSelection, before: Bitmap) -> PixelRect {
         let target = floating.frame.intersection(canvas.bounds)
         guard !target.isEmpty else { return floating.frame.insetBy(-handleTolerance) }
+        lastPlacedFloatingFrame = floating.frame
         canvas.composite(floating.bitmap, at: floating.origin)
         recordEdit(name: "Move", before: before, dirty: target)
         return floating.frame.union(target)
@@ -843,8 +855,25 @@ public final class PaintEngine {
     /// to a freeform shape has to mean the shape, not the box around it, or the
     /// tool is a rectangle wearing a costume.
     @discardableResult
+    /// Crop to the selection, or to whatever is floating.
+    ///
+    /// **Floating content defines the crop region.** This used to commit the
+    /// float and *then* look for a selection — of which a paste leaves none — so
+    /// cropping right after pasting placed the image and reported that nothing
+    /// was selected. The work was done and the message said it had not been.
+    ///
+    /// Reading the frame after the commit rather than before is deliberate:
+    /// committing can enlarge the canvas and shift the existing artwork, which
+    /// moves the content's coordinates with it.
     public func cropToSelection() -> Bool {
-        _ = commitFloating()
+        if floating != nil {
+            _ = commitFloating()
+            if let placed = lastPlacedFloatingFrame {
+                let region = placed.intersection(canvas.bounds)
+                if !region.isEmpty { selection = Selection(bounds: region) }
+            }
+        }
+
         guard let selection, !selection.isEmpty,
               selection.bounds != canvas.bounds || !selection.isRectangular,
               var cropped = ImageTransform.cropped(canvas, to: selection.bounds)

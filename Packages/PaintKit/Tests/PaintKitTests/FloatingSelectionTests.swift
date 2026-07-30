@@ -423,3 +423,67 @@ struct FloatingGrowthTests {
         #expect(e.canvas.width == 100)
     }
 }
+
+/// Cropping right after a paste.
+///
+/// `cropToSelection` committed the float *first* and then looked for a
+/// selection — of which a paste leaves none — so it placed the image and then
+/// reported that nothing was selected. The work was done and the message said
+/// it had not been.
+@Suite("Crop to what was just pasted")
+@MainActor
+struct CropToFloatingTests {
+
+    private func engine(_ w: Int, _ h: Int) -> PaintEngine {
+        PaintEngine(canvas: Bitmap(width: w, height: h, fill: .white))
+    }
+
+    private func red(_ w: Int, _ h: Int) -> Bitmap {
+        Bitmap(width: w, height: h, fill: PaintColour(hex: "FF0000")!.rgba8)
+    }
+
+    @Test("Cropping after pasting crops to the pasted content")
+    func cropsToFloating() {
+        let e = engine(400, 400)
+        e.paste(red(80, 60))
+        #expect(e.cropToSelection(), "cropping to a fresh paste reported failure")
+        #expect(e.canvas.width == 80)
+        #expect(e.canvas.height == 60)
+        // And what survived is the pasted pixels, not the canvas behind them.
+        #expect(e.canvas.pixel(at: PixelPoint(x: 40, y: 30)) == PaintColour(hex: "FF0000")!.rgba8)
+    }
+
+    @Test("It crops to where the content ended up, not where it started")
+    func cropsToPlacedFrame() {
+        // Committing content dragged off the top-left grows the canvas and
+        // shifts the artwork, so the frame the crop needs is the one *after*
+        // placement.
+        let e = engine(200, 200)
+        e.paste(red(60, 60))
+        e.moveFloating(to: PixelPoint(x: -30, y: -30))
+        #expect(e.cropToSelection())
+        #expect(e.canvas.width == 60)
+        #expect(e.canvas.height == 60)
+        #expect(e.canvas.pixel(at: PixelPoint(x: 30, y: 30)) == PaintColour(hex: "FF0000")!.rgba8)
+    }
+
+    @Test("A paste that filled the canvas leaves nothing to crop, and says so by returning false")
+    func fullCanvasPasteIsANoOp() {
+        // The canvas grew to hold the image, so the content *is* the canvas.
+        // Reporting false is correct; the app must not turn it into an alert.
+        let e = engine(100, 100)
+        e.paste(red(300, 200))
+        #expect(e.canvas.width == 300)
+        #expect(!e.cropToSelection(), "there was something to crop to after all")
+        // The paste still landed.
+        #expect(e.floating == nil)
+        #expect(e.canvas.pixel(at: PixelPoint(x: 150, y: 100)) == PaintColour(hex: "FF0000")!.rgba8)
+    }
+
+    @Test("With nothing selected and nothing floating it simply fails")
+    func nothingToCropTo() {
+        let e = engine(120, 120)
+        #expect(!e.cropToSelection())
+        #expect(e.canvas.width == 120)
+    }
+}
