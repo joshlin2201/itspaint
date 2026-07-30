@@ -49,6 +49,16 @@ version may still carry breaking changes to the document format.
   is already open.
 
 ### Fixed
+- **The Place / Crop / Discard bar outlived the content it acts on.** Placing a
+  float and then undoing past it left the bar up over nothing, offering to place
+  something that was no longer there, with a blank size chip beside it. The same
+  passthrough problem as the badge counter, one property along: the bar asked
+  the engine whether anything was floating, and nothing told SwiftUI when the
+  answer changed — so it came and went only when some *other* state happened to
+  redraw the view around it. The chip looked blank rather than stale precisely
+  because it *does* follow `revision`. The flag is mirrored on `EditorModel`
+  now, synced wherever a dirty rect is already noted, so every route that can
+  lift, place, discard or undo a float is covered by one write.
 - **The step badge counter appeared to stick.** `PaintEngine` is deliberately
   UI-free and so not `@Observable`, and both the rail cell and the panel hint
   read the counter through a computed passthrough — invisible to SwiftUI, so

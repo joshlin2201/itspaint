@@ -310,7 +310,7 @@ final class EditorModel {
 
     func noteChange(_ dirty: PixelRect) {
         guard !dirty.isEmpty else { return }
-        revision &+= 1
+        noteVisualChange(dirty)
         syncBadgeNumber()
         noteCanvasSizeIfChanged()
         onCanvasChanged?(dirty)
@@ -333,6 +333,7 @@ final class EditorModel {
     func noteVisualChange(_ dirty: PixelRect) {
         guard !dirty.isEmpty else { return }
         revision &+= 1
+        syncFloatingState()
     }
 
     @ObservationIgnored private var lastKnownUndoCount: Int = 0
@@ -591,7 +592,26 @@ final class EditorModel {
 
     /// True while something pasted or lifted is still floating, so the chrome
     /// can offer what to do with it.
-    var hasFloatingContent: Bool { engine.floating != nil }
+    ///
+    /// **Mirrored, not forwarded**, for the same reason `nextBadgeNumber` is: a
+    /// computed passthrough to the UI-free engine is invisible to SwiftUI, so
+    /// the actions bar only appeared and vanished when something *else*
+    /// invalidated the view around it. Placing a float and then undoing past it
+    /// changes nothing else, which is how the bar outlived the content it acts
+    /// on — still offering Place and Crop with nothing to place, and a blank
+    /// size chip because that read-out *does* follow `revision`.
+    private(set) var hasFloatingContent = false
+
+    /// Pull the flag across whenever anything has been drawn or invalidated —
+    /// which is every route that can lift, drop, place, discard or undo a float.
+    ///
+    /// An empty frame reads as nothing floating. The engine does not make those,
+    /// but the bar exists to place and crop *to* something, and both are
+    /// meaningless on a rect of no size.
+    private func syncFloatingState() {
+        let floats = engine.floating.map { !$0.frame.isEmpty } ?? false
+        if hasFloatingContent != floats { hasFloatingContent = floats }
+    }
 
     /// Write the floating content down where it sits.
     func placeFloating() {

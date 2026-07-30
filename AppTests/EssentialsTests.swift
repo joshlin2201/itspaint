@@ -182,6 +182,44 @@ struct EssentialsTests {
         // Outside the marquee the block survives.
         #expect(model.canvas.pixel(at: PixelPoint(x: 55, y: 55)) == red)
     }
+
+    /// The actions bar reads `hasFloatingContent`, and the engine it asks is not
+    /// observable — so this checks the mirror, not the engine. Placing and then
+    /// undoing past the placement is the case that used to leave the bar up with
+    /// nothing to place.
+    @Test("The floating flag follows the content through place, undo and redo")
+    func floatingFlagFollowsHistory() {
+        let model = markedModel()
+        select(model, PixelPoint(x: 20, y: 20), PixelPoint(x: 50, y: 50))
+        #expect(!model.hasFloatingContent)
+
+        model.copySelection()
+        model.paste()
+        #expect(model.hasFloatingContent)
+
+        // The value going false is not enough — the bar only goes away if
+        // SwiftUI is *told*. A computed passthrough to the engine registers no
+        // dependency here, which is the whole bug: correct answer, never asked
+        // for again.
+        // `onChange` is `@Sendable`, and it fires synchronously on whichever
+        // thread mutated — here, this one.
+        nonisolated(unsafe) var notified = false
+        withObservationTracking { _ = model.hasFloatingContent } onChange: { notified = true }
+
+        model.placeFloating()
+        #expect(!model.hasFloatingContent)
+        #expect(notified, "nothing invalidates the bar, so it stays up over nothing")
+
+        // Undoing the placement, then the edit under it. Neither leaves anything
+        // floating, so neither should leave the bar up.
+        model.undo()
+        #expect(!model.hasFloatingContent)
+        model.undo()
+        #expect(!model.hasFloatingContent)
+
+        model.redo()
+        #expect(!model.hasFloatingContent)
+    }
 }
 
 @Suite("Essentials — shortcuts and tools")
