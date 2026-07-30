@@ -81,8 +81,11 @@ extension DrawingDocument {
 
     @IBAction func cropToSelection(_ sender: Any?) { model.cropToSelection() }
     @IBAction func trimBorders(_ sender: Any?) { model.trimBorders() }
+    @IBAction func removeBackground(_ sender: Any?) { model.removeBackground() }
     @IBAction func showSizeSheet(_ sender: Any?) { model.isSizeSheetPresented = true }
     @IBAction func showRotateSheet(_ sender: Any?) { model.isRotateSheetPresented = true }
+
+    @IBAction func showSignatureSheet(_ sender: Any?) { model.isSignatureSheetPresented = true }
     @IBAction func flipHorizontal(_ sender: Any?) { model.flipHorizontally() }
     @IBAction func flipVertical(_ sender: Any?) { model.flipVertically() }
     @IBAction func rotateRight(_ sender: Any?) { model.rotate(.clockwise90) }

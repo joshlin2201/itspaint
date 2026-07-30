@@ -90,6 +90,10 @@ job people actually use it for:**
 That list is the wedge. It is not "build a better Preview" — it is "the five
 things Markup refuses to do are the five things a bug report needs".
 
+Of Markup's own annotation set, **the loupe is now the only thing it has that we
+do not** — signature capture shipped, and ours keys the ink against a local paper
+estimate so an imported photo of paper works, not just a trackpad drag.
+
 See [CAPTURE.md](CAPTURE.md) for how we get into that workflow.
 
 ---

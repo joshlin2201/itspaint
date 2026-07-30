@@ -7,6 +7,47 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+### Added
+- **Remove Background** (`Image ▸ Remove Background`) keys the page out from
+  behind the subject in one command. It is not a new engine — it is Instant
+  Alpha's own span walk, seeded automatically at the four corners at a tolerance
+  that survives a real capture. Four corners rather than one because a subject
+  touching an edge splits the page into separate regions, and a corner in a
+  different region from the other three is the normal case.
+
+  It **declines rather than guessing.** If the flood would take essentially the
+  whole canvas — which is what happens on a flat image, where every corner is the
+  same region as the middle — nothing changes and the alert points at Instant
+  Alpha. A one-click background removal that erases the picture is worse than one
+  that says it cannot help.
+
+  This closes one of the three cheap parity gaps against Windows 11 Paint, whose
+  version of this is AI-backed and one click; ours is one click and needs no
+  model, no network and no NPU.
+- **Signature capture** (`⌃⌘S`, `Tools ▸ Signature…`). Sign in the box with a
+  trackpad, mouse or tablet, or import a photo of a signature on paper. Either
+  way the ink is keyed to transparent and trimmed to itself, so it lands *on*
+  the artwork instead of dropping a white patch over it, and it arrives as
+  floating content — positioning a signature is the same gesture as positioning
+  a paste. Signatures are kept as one keyed PNG each in Application Support, so
+  the directory listing is the library and there is no index to fall out of step
+  with the files.
+
+  Three decisions worth knowing. **A signature never grows the canvas**, unlike
+  a paste: it goes onto a page that already exists, so it scales down to at most
+  40% of the canvas and lands lower-right. **The ink is keyed against a local
+  paper estimate**, per tile and interpolated, because a phone photo has a
+  lighting gradient across it and one paper level for the whole frame either
+  eats the pale parts of the strokes or leaves a grey haze. And the strip is
+  **paper white in both appearances** — its border, baseline and hint are
+  explicitly dark, since `.primary` is white in dark mode and would be invisible
+  on it.
+
+  No camera route yet: it needs a camera entitlement and a permission prompt,
+  which is a bigger ask than the feature has earned before anyone has used it.
+  A photo taken on a phone and AirDropped is the same result through a door that
+  is already open.
+
 ### Fixed
 - **The step badge counter appeared to stick.** `PaintEngine` is deliberately
   UI-free and so not `@Observable`, and both the rail cell and the panel hint

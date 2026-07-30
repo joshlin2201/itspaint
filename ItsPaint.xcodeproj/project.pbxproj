@@ -8,13 +8,16 @@
 
 /* Begin PBXBuildFile section */
 		05A4C30BAB4A3AB1F58857EA /* PaintKit in Frameworks */ = {isa = PBXBuildFile; productRef = C292D927C6345EE278105A3E /* PaintKit */; };
+		144EB815F72638E3A405C5CC /* SignatureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ADE1416B1C3BAC5ADF4D0D8 /* SignatureStore.swift */; };
 		18E4BB5BDECAEE5E553BD0DD /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BC3E9F635AA81443BB4BF957 /* PrivacyInfo.xcprivacy */; };
 		192AD6C35D59708B6C314B86 /* CanvasNSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D86C72CBA19ADE0DD74D35 /* CanvasNSView.swift */; };
 		1976F8F0D1BA69C8D0910DED /* MainMenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1648F5F1151885FA15DCB653 /* MainMenuBuilder.swift */; };
 		1DE130CDBF4B6616B66BF5F1 /* PasteGrowthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B063B5E24D6EBB4CEB198E5B /* PasteGrowthTests.swift */; };
+		28DF3938409E7E6B4A4C1AF7 /* SigningStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BCA68F035B62041B06BC57D /* SigningStrip.swift */; };
 		2966C26A04977F9BD83536E9 /* ToolOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */; };
 		382566FBB983772559BF672D /* ToolbarGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */; };
 		397D8480B03F1D4E483412F6 /* CanvasRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CCE83773644C45A0171C62 /* CanvasRenderingTests.swift */; };
+		4385DB4520BD7B7E7F98D05D /* SignatureSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA6F6F30090979763C866F84 /* SignatureSheet.swift */; };
 		43DF040CF6A5A908A865E871 /* CanvasScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DC85A97B97F5CFF1EEBFE4 /* CanvasScrollView.swift */; };
 		48905D56B247546BA33C44F8 /* ItsPaintApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E7B1F407FDB6F47C079660 /* ItsPaintApp.swift */; };
 		4BC22C9E41431096754A0997 /* PaintKit in Frameworks */ = {isa = PBXBuildFile; productRef = 61964C2B3FE22724FE4E4A8B /* PaintKit */; };
@@ -50,6 +53,7 @@
 
 /* Begin PBXFileReference section */
 		06D86C72CBA19ADE0DD74D35 /* CanvasNSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasNSView.swift; sourceTree = "<group>"; };
+		0ADE1416B1C3BAC5ADF4D0D8 /* SignatureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureStore.swift; sourceTree = "<group>"; };
 		11CCE83773644C45A0171C62 /* CanvasRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasRenderingTests.swift; sourceTree = "<group>"; };
 		14E7B1F407FDB6F47C079660 /* ItsPaintApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItsPaintApp.swift; sourceTree = "<group>"; };
 		1648F5F1151885FA15DCB653 /* MainMenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenuBuilder.swift; sourceTree = "<group>"; };
@@ -65,6 +69,7 @@
 		57CB1F5FDC405482E21278EA /* ItsPaint.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ItsPaint.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		605B317CA16CD2D068DF970B /* TextEditorLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextEditorLayoutTests.swift; sourceTree = "<group>"; };
 		60DC85A97B97F5CFF1EEBFE4 /* CanvasScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScrollView.swift; sourceTree = "<group>"; };
+		6BCA68F035B62041B06BC57D /* SigningStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SigningStrip.swift; sourceTree = "<group>"; };
 		6E86C21F2F8518B426159B77 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		7833326AD2D84AF29B6DE601 /* ToolRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolRail.swift; sourceTree = "<group>"; };
 		81D5AB95221C3E1A9DD3CFC7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -78,6 +83,7 @@
 		C83A429AB8B62EFEDC176D65 /* ColourPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColourPopover.swift; sourceTree = "<group>"; };
 		CA3B7CF910C5BF4084044565 /* PaintKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PaintKit; path = Packages/PaintKit; sourceTree = SOURCE_ROOT; };
 		E80562B1588560C2E61CCE65 /* FixedGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixedGrid.swift; sourceTree = "<group>"; };
+		EA6F6F30090979763C866F84 /* SignatureSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureSheet.swift; sourceTree = "<group>"; };
 		F2ACA876E800C1AB89C90365 /* SizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeSheet.swift; sourceTree = "<group>"; };
 		F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarGeometryTests.swift; sourceTree = "<group>"; };
 		FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolOptions.swift; sourceTree = "<group>"; };
@@ -122,6 +128,9 @@
 				E80562B1588560C2E61CCE65 /* FixedGrid.swift */,
 				86C35AB5A1478944CF8934D3 /* RotateSheet.swift */,
 				1BDFB5F76AC906C0238C2DA8 /* SettingsWindow.swift */,
+				EA6F6F30090979763C866F84 /* SignatureSheet.swift */,
+				0ADE1416B1C3BAC5ADF4D0D8 /* SignatureStore.swift */,
+				6BCA68F035B62041B06BC57D /* SigningStrip.swift */,
 				F2ACA876E800C1AB89C90365 /* SizeSheet.swift */,
 				FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */,
 				7833326AD2D84AF29B6DE601 /* ToolRail.swift */,
@@ -330,6 +339,9 @@
 				1976F8F0D1BA69C8D0910DED /* MainMenuBuilder.swift in Sources */,
 				6B8140C107D4A209AD6CD789 /* RotateSheet.swift in Sources */,
 				623D371268183070226716CB /* SettingsWindow.swift in Sources */,
+				4385DB4520BD7B7E7F98D05D /* SignatureSheet.swift in Sources */,
+				144EB815F72638E3A405C5CC /* SignatureStore.swift in Sources */,
+				28DF3938409E7E6B4A4C1AF7 /* SigningStrip.swift in Sources */,
 				D00A7C03ECFC7BC4575AF104 /* SizeSheet.swift in Sources */,
 				2966C26A04977F9BD83536E9 /* ToolOptions.swift in Sources */,
 				530689DA33232E54BB8DFD63 /* ToolRail.swift in Sources */,

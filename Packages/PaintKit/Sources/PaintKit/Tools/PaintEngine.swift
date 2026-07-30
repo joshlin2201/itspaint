@@ -697,16 +697,73 @@ public final class PaintEngine {
     /// Clear the selected pixels to alpha rather than painting the background
     /// colour over them. Instant Alpha exposes this as its direct outcome while
     /// Delete keeps the classic Paint behaviour.
+    /// - Parameter named: the undo action name. Remove Background clears the same
+    ///   pixels the same way, and naming it "Make transparent" in the Edit menu
+    ///   would describe the mechanism rather than the command the user chose.
     @discardableResult
-    public func makeSelectionTransparent() -> PixelRect {
+    public func makeSelectionTransparent(named: String = "Make transparent") -> PixelRect {
         guard floating == nil, let selection, !selection.isEmpty else { return .empty }
-        let dirty = commitSingleShot("Make transparent") { canvas in
+        let dirty = commitSingleShot(named) { canvas in
             canvas.fill(selection, with: .clear)
             return selection.bounds
         }
         self.selection = nil
         lassoPath = []
         return dirty
+    }
+
+    /// Key the page out from behind the subject, in one action.
+    ///
+    /// Instant Alpha already does this, but it costs a tool switch, a tolerance
+    /// decision and a menu item, and the equivalent in Windows 11 Paint is one
+    /// click. This is that one click, and it is not a new engine: the same span
+    /// walk, seeded automatically at a tolerance that works on a real capture.
+    ///
+    /// **Seeded from the four corners, because that is where a background is.**
+    /// A centre seed would key out whatever the subject is standing on. All four
+    /// rather than one because a subject that touches an edge splits the page
+    /// into regions, and a corner in a different region from the other three is
+    /// the normal case, not the exotic one.
+    ///
+    /// Returns `false` and changes nothing when there is no background to speak
+    /// of — a flat image is one region from any seed, and a Remove Background
+    /// that erases the picture is far worse than one that declines.
+    @discardableResult
+    public func removeBackground(tolerance: Int = 24) -> Bool {
+        _ = commitFloating()
+        guard !canvas.bounds.isEmpty else { return false }
+
+        let corners = [
+            PixelPoint(x: 0, y: 0),
+            PixelPoint(x: canvas.width - 1, y: 0),
+            PixelPoint(x: 0, y: canvas.height - 1),
+            PixelPoint(x: canvas.width - 1, y: canvas.height - 1)
+        ]
+
+        // Built up in `selection` itself, through the same combiner Shift-click
+        // uses — one description of "add these regions together" serves both, and
+        // the page *is* what the selection should end up being.
+        let previous = selection
+        selection = nil
+        for corner in corners {
+            selection = combinedSelection(
+                with: Raster.floodSelection(from: corner, tolerance: tolerance, in: canvas),
+                operation: .add
+            )
+        }
+
+        guard let page = selection, !page.isEmpty else {
+            selection = previous
+            return false
+        }
+        let covered = page.mask?.count { $0 > 0 } ?? page.bounds.area
+        guard Double(covered) / Double(canvas.count) < 0.92 else {
+            selection = previous
+            return false
+        }
+
+        makeSelectionTransparent(named: "Remove background")
+        return true
     }
 
     /// Place `bitmap` as floating content, centred on the canvas (or at the
@@ -748,6 +805,54 @@ public final class PaintEngine {
         dirty = dirty.union(selectionOverlayRect())
         selection = nil
         floating = FloatingSelection(bitmap: bitmap, origin: origin)
+        settings.tool = .select
+        return dirty.union(floating?.frame ?? .empty)
+    }
+
+    /// Drop a prepared image onto the canvas as floating content, scaled to fit.
+    ///
+    /// **A stamp must never enlarge the document.** Paste grows the canvas, because
+    /// a pasted screenshot is new content that deserves room. A signature is the
+    /// opposite: it goes *onto* something that already exists, and a signature
+    /// wider than the page it is signing should shrink, not push the page out. So
+    /// this scales down to a fraction of the canvas rather than growing it.
+    ///
+    /// It arrives floating, so it can be positioned and resized before it lands —
+    /// which is the entire reason it reuses the paste machinery instead of
+    /// compositing straight in.
+    @discardableResult
+    public func stamp(_ bitmap: Bitmap, coveringAtMost fraction: Double = 0.4) -> PixelRect {
+        var dirty = commitFloating()
+        guard bitmap.width > 0, bitmap.height > 0, !canvas.bounds.isEmpty else { return dirty }
+
+        var placed = bitmap
+        let widthLimit = Double(canvas.width) * fraction
+        let heightLimit = Double(canvas.height) * fraction
+        let scale = min(1, min(widthLimit / Double(bitmap.width), heightLimit / Double(bitmap.height)))
+        if scale < 1 {
+            let target = (
+                width: max(1, Int((Double(bitmap.width) * scale).rounded())),
+                height: max(1, Int((Double(bitmap.height) * scale).rounded()))
+            )
+            // Smooth, not nearest: a signature is a curve, and nearest-neighbour
+            // would stair-step exactly the strokes the ink keying went to trouble
+            // to keep soft.
+            if let scaled = ImageTransform.scaled(bitmap, to: target, using: .smooth) {
+                placed = scaled
+            }
+        }
+
+        // Lower right, inset — where a signature goes on a document, and clear of
+        // the top-left where annotation usually starts.
+        let inset = max(8, min(canvas.width, canvas.height) / 24)
+        let origin = PixelPoint(
+            x: max(0, canvas.width - placed.width - inset),
+            y: max(0, canvas.height - placed.height - inset)
+        )
+
+        dirty = dirty.union(selectionOverlayRect())
+        selection = nil
+        floating = FloatingSelection(bitmap: placed, origin: origin)
         settings.tool = .select
         return dirty.union(floating?.frame ?? .empty)
     }

@@ -117,8 +117,8 @@ squares and circles.
 
 Flip horizontal / vertical, rotate 90° either way or 180°, invert colours
 (**honours the selection** — inverting one region is far more often what you want
-on a screenshot), clear image, image size (`⌘R`), crop to selection (`⌘K`), trim
-borders (`⇧⌘T`).
+on a screenshot), clear image, remove background, image size (`⌘R`), crop to
+selection (`⌘K`), trim borders (`⇧⌘T`).
 
 - **Crop to a lasso** crops to the traced shape, clearing everything outside it
   to transparent — cropping to a freeform shape has to mean the shape, not the
@@ -127,6 +127,16 @@ borders (`⇧⌘T`).
   "solid" border is rarely one exact colour after a lossy format or a shadow, and
   a zero-tolerance trim silently does nothing on exactly the images people most
   want to trim.
+- **Remove Background** keys the page out from behind the subject in one
+  command — the same flood Instant Alpha uses, seeded automatically at the four
+  corners rather than by hand. Four corners, not one, because a subject that
+  touches an edge splits the page into separate regions. An enclosed light area
+  *inside* the subject is left alone: the flood is connected, and a hole in the
+  middle of the artwork is not background.
+
+  It **declines rather than guessing** when the edges are all one region with the
+  middle — on a flat image, removing the background would erase the picture — and
+  says so, pointing at Instant Alpha for the version you steer yourself.
 - A size change **clears undo history**, because patches are addressed in canvas
   coordinates and would restore pixels into the wrong places.
 
@@ -143,6 +153,34 @@ borders (`⇧⌘T`).
 - `⌥⌘C` copies the whole image; **Share…** opens the system share sheet.
 - Pasteboard reads prefer the raw file or PNG data over `NSImage`, whose
   representation can arrive scaled or DPI-adjusted.
+
+---
+
+## Signature
+
+`⌃⌘S` (`Tools ▸ Signature…`) opens the signing sheet. Sign in the box, or
+**Import Image…** a photo or scan of a signature on paper. Saved signatures
+appear as chips at the top of the sheet; clicking one inserts it, and
+right-clicking offers Delete.
+
+- **The ink is keyed to transparent**, so a signature lands on artwork without a
+  white rectangle behind it. Alpha comes from how dark each pixel is relative to
+  its *own local* paper level, estimated per tile and interpolated, which is what
+  survives the lighting gradient across a phone photo. Stroke ends stay soft
+  rather than stair-stepping.
+- **It arrives floating**, at most 40% of the canvas and inset from the
+  lower-right. A signature never grows the canvas — that is the difference
+  between signing something and pasting something.
+- **The ink takes Colour 1**, so a blue-ink signature is one swatch away. A light
+  Colour 1 falls back to black rather than saving invisible ink.
+- A photo that is nearly blank, or nearly all dark, is **reported rather than
+  keyed** — "no signature found" beats handing back a rectangle of noise.
+- Signatures live as one PNG each in Application Support and are shared by every
+  document. They are not document state: you capture one once and stamp it on
+  everything you sign.
+
+No camera capture yet — that needs a camera entitlement. AirDrop a photo from a
+phone and use Import Image…
 
 ---
 
@@ -171,7 +209,7 @@ macOS reads it but ships no encoder.
 ## Menus worth knowing
 
 - **Tools** — every tool by name with its key, a Shape submenu with all fifteen
-  shapes, plus Swap Colours and Larger / Smaller Brush.
+  shapes, plus Signature…, Swap Colours and Larger / Smaller Brush.
 - **View** — zoom commands, pixel grid, Move Toolbar, Colours…
 - **Edit** — the usual, plus Invert Selection, Crop to Selection,
   Trim Borders, Swap Colours.

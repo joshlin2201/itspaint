@@ -35,7 +35,7 @@ us on exactly four things; three of them are cheap.
 |---|---|---|
 | ~~**Freeform rotate**~~ | **Shipped.** `Image ▸ Rotate…` takes any angle, grows the canvas to the rotated bounding box, and fills the exposed corners with Colour 2. The quarter turns keep their own exact path. | Done |
 | **Rulers and guides** | Paint has them; we have a pixel grid above 4× and nothing else. Aligning annotations by eye is the most common reason a markup looks amateur. | View-layer only. Two edge strips reading the existing zoom and scroll origin, plus draggable guides in a small model array. |
-| **One-click background removal** | Their AI version and our Instant Alpha do the same job; theirs is one click and ours is a click plus a tolerance plus a menu item. | Not a new engine — a **Remove background** action that runs the existing corner-seeded flood at a default tolerance and reports what it did. |
+| ~~**One-click background removal**~~ | **Shipped.** `Image ▸ Remove Background` floods from all four corners at tolerance 24, unions the regions through the same combiner Shift-click uses, and clears them as one undoable edit. Four corners because a subject touching an edge splits the page; it declines outright when the flood would take over 92% of the canvas, rather than erasing the picture, and names Instant Alpha when it does. | Done |
 
 **Layers is the fourth, and it stays declined.** See *Not planned* below.
 
@@ -48,9 +48,13 @@ us on exactly four things; three of them are cheap.
 - **Multi-page or multi-image documents.** Only if the `.itspaint` format can
   stay readable by other tools; a private container would break the promise the
   format makes.
-- **Signature capture** (trackpad / camera / iPhone). High value for markup, but
-  it is a Continuity Camera integration rather than a paint feature — it belongs
-  after the list above.
+- ~~**Signature capture**~~ **Shipped.** `⌃⌘S` signs in a strip or imports a
+  photo of paper; `InkExtractor` keys the ink to transparent against a per-tile
+  paper estimate and the result stamps as floating content that never grows the
+  canvas. Built ahead of the list above because it turned out not to need the
+  Continuity Camera integration that had put it last: a trackpad drag and an
+  AirDropped photo cover both routes with no new entitlement. The camera itself
+  is still deferred for exactly that reason.
 
 ## The capture track — the reason anyone opens this daily
 

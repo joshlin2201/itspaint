@@ -180,6 +180,12 @@ enum MainMenuBuilder {
         add(to: menu, "Invert Colours", #selector(AppCommands.invertColours(_:)), "i")
         add(to: menu, "Clear Image", #selector(AppCommands.clearImage(_:)), "")
             .keyEquivalentModifierMask = [.command, .shift]
+        menu.addItem(.separator())
+        // In Image rather than in the Select tool's options: it takes no
+        // selection, asks nothing, and acts on the whole picture — which is what
+        // every other item in this menu does. Instant Alpha keeps the version
+        // you steer by hand.
+        add(to: menu, "Remove Background", #selector(AppCommands.removeBackground(_:)), "")
 
         item.submenu = menu
         return item
@@ -250,6 +256,18 @@ enum MainMenuBuilder {
         let textItem = NSMenuItem(title: "Text", action: nil, keyEquivalent: "")
         textItem.submenu = text
         menu.addItem(textItem)
+
+        menu.addItem(.separator())
+
+        // A signature is not a tool — it makes no marks of its own, it inserts
+        // something you prepared earlier. Preview reaches it the same way, from a
+        // menu rather than the markup bar, and that is the right call: a rail cell
+        // for something used once per document is a cell taken from the tools used
+        // hundreds of times.
+        //
+        // `⇧⌘S` is Duplicate, and `⌘S` is Save, so the signature gets `⌃⌘S`.
+        add(to: menu, "Signature…", #selector(AppCommands.showSignatureSheet(_:)), "s")
+            .keyEquivalentModifierMask = [.command, .control]
 
         menu.addItem(.separator())
         add(to: menu, "Swap Colours", #selector(AppCommands.swapColours(_:)), "x")
@@ -342,8 +360,10 @@ enum MainMenuBuilder {
     func zoomToFit(_ sender: Any?)
     func cropToSelection(_ sender: Any?)
     func trimBorders(_ sender: Any?)
+    func removeBackground(_ sender: Any?)
     func showSizeSheet(_ sender: Any?)
     func showRotateSheet(_ sender: Any?)
+    func showSignatureSheet(_ sender: Any?)
     func zoomIn(_ sender: Any?)
     func zoomOut(_ sender: Any?)
     func zoomActual(_ sender: Any?)

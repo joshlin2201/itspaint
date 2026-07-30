@@ -530,6 +530,17 @@ final class EditorModel {
         if canPaste != available { canPaste = available }
     }
 
+    /// Drop a saved signature onto the artwork as floating content.
+    ///
+    /// Floating on purpose: a signature is almost never right first time — it wants
+    /// nudging into the space on the form and sizing to the line. Arriving with the
+    /// selection handles already on it means positioning it is the same gesture as
+    /// positioning a paste, and clicking away commits it.
+    func insertSignature(_ bitmap: Bitmap) {
+        noteChange(engine.stamp(bitmap))
+        syncFromEngine()
+    }
+
     func paste() {
         do {
             let bitmap = try readPasteboardBitmap()
@@ -713,6 +724,26 @@ final class EditorModel {
         noteChange(canvas.bounds)
     }
 
+    /// Key the page out from behind the subject in one command.
+    ///
+    /// It declines rather than guessing when the whole picture is one region —
+    /// and says so, because the alternative is a command that appears to do
+    /// nothing. Instant Alpha is the answer when it declines and you still want
+    /// the region gone, so the message names it.
+    func removeBackground() {
+        guard engine.removeBackground() else {
+            present(
+                message: "There's no background to remove.",
+                recovery: "The edges of this image are all one region, so removing "
+                    + "it would erase the picture. Use the Select tool's Instant "
+                    + "Alpha mode to choose the area yourself."
+            )
+            return
+        }
+        noteChange(canvas.bounds)
+        syncFromEngine()
+    }
+
     // MARK: - Image menu
 
     func clearImage() { noteChange(engine.clearCanvas()) }
@@ -749,6 +780,7 @@ final class EditorModel {
     }
 
     var isRotateSheetPresented: Bool = false
+    var isSignatureSheetPresented: Bool = false
 
     func resizeCanvas(width: Int, height: Int) {
         guard Bitmap.isSizeSupported(width: width, height: height) else {

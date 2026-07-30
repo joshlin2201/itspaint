@@ -108,6 +108,9 @@ struct EditorView: View {
         .sheet(isPresented: $model.isSizeSheetPresented) {
             SizeSheet(model: model)
         }
+        .sheet(isPresented: $model.isSignatureSheetPresented) {
+            SignatureSheet(model: model)
+        }
         .sheet(isPresented: $model.isRotateSheetPresented) {
             RotateSheet(model: model)
         }

@@ -728,6 +728,41 @@ struct SelectionTests {
         #expect(engine.canvas == before)
     }
 
+    @Test("Remove Background keys the page and keeps a subject that touches an edge")
+    func removeBackgroundClearsCornersNotSubject() {
+        // A subject running off the right edge, which is what splits the page
+        // into two regions and is the reason all four corners are seeded.
+        var canvas = Bitmap(width: 40, height: 20, fill: .white)
+        Raster.fillRect(
+            PixelRect(x: 20, y: 6, width: 20, height: 8),
+            colour: RGBA8(r: 200, g: 30, b: 30), into: &canvas
+        )
+        let engine = PaintEngine(canvas: canvas)
+        let before = engine.canvas
+
+        #expect(engine.removeBackground())
+
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 0, y: 0)) == .clear)
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 39, y: 19)) == .clear)
+        // The subject survives, including the part sitting on the right edge.
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 30, y: 10))?.a == 255)
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 39, y: 10))?.a == 255)
+        #expect(engine.undoStack.undoActionName == "Remove background")
+        engine.undo()
+        #expect(engine.canvas == before)
+    }
+
+    @Test("Remove Background declines rather than erasing a flat image")
+    func removeBackgroundRefusesWithNoSubject() {
+        let engine = PaintEngine(canvas: Bitmap(width: 20, height: 20, fill: .white))
+        let before = engine.canvas
+
+        #expect(!engine.removeBackground())
+
+        #expect(engine.canvas == before, "it erased an image that was all background")
+        #expect(engine.selection == nil, "a refusal left a selection behind")
+    }
+
     @Test("Selecting does not modify a single pixel")
     func selectingIsNonDestructive() {
         let engine = markedEngine()

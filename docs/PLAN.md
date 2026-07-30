@@ -114,8 +114,8 @@ takes its space rather than covering the artwork. See `DESIGN.md`.
 
 **Testing.** Deterministic pixel assertions rather than image snapshots: they
 run in milliseconds, need no Git LFS or third-party package, and name the exact
-pixel that moved instead of showing two similar-looking PNGs. Currently **293
-tests** (211 engine, 82 app), including a byte-identical open-then-write guard.
+pixel that moved instead of showing two similar-looking PNGs. Currently **372
+tests** (263 engine, 109 app), including a byte-identical open-then-write guard.
 The six throughput guards apply their time budgets only in release builds,
 because debug timings measure the compiler rather than the algorithm.
 
