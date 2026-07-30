@@ -33,6 +33,9 @@ clipboard out.png</code>.</sub>
   left and bottom of the window.
 - **Precise canvas control** with pointer-centred zoom, nearest-neighbour display
   above 100%, pixel grids, and live tool footprints.
+- **Paste without losing anything** — the canvas grows to hold an image larger
+  than it, and the window follows, so nothing is cropped when you place it.
+- **Rotate by any angle**, with the canvas growing to fit the corners.
 - **Native documents and common exports** with no third-party dependencies,
   accounts, telemetry, or cloud service.
 
