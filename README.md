@@ -16,11 +16,7 @@ window.
 
 <br>
 
-![ItsPaint showing a feature tour drawn with the app](docs/images/editor-window.png)
-
-<sub>The artwork in this screenshot was produced by PaintKit, the same engine
-used by the editor. The sample is reproducible with
-<code>swift run --package-path Packages/PaintKit paint-demo out.png</code>.</sub>
+![ItsPaint editing a chameleon painting on a transparent canvas](docs/images/editor-window.png)
 
 </div>
 

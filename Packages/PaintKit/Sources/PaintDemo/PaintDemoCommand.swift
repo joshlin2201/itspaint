@@ -72,15 +72,10 @@ struct PaintDemoCommand {
 
         let output = arguments.first.map { url(for: $0, currentDirectory: currentDirectory) }
             ?? currentDirectory.appendingPathComponent("itspaint-sample.png")
-        return write(LegacyClipboardDemo.render(), to: output)
-    }
-
-    @MainActor
-    private static func write(_ canvas: DemoCanvas, to output: URL) -> Int32 {
         do {
-            try ImageCodec.write(canvas.engine.canvas, to: output, as: .png)
-            print("Wrote \(canvas.engine.canvas.width)×\(canvas.engine.canvas.height) to \(output.path)")
-            print("Undo steps recorded: \(canvas.engine.undoStack.undoCount)")
+            let bitmap = ChameleonScene.render()
+            try ImageCodec.write(bitmap, to: output, as: .png)
+            print("Wrote \(bitmap.width)×\(bitmap.height) to \(output.path)")
             return 0
         } catch {
             writeError("Failed: \(error)\n")
@@ -97,14 +92,14 @@ struct PaintDemoCommand {
     }
 
     private static func printSceneUsage() {
-        writeError("Usage: paint-demo --scene <clipboard|quick-sketch|transparency> <output.png>\n")
+        writeError("Usage: paint-demo --scene <clipboard|quick-sketch|transparency|chameleon> <output.png>\n")
     }
 
     private static func printHelp() {
         print("""
         Usage:
           paint-demo [output.png]
-          paint-demo --scene <clipboard|quick-sketch|transparency> <output.png>
+          paint-demo --scene <clipboard|quick-sketch|transparency|chameleon> <output.png>
           paint-demo --bench
           paint-demo --icon [output-directory]
           paint-demo --social <window-capture> <output.png>

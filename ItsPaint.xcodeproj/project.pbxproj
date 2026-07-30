@@ -15,6 +15,7 @@
 		1DE130CDBF4B6616B66BF5F1 /* PasteGrowthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B063B5E24D6EBB4CEB198E5B /* PasteGrowthTests.swift */; };
 		28DF3938409E7E6B4A4C1AF7 /* SigningStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BCA68F035B62041B06BC57D /* SigningStrip.swift */; };
 		2966C26A04977F9BD83536E9 /* ToolOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */; };
+		34B28AEA54884FAC000F2DBB /* WindowCaptureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61038BAA63756BDF531B7A0 /* WindowCaptureTests.swift */; };
 		382566FBB983772559BF672D /* ToolbarGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */; };
 		397D8480B03F1D4E483412F6 /* CanvasRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CCE83773644C45A0171C62 /* CanvasRenderingTests.swift */; };
 		4385DB4520BD7B7E7F98D05D /* SignatureSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA6F6F30090979763C866F84 /* SignatureSheet.swift */; };
@@ -86,6 +87,7 @@
 		EA6F6F30090979763C866F84 /* SignatureSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureSheet.swift; sourceTree = "<group>"; };
 		F2ACA876E800C1AB89C90365 /* SizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeSheet.swift; sourceTree = "<group>"; };
 		F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarGeometryTests.swift; sourceTree = "<group>"; };
+		F61038BAA63756BDF531B7A0 /* WindowCaptureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowCaptureTests.swift; sourceTree = "<group>"; };
 		FCDBC76A218F68A75CCE2195 /* ToolOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolOptions.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -162,6 +164,7 @@
 				B063B5E24D6EBB4CEB198E5B /* PasteGrowthTests.swift */,
 				605B317CA16CD2D068DF970B /* TextEditorLayoutTests.swift */,
 				F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */,
+				F61038BAA63756BDF531B7A0 /* WindowCaptureTests.swift */,
 			);
 			path = AppTests;
 			sourceTree = "<group>";
@@ -359,6 +362,7 @@
 				1DE130CDBF4B6616B66BF5F1 /* PasteGrowthTests.swift in Sources */,
 				F4C7E8CF3B5107D648F3FC45 /* TextEditorLayoutTests.swift in Sources */,
 				382566FBB983772559BF672D /* ToolbarGeometryTests.swift in Sources */,
+				34B28AEA54884FAC000F2DBB /* WindowCaptureTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

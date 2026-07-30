@@ -8,6 +8,13 @@ version may still carry breaking changes to the document format.
 ## [Unreleased]
 
 ### Added
+- **A new hero demo scene** (`paint-demo --scene chameleon`, and the default
+  when no scene is named): a low-poly chameleon catching a drop of paint,
+  painted by the engine — polygon facets, brush-stroke tail spiral, highlighter
+  shadow — on a canvas Instant Alpha has fully knocked out. The README window
+  capture now comes from `WindowCaptureTests`, which renders a real editor
+  window to PNG from inside the app process, so every pixel of the hero image
+  is reproducible from this repository.
 - **Remove Background** (`Image ▸ Remove Background`) keys the page out from
   behind the subject in one command. It is not a new engine — it is Instant
   Alpha's own span walk, seeded automatically at the four corners at a tolerance

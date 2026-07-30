@@ -8,11 +8,12 @@ struct DemoSceneTests {
     @Test("The public demo suite has stable CLI names and filenames")
     func stableNames() {
         #expect(DemoScene.allCases.map(\.rawValue) == [
-            "clipboard", "quick-sketch", "transparency",
+            "clipboard", "quick-sketch", "transparency", "chameleon",
         ])
         #expect(DemoScene.clipboard.defaultFilename == "clipboard-markup.png")
         #expect(DemoScene.quickSketch.defaultFilename == "quick-sketch.png")
         #expect(DemoScene.transparency.defaultFilename == "transparency.png")
+        #expect(DemoScene.chameleon.defaultFilename == "chameleon.png")
     }
 
     @Test("Every named scene writes a valid distinct PNG")
@@ -31,9 +32,11 @@ struct DemoSceneTests {
             #expect((bitmap.width, bitmap.height) == (1000, 640))
             decoded.append(bitmap)
         }
-        #expect(decoded[0] != decoded[1])
-        #expect(decoded[0] != decoded[2])
-        #expect(decoded[1] != decoded[2])
+        for first in decoded.indices {
+            for second in decoded.indices where second > first {
+                #expect(decoded[first] != decoded[second])
+            }
+        }
     }
 
     @Test("Clipboard markup is fixed, deterministic, and visibly annotated")
@@ -108,6 +111,37 @@ struct DemoSceneTests {
         #expect(image.pixel(at: PixelPoint(x: 623, y: 328)) ==
                 RGBA8(r: 181, g: 205, b: 214))
         #expect(image == TransparencyScene.render())
+    }
+
+    @Test("The chameleon sits on a fully knocked-out background")
+    @MainActor
+    func chameleon() {
+        let image = ChameleonScene.render()
+
+        #expect((image.width, image.height) == (1000, 640))
+        #expect(image == ChameleonScene.render())
+        #expect(image.pixel(at: ChameleonScene.backgroundSample) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 988, y: 12)) == .clear)
+        #expect(image.pixel(at: PixelPoint(x: 12, y: 628)) == .clear)
+
+        // The pocket the legs, belly and bough enclose is knocked out too.
+        #expect(image.pixel(at: PixelPoint(x: 530, y: 470)) == .clear)
+
+        // Landmarks: the shaded flank facet, one crest sail, the blue tail
+        // tip, and the drop of paint the tongue has caught.
+        #expect(image.pixel(at: PixelPoint(x: 500, y: 300)) ==
+                RGBA8(r: 35, g: 133, b: 75))
+        #expect(image.pixel(at: PixelPoint(x: 545, y: 175)) ==
+                RGBA8(r: 239, g: 106, b: 91))
+        #expect(image.pixel(at: PixelPoint(x: 238, y: 402)) ==
+                RGBA8(r: 47, g: 128, b: 237))
+        #expect(image.pixel(at: PixelPoint(x: 902, y: 104)) ==
+                RGBA8(r: 47, g: 128, b: 237))
+
+        // No pixel of the key background survives anywhere — the knockout
+        // sweep leaves no magenta specks between facets.
+        let key = RGBA8(r: 255, g: 0, b: 255)
+        #expect(!image.pixels.contains(key))
     }
 
     @Test("Transparency keeps the full sticker in its centred 500 by 300 frame")
