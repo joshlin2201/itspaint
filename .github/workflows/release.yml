@@ -215,66 +215,77 @@ jobs:
           fi
 
           mkdir -p "$DIST"
-          ditto "$APP" "$STAGING/ItsPaint.app"
-          ln -s /Applications "$STAGING/Applications"
-          hdiutil create -volname "ItsPaint $VERSION" -srcfolder "$STAGING" \
-            -ov -format UDZO "$DMG"
 
-          # Notarise the disk image, then staple both it and the app inside it.
+          # Notarise the **app** first, then build the disk image from the
+          # stapled copy, then notarise the image.
           #
-          # One submission covers both: the notary service tickets the app's
-          # cdhash as well as the container, so `stapler staple` on the .app
-          # finds a ticket without a second round trip. The zip is built from
-          # the stapled app afterwards — a zip cannot carry a ticket itself,
-          # only the app inside it can.
+          # Two submissions, deliberately. Notarising only the image leaves the
+          # app inside it unstapled — the ticket is attached to the `.dmg` file,
+          # not to the bundle — so an app dragged out to Applications has to ask
+          # Apple on first launch, which is the one thing stapling exists to
+          # avoid. `stapler validate` on that copy says so outright.
           #
-          # Stapling is what makes a first launch work with no network. Without
-          # it Gatekeeper has to ask Apple, and an offline user sees the app
-          # refuse to open.
-          # A plain shell variable, *not* $GITHUB_ENV, because this same step
-          # branches on it below — anything written to $GITHUB_ENV only reaches
-          # later steps, so reading it back here would silently always be false
-          # and quietly skip the verification underneath.
-          NOTARISED=false
-          if [[ "$SIGNED" == "true" && -n "${NOTARY_APPLE_ID:-}" && -n "${NOTARY_PASSWORD:-}" ]]; then
-            echo "Submitting $DMG to the notary service…"
-            SUBMIT_LOG="$RUNNER_TEMP/notarytool.log"
+          # A single submission cannot fix it: stapling the app changes the
+          # image's own hash, and the image needs a ticket for *its* hash. Once
+          # the account is warm each submission takes about a minute, so the
+          # second one is cheap.
+          notarise() {
+            local target="$1" log="$RUNNER_TEMP/notarytool-$(basename "$target").log"
             set +e
-            xcrun notarytool submit "$DMG" \
+            xcrun notarytool submit "$target" \
               --apple-id "$NOTARY_APPLE_ID" \
               --password "$NOTARY_PASSWORD" \
               --team-id "${NOTARY_TEAM_ID:-$SIGN_TEAM}" \
-              --wait --timeout 75m 2>&1 | tee "$SUBMIT_LOG"
-            SUBMIT_STATUS=${PIPESTATUS[0]}
+              --wait --timeout 75m 2>&1 | tee "$log"
+            local code=${PIPESTATUS[0]}
             set -e
-            # Surface the id even on failure: a submission that timed out here
-            # usually still completes at Apple, and `notarytool log <id>` is the
-            # only way to find out why it was rejected.
-            SUBMISSION_ID="$(awk '/^ *id: /{print $2; exit}' "$SUBMIT_LOG")"
-            echo "Notarisation submission id: ${SUBMISSION_ID:-unknown}"
-            # A wait that ran out is **not** a rejection. Apple queues the
-            # submission and keeps working on it; both of this project's first
-            # two submissions were Accepted well after our wait gave up. So a
-            # timeout leaves the artifacts intact and unstapled rather than
-            # throwing away a green build, and says exactly how to finish it.
-            if grep -q "Timeout of" "$SUBMIT_LOG"; then
-              echo "::warning::Notarisation did not finish inside the wait. The submission is still queued at Apple."
-              echo "::warning::Check it with: xcrun notarytool log $SUBMISSION_ID --keychain-profile <profile>"
-              echo "::warning::Once accepted, re-run this workflow to notarise and staple a fresh build."
-            elif [[ $SUBMIT_STATUS -ne 0 ]]; then
-              # A real failure — rejected, bad credentials, malformed archive.
-              echo "notarytool failed; inspect with:" >&2
-              echo "  xcrun notarytool log ${SUBMISSION_ID:-<id>} --keychain-profile <profile>" >&2
-              exit $SUBMIT_STATUS
-            else
-              xcrun stapler staple "$DMG"
-              xcrun stapler staple "$APP"
-              NOTARISED=true
+            NOTARY_ID="$(awk '/^ *id: /{print $2; exit}' "$log")"
+            echo "Notarisation submission id for $(basename "$target"): ${NOTARY_ID:-unknown}"
+            # A wait that ran out is not a rejection — Apple keeps working the
+            # submission. Report it as unfinished so a green build survives.
+            if grep -q "Timeout of" "$log"; then
+              NOTARY_RESULT=timeout
+              return 0
             fi
-          else
-            echo "::warning::Not notarised — NOTARY_APPLE_ID / NOTARY_PASSWORD are unset."
+            [[ $code -eq 0 ]] && NOTARY_RESULT=accepted || NOTARY_RESULT=failed
+            return $code
+          }
+
+          NOTARISED=false
+          if [[ "$SIGNED" == "true" && -n "${NOTARY_APPLE_ID:-}" && -n "${NOTARY_PASSWORD:-}" ]]; then
+            APP_ARCHIVE="$RUNNER_TEMP/ItsPaint-notarise.zip"
+            ditto -c -k --keepParent "$APP" "$APP_ARCHIVE"
+            notarise "$APP_ARCHIVE"
+
+            if [[ "$NOTARY_RESULT" == "accepted" ]]; then
+              # Staple the bundle before it is ever copied anywhere.
+              xcrun stapler staple "$APP"
+
+              ditto "$APP" "$STAGING/ItsPaint.app"
+              ln -s /Applications "$STAGING/Applications"
+              hdiutil create -volname "ItsPaint $VERSION" -srcfolder "$STAGING" \
+                -ov -format UDZO "$DMG"
+
+              notarise "$DMG"
+              if [[ "$NOTARY_RESULT" == "accepted" ]]; then
+                xcrun stapler staple "$DMG"
+                NOTARISED=true
+              fi
+            fi
           fi
-          # And for the release-notes step, which is a later step.
+
+          if [[ "$NOTARISED" != "true" ]]; then
+            if [[ "$SIGNED" == "true" ]]; then
+              echo "::warning::Shipping without a stapled notarisation ticket."
+            fi
+            # The image still has to exist.
+            if [[ ! -f "$DMG" ]]; then
+              ditto "$APP" "$STAGING/ItsPaint.app"
+              ln -s /Applications "$STAGING/Applications"
+              hdiutil create -volname "ItsPaint $VERSION" -srcfolder "$STAGING" \
+                -ov -format UDZO "$DMG"
+            fi
+          fi
           echo "NOTARISED=$NOTARISED" >> "$GITHUB_ENV"
 
           # Built after stapling so the archive carries the ticket too.
@@ -289,6 +300,13 @@ jobs:
             spctl -a -vvv -t exec "$VERIFY_DIR/ItsPaint.app"
             xcrun stapler validate "$DMG"
             xcrun stapler validate "$VERIFY_DIR/ItsPaint.app"
+
+            # And the copy a user actually drags out of the disk image, which is
+            # the one that was silently unstapled before.
+            MOUNT="$(hdiutil attach "$DMG" -nobrowse -readonly | awk -F'\t' 'END{print $NF}')"
+            xcrun stapler validate "$MOUNT/ItsPaint.app"
+            spctl -a -vvv -t exec "$MOUNT/ItsPaint.app"
+            hdiutil detach "$MOUNT" -quiet
           fi
 
           # Last, because stapling rewrites the files it tickets.
