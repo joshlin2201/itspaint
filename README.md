@@ -18,6 +18,8 @@ window.
 
 ![ItsPaint editing a chameleon painting on a transparent canvas](docs/images/editor-window.png)
 
+<img src="docs/images/markup-reel.gif" width="830" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
+
 </div>
 
 ## Highlights

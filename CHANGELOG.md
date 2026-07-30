@@ -8,6 +8,11 @@ version may still carry breaking changes to the document format.
 ## [Unreleased]
 
 ### Added
+- **A README workflow reel** (`docs/images/markup-reel.gif`): paste a settings
+  sheet, drop three step badges, pixelate the API token — nine seconds, 150 KB,
+  and every frame is a real editor window rendered by `WindowCaptureTests`,
+  driving the same model the app runs. The two jobs macOS Markup cannot do are
+  now the first thing the repository shows.
 - **A new hero demo scene** (`paint-demo --scene chameleon`, and the default
   when no scene is named): a low-poly chameleon catching a drop of paint,
   painted by the engine — polygon facets, brush-stroke tail spiral, highlighter
