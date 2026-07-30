@@ -27,7 +27,7 @@ people mostly want to draw on a screenshot rather than paint a picture.
 
 ### 1. Nothing that matters is hidden
 
-Twelve tools, both loaded colours and a palette are on screen at all times. A
+Eleven tools, both loaded colours and a palette are on screen at all times. A
 popover you have to know about is a worse control than a swatch you can already
 see.
 

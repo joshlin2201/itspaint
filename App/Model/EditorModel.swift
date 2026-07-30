@@ -61,6 +61,11 @@ final class EditorModel {
 
     var sprayDensity: Double { didSet { engine.settings.sprayDensity = sprayDensity } }
 
+    /// Whether the brush's current tip sprays. The canvas's hold-still timer and
+    /// the Flow row both key off this, so neither can disagree with the engine
+    /// about what the tip is doing.
+    var isSpraying: Bool { engine.settings.isSpraying }
+
     /// Point size of the text tool, mirrored so the options panel can bind to
     /// it like every other setting.
     var textSize: Double {
@@ -175,10 +180,35 @@ final class EditorModel {
         }
     }
 
-    /// The next number the badge tool will drop, for the options panel.
-    var nextBadgeNumber: Int { engine.nextBadgeNumber }
+    /// The next number the badge tool will drop.
+    ///
+    /// **Mirrored, not forwarded.** `PaintEngine` is deliberately UI-free and so
+    /// not `@Observable`; a computed passthrough to it is invisible to SwiftUI,
+    /// which is why the rail cell and the panel hint both sat on whatever number
+    /// they had happened to render first and only moved when something *else*
+    /// invalidated them.
+    ///
+    /// The obvious fix is to read `revision` in those views, the way the header
+    /// strip does for undo's flags. It is the wrong one here: `revision` bumps on
+    /// every dirty rect, which during a freehand stroke is every mouse-moved
+    /// event, so the whole rail and panel would re-render sixty times a second to
+    /// track a number that changes once per badge. Syncing the mirror only when
+    /// the value genuinely differs makes the notification exact.
+    private(set) var nextBadgeNumber: Int = 1
 
-    func resetBadgeNumbering() { engine.resetBadgeNumbering() }
+    /// Pull the counter across if the engine has moved it. Called from the same
+    /// place every other post-edit bookkeeping happens, so a badge dropped by any
+    /// route — pointer, menu, undo, redo — lands here.
+    private func syncBadgeNumber() {
+        if nextBadgeNumber != engine.nextBadgeNumber {
+            nextBadgeNumber = engine.nextBadgeNumber
+        }
+    }
+
+    func resetBadgeNumbering() {
+        engine.resetBadgeNumbering()
+        syncBadgeNumber()
+    }
 
     /// True while a curve or polygon is half-built, so the chrome can say how
     /// to finish it.
@@ -256,6 +286,7 @@ final class EditorModel {
         // the previous document's size would announce one.
         lastKnownCanvasSize = (canvas.width, canvas.height)
         pointerPosition = nil
+        syncBadgeNumber()
         revision &+= 1
     }
 
@@ -275,6 +306,7 @@ final class EditorModel {
     func noteChange(_ dirty: PixelRect) {
         guard !dirty.isEmpty else { return }
         revision &+= 1
+        syncBadgeNumber()
         noteCanvasSizeIfChanged()
         onCanvasChanged?(dirty)
 

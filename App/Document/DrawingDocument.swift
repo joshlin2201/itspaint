@@ -655,7 +655,7 @@ private struct ExportAccessory: View {
                 ForEach(Self.scales, id: \.value) { scale in
                     let width = Int(Double(canvas.canvas) * scale.value)
                     let height = Int(Double(canvas.1) * scale.value)
-                    Text("\(scale.label) — \(width) × \(height)")
+                    Text("\(scale.label) · \(width) × \(height)")
                         .tag(scale.value)
                         .disabled(!Bitmap.isSizeSupported(width: width, height: height))
                 }

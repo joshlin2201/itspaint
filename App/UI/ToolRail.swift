@@ -84,9 +84,26 @@ struct ToolRail: View {
         }
     }
 
+    /// The glyph a cell shows, which for the step badge is not a constant.
+    ///
+    /// **The badge cell used to read `1` forever.** It is a counter — the panel
+    /// beside it says "Drops 4 next" — and the rail was stating a different
+    /// number than the tool was about to stamp. `1.circle.fill` was also the
+    /// only *filled* glyph in a rail of outline strokes, so the least-used tool
+    /// was the loudest thing in the column. Both problems have the same fix:
+    /// draw the number it will actually drop, in the weight everything else
+    /// uses.
+    private func symbol(for kind: ToolKind) -> String {
+        guard kind == .badge else { return kind.symbolName }
+        // SF Symbols ships `N.circle` up to 50; past that, fall back rather
+        // than render a blank cell.
+        let next = model.nextBadgeNumber
+        return (1...50).contains(next) ? "\(next).circle" : "number.circle"
+    }
+
     private func cell(for kind: ToolKind) -> some View {
         ToolCell(
-            symbol: kind.symbolName,
+            symbol: symbol(for: kind),
             drawnGlyph: kind == .fill ? .bucket : nil,
             title: kind.displayName,
             shortcut: String(kind.shortcut).uppercased(),
@@ -94,7 +111,11 @@ struct ToolRail: View {
             isSelected: model.tool == kind,
             // The selected tool carries a chevron towards its options, so the
             // panel that appears reads as belonging to the button you pressed.
+            // It points *back* while the panel is open: a disclosure that shows
+            // the same direction in both states is decoration, and this one is
+            // also the control that closes the panel again.
             hasOptions: model.tool == kind,
+            isOptionsOpen: model.isOptionsExpanded,
             optionsEdge: model.chromeEdge
         ) {
             onSelect(kind)
@@ -124,7 +145,7 @@ struct ToolRail: View {
         .padding(Tokens.Rail.colourInset)
         .background {
             RoundedRectangle(cornerRadius: Tokens.Radius.well, style: .continuous)
-                .fill(.primary.opacity(0.06))
+                .fill(.primary.opacity(Tokens.Fill.cell))
         }
     }
 
@@ -132,7 +153,7 @@ struct ToolRail: View {
     /// panel, so the rail reads as grouped rather than sliced.
     private var separator: some View {
         Rectangle()
-            .fill(.primary.opacity(0.12))
+            .fill(.primary.opacity(Tokens.Fill.track))
             .frame(
                 width: isVertical ? Tokens.Rail.cross : 1,
                 height: isVertical ? 1 : Tokens.Size.toolCell - Tokens.Space.base
@@ -146,7 +167,7 @@ struct ToolRail: View {
             Image(systemName: model.chromeEdge.toggled.symbolName)
                 .font(.system(size: 12, weight: .medium))
                 .frame(width: Tokens.Size.toolCell, height: Tokens.Size.toolCell)
-                .foregroundStyle(.primary.opacity(0.55))
+                .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -179,6 +200,7 @@ struct ToolCell: View {
     let key: String
     let isSelected: Bool
     var hasOptions: Bool = false
+    var isOptionsOpen: Bool = false
     var optionsEdge: EditorModel.ChromeEdge = .left
     var isProminent: Bool = false
     let action: () -> Void
@@ -188,6 +210,17 @@ struct ToolCell: View {
     @Environment(TooltipController.self) private var tooltips
     @Environment(\.colorSchemeContrast) private var contrast
 
+    /// Towards the panel when it is closed, back towards the cell when it is
+    /// open — so the notch is the state of the disclosure, not a decoration.
+    private var chevron: String {
+        switch (optionsEdge.isVertical, isOptionsOpen) {
+        case (true, false): "chevron.right"
+        case (true, true): "chevron.left"
+        case (false, false): "chevron.down"
+        case (false, true): "chevron.up"
+        }
+    }
+
     var body: some View {
         Button {
             tooltips.dismiss()
@@ -195,7 +228,7 @@ struct ToolCell: View {
         } label: {
             glyph
                 .frame(width: Tokens.Size.toolCell, height: Tokens.Size.toolCell)
-                .foregroundStyle(isSelected || isProminent ? Color.white : Color.primary.opacity(0.82))
+                .foregroundStyle(isSelected || isProminent ? Color.white : Color.primary.opacity(Tokens.Ink.regular))
                 .background {
                     RoundedRectangle(cornerRadius: Tokens.Radius.cell, style: .continuous)
                         .fill(fill)
@@ -213,10 +246,11 @@ struct ToolCell: View {
                         // A notch towards the panel: the options are this
                         // button's, expanded, not a separate control that
                         // happens to be nearby.
-                        Image(systemName: optionsEdge.isVertical ? "chevron.right" : "chevron.down")
+                        Image(systemName: chevron)
                             .font(.system(size: 7, weight: .black))
-                            .foregroundStyle(.white.opacity(0.85))
+                            .foregroundStyle(.white.opacity(Tokens.Ink.regular))
                             .padding(optionsEdge.isVertical ? .trailing : .bottom, 1.5)
+                            .animation(Tokens.Motion.micro, value: isOptionsOpen)
                     }
                 }
                 .scaleEffect(isPressed ? 0.90 : 1)
@@ -245,7 +279,7 @@ struct ToolCell: View {
         if let drawnGlyph {
             // Painted in the cell's own foreground, so it tracks selection the
             // way an SF Symbol would.
-            drawnGlyph.shape(in: isSelected || isProminent ? Color.white : Color.primary.opacity(0.82))
+            drawnGlyph.shape(in: isSelected || isProminent ? Color.white : Color.primary.opacity(Tokens.Ink.regular))
                 .frame(width: Tokens.Size.toolGlyph, height: Tokens.Size.toolGlyph)
         } else {
             Image(systemName: symbol)
@@ -256,7 +290,7 @@ struct ToolCell: View {
 
     private var fill: AnyShapeStyle {
         if isSelected || isProminent { return AnyShapeStyle(Color.accentColor) }
-        if isHovering { return AnyShapeStyle(Color.primary.opacity(0.12)) }
+        if isHovering { return AnyShapeStyle(Color.primary.opacity(Tokens.Fill.track)) }
         return AnyShapeStyle(Color.clear)
     }
 }
@@ -310,7 +344,7 @@ private struct ColourControls: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.primary.opacity(0.55))
+            .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
             .onHover { hovering in
                 hovering
                     ? tooltips.hover(key: "swap", title: "Swap colours", shortcut: "X")
@@ -367,9 +401,13 @@ private struct ColourControls: View {
                 hovering
                     ? tooltips.hover(
                         key: "colour\(label)",
+                        // One separator, not two. These read left to right as
+                        // "what it is, what it is set to, what you can do",
+                        // which a dash and a middle dot in the same nine words
+                        // actively worked against.
                         title: role == .foreground
-                            ? "Colour 1 — \(colour.hexString) · double-click to change"
-                            : "Colour 2 — \(colour.hexString) · click to use as Colour 1",
+                            ? "Colour 1 · \(colour.hexString) · double-click to change"
+                            : "Colour 2 · \(colour.hexString) · click to use as Colour 1",
                         shortcut: nil
                     )
                     : tooltips.endHover(key: "colour\(label)")
@@ -424,18 +462,20 @@ private struct PaletteGrid: View {
     }
 
     private func swatch(_ colour: PaintColour) -> some View {
-        RoundedRectangle(cornerRadius: 3, style: .continuous)
+        RoundedRectangle(cornerRadius: Tokens.Radius.swatch, style: .continuous)
             .fill(Color(cgColor: colour.cgColor))
             .frame(width: Tokens.Size.swatch, height: Tokens.Size.swatch)
             .overlay {
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                RoundedRectangle(cornerRadius: Tokens.Radius.swatch, style: .continuous)
                     .strokeBorder(.black.opacity(0.28), lineWidth: 0.5)
             }
             .overlay {
                 // A ring on whichever swatches are loaded, so the palette says
                 // where the current colours came from.
                 if colour == model.foreground || colour == model.background {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    // Inset by its own padding, so the ring stays concentric
+                    // with the chip instead of looking pinched at the corners.
+                    RoundedRectangle(cornerRadius: Tokens.Radius.swatch - 1.5, style: .continuous)
                         .strokeBorder(
                             colour.prefersDarkContrast ? .black.opacity(0.85) : .white.opacity(0.95),
                             lineWidth: 1.5
@@ -449,7 +489,7 @@ private struct PaletteGrid: View {
                 Button("Set as Colour 1") { model.applySwatch(colour, to: .foreground) }
                 Button("Set as Colour 2") { model.applySwatch(colour, to: .background) }
             }
-            .help("\(colour.hexString) — click for Colour 1, right-click for Colour 2")
+            .help("\(colour.hexString) · click for Colour 1, right-click for Colour 2")
             .accessibilityLabel("Swatch \(colour.hexString)")
     }
 }

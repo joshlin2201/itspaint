@@ -21,7 +21,7 @@ struct DocumentTitle: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(name)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary.opacity(0.95))
+                .foregroundStyle(.primary.opacity(Tokens.Ink.strong))
                 .lineLimit(1)
                 .truncationMode(.middle)
 
@@ -30,7 +30,7 @@ struct DocumentTitle: View {
             // the artwork.
             Text(subtitle)
                 .font(.system(size: 10.5))
-                .foregroundStyle(.primary.opacity(0.5))
+                .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
                 .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
@@ -77,10 +77,10 @@ struct HeaderButton: View {
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .medium))
                 .frame(width: 26, height: 26)
-                .foregroundStyle(.primary.opacity(isEnabled ? 0.85 : 0.28))
+                .foregroundStyle(.primary.opacity(isEnabled ? Tokens.Ink.regular : Tokens.Ink.disabled))
                 .background {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(.primary.opacity(isHovering && isEnabled ? 0.12 : 0))
+                    RoundedRectangle(cornerRadius: Tokens.Radius.control, style: .continuous)
+                        .fill(.primary.opacity(isHovering && isEnabled ? Tokens.Fill.hover : 0))
                 }
                 .contentShape(Rectangle())
         }
@@ -126,11 +126,45 @@ struct ShareButton: NSViewRepresentable {
     }
 }
 
+/// The zoom percentage, which is also the way back to 100%.
+///
+/// A bare `Text` with a tap gesture was an invisible affordance: nobody clicks a
+/// label. This hovers and presses like the buttons on either side of it, and goes
+/// quiet at 100% because at that point pressing it does nothing.
+struct ZoomReadout: View {
+    let label: String
+    let isActualSize: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 11).monospacedDigit())
+                .foregroundStyle(.primary.opacity(isActualSize ? Tokens.Ink.muted : Tokens.Ink.regular))
+                .frame(minWidth: 40)
+                .frame(height: 26)
+                .background {
+                    RoundedRectangle(cornerRadius: Tokens.Radius.control, style: .continuous)
+                        .fill(.primary.opacity(isHovering && !isActualSize ? Tokens.Fill.hover : 0))
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isActualSize)
+        .onHover { isHovering = $0 }
+        .animation(Tokens.Motion.micro, value: isHovering)
+        .help("Actual size (⌘0)")
+        .accessibilityLabel("Zoom \(label), press for actual size")
+    }
+}
+
 /// A hairline between two runs inside one group.
 struct HeaderDivider: View {
     var body: some View {
         Rectangle()
-            .fill(.primary.opacity(0.14))
+            .fill(.primary.opacity(Tokens.Fill.separator))
             .frame(width: 1, height: 14)
             .padding(.horizontal, 2)
     }
@@ -191,32 +225,23 @@ struct WindowActions: View {
                     isEnabled: model.zoom > (EditorModel.zoomSteps.first ?? 1)
                 ) { model.zoomOut() }
 
-                Text(zoomLabel)
-                    .font(.system(size: 11).monospacedDigit())
-                    .foregroundStyle(.primary.opacity(0.8))
-                    .frame(minWidth: 40)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        model.hasUserZoomed = true
-                        model.zoom = 1
-                    }
-                    .help("Actual size (⌘0)")
-                    .accessibilityLabel("Zoom \(zoomLabel), click for actual size")
+                // **The percentage is the button.** There used to be a separate
+                // `arrow.up.left.and.arrow.down.right` cell for Actual Size,
+                // behind a divider, while tapping this label did exactly the
+                // same thing. Two controls for one action, and the glyph on the
+                // explicit one is the one every other Mac app uses for *fit* or
+                // *full screen*, so the pair managed to be both redundant and
+                // misleading. What is left is a real button whose label is the
+                // current zoom and whose action is 100%.
+                ZoomReadout(label: zoomLabel, isActualSize: model.zoom == 1) {
+                    model.hasUserZoomed = true
+                    model.zoom = 1
+                }
 
                 HeaderButton(
                     symbol: "plus", title: "Zoom in", shortcut: "⌘+",
                     isEnabled: model.zoom < (EditorModel.zoomSteps.last ?? 1)
                 ) { model.zoomIn() }
-
-                HeaderDivider()
-
-                HeaderButton(
-                    symbol: "arrow.up.left.and.arrow.down.right",
-                    title: "Actual size", shortcut: "⌘0"
-                ) {
-                    model.hasUserZoomed = true
-                    model.zoom = 1
-                }
             }
 
             HeaderGroup {
@@ -258,19 +283,24 @@ struct FloatingActions: View {
         HStack(spacing: Tokens.Space.tight) {
             Image(systemName: "square.dashed.inset.filled")
                 .font(.system(size: 11))
-                .foregroundStyle(.primary.opacity(0.6))
+                .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
 
             if let size = model.selectionSize {
                 Text("\(size.width) × \(size.height)")
                     .font(Tokens.Text.pillValue)
-                    .foregroundStyle(.primary.opacity(0.7))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
             }
 
             HeaderDivider()
 
-            action("Place", symbol: "checkmark", prominent: true) { model.placeFloating() }
-            action("Crop to it", symbol: "crop") { model.cropToSelection() }
-            action("Discard", symbol: "xmark") { model.discardFloating() }
+            // "Crop to it" wanted an antecedent the bar never gave it. The bar
+            // only exists while something is floating, so there is exactly one
+            // thing to crop to and the shorter word is the unambiguous one.
+            action("Place", symbol: "checkmark", role: .primary) { model.placeFloating() }
+            action("Crop", symbol: "crop") { model.cropToSelection() }
+            // Discard throws the paste away. Styled like its neighbours it was
+            // one slip from Crop, which is reversible, at identical weight.
+            action("Discard", symbol: "xmark", role: .destructive) { model.discardFloating() }
         }
         .padding(.horizontal, Tokens.Space.base)
         .frame(height: Tokens.Size.headerControl)
@@ -280,8 +310,17 @@ struct FloatingActions: View {
         .accessibilityLabel("Pasted content. Place, crop to it, or discard.")
     }
 
+    /// What one action in the bar is for, which is what it looks like.
+    ///
+    /// Three actions at one weight is three equally-good answers. They are not:
+    /// placing is what clicking off already does, cropping is reversible, and
+    /// discarding throws the paste away.
+    private enum Role {
+        case primary, neutral, destructive
+    }
+
     private func action(
-        _ title: String, symbol: String, prominent: Bool = false,
+        _ title: String, symbol: String, role: Role = .neutral,
         perform: @escaping () -> Void
     ) -> some View {
         Button(action: perform) {
@@ -289,18 +328,36 @@ struct FloatingActions: View {
                 Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
                 Text(title).font(.system(size: 11.5))
             }
-            .foregroundStyle(prominent ? Color.white : .primary.opacity(0.85))
+            .foregroundStyle(foreground(role))
             .padding(.horizontal, Tokens.Space.base)
             .frame(height: 22)
             .background {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(prominent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary.opacity(0.12)))
+                RoundedRectangle(cornerRadius: Tokens.Radius.control, style: .continuous)
+                    .fill(background(role))
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(title)
         .accessibilityLabel(title)
+    }
+
+    private func foreground(_ role: Role) -> AnyShapeStyle {
+        switch role {
+        case .primary: AnyShapeStyle(Color.white)
+        // Not a red fill: the bar is small and a filled red button beside a
+        // filled accent one is two things shouting. A red label on the same
+        // tonal cell as Crop is enough to break the tie.
+        case .destructive: AnyShapeStyle(Color.red)
+        case .neutral: AnyShapeStyle(.primary.opacity(Tokens.Ink.regular))
+        }
+    }
+
+    private func background(_ role: Role) -> AnyShapeStyle {
+        switch role {
+        case .primary: AnyShapeStyle(Color.accentColor)
+        case .destructive, .neutral: AnyShapeStyle(.primary.opacity(Tokens.Fill.track))
+        }
     }
 }
 
@@ -324,11 +381,11 @@ struct PointerReadout: View {
                 // While a region is being dragged its size is the useful
                 // number, and it is worth an accent because it is live.
                 Text("\(size.width) × \(size.height)")
-                    .foregroundStyle(.primary.opacity(0.9))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.strong))
             }
             if let position = model.pointerPosition {
                 Text("\(position.x), \(position.y)")
-                    .foregroundStyle(.primary.opacity(0.45))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
             }
         }
         .font(.system(size: 10.5).monospacedDigit())

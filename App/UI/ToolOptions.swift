@@ -4,7 +4,7 @@ import SwiftUI
 /// The active tool's own controls, expanded from its button in the rail.
 ///
 /// This is the classic ribbon's trick and it is the right one: the rail stays a
-/// short list of *jobs*, and the variations — fifteen shapes, three brush tips,
+/// short list of *jobs*, and the variations — fifteen shapes, four brush tips,
 /// outline versus fill — appear only for the job you picked. Nothing is behind
 /// a menu, but nothing irrelevant is on screen either.
 ///
@@ -43,12 +43,21 @@ struct ToolOptions: View {
         .environment(\.optionsAxisIsVertical, isVertical)
         .font(Tokens.Text.pillLabel)
         .lineLimit(1)
-        .frame(width: isVertical ? Tokens.Rail.optionsContentWidth : nil, alignment: .leading)
-        .fixedSize(horizontal: !isVertical, vertical: false)
+        // The fixed width exists to align controls with each other. A tool with
+        // no controls has nothing to align, and holding the full width for it
+        // just parks 258pt of empty glass over the artwork.
+        .frame(
+            width: isVertical && hasAlignedControls ? Tokens.Rail.optionsContentWidth : nil,
+            alignment: .leading
+        )
+        .fixedSize(horizontal: !(isVertical && hasAlignedControls), vertical: false)
         .padding(.horizontal, Tokens.Space.snug)
         .padding(.vertical, Tokens.Space.base - 1)
         .chromeSurface(cornerRadius: Tokens.Radius.panel)
         .animation(Tokens.Motion.pillResize, value: model.tool)
+        // The Flow row appears and disappears with the tip, so the panel
+        // has to resize for that too, not only for a change of tool.
+        .animation(Tokens.Motion.pillResize, value: model.brushShape)
         .animation(Tokens.Motion.pillResize, value: model.hasSelection)
     }
 
@@ -66,11 +75,13 @@ struct ToolOptions: View {
                 VStack(alignment: .leading, spacing: 1) {
                     title
                     if let hint {
+                        // One line, not two. The panel's height should be a
+                        // function of its controls, not of how long a sentence
+                        // about the tool happens to be.
                         Text(hint)
                             .font(.system(size: 10))
-                            .foregroundStyle(.primary.opacity(0.42))
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
+                            .lineLimit(1)
                     }
                 }
                 .padding(.bottom, 2)
@@ -80,7 +91,7 @@ struct ToolOptions: View {
                     if let hint {
                         Text(hint)
                             .font(.system(size: 10.5))
-                            .foregroundStyle(.primary.opacity(0.45))
+                            .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
                     }
                 }
             }
@@ -92,22 +103,42 @@ struct ToolOptions: View {
             .font(.system(size: 11.5, weight: .semibold))
     }
 
-    /// One line saying how the tool is driven, for the tools whose gesture is
-    /// not obvious from the glyph.
+    /// Whether this tool contributes any rows to the label/control grid.
+    ///
+    /// Kept beside `controls` deliberately: a tool that gains its first control
+    /// has to be removed from here in the same edit, and the two being adjacent
+    /// is the only thing that makes that likely.
+    private var hasAlignedControls: Bool {
+        switch model.tool {
+        case .pencil, .eyedropper: false
+        default: true
+        }
+    }
+
+    /// The one thing about this tool a pointer will not tell you.
+    ///
+    /// **A keystroke, a second stage, or nothing.** These used to be little
+    /// lists: "Drag its edge to move · corners resize · ⌘↩ places it" is three
+    /// clauses in three different grammars, it wrapped onto a second line, and it
+    /// made the Text panel a different height from every other panel. Two of its
+    /// three clauses also described something the handles and their cursors
+    /// already say — permanent instructions for what you learn on first contact.
+    ///
+    /// So the rule is: hint what is *invisible*. A modifier key and a two-stage
+    /// gesture are invisible. Dragging a handle is not.
     private var hint: String? {
         switch model.tool {
         case .pencil: "1 px, fixed"
-        case .text: "Drag its edge to move · corners resize · ⌘↩ places it"
-        case .eyedropper: "Click to load Colour 1 · ⌥ from any tool"
-        case .select where model.selectionKind == .lasso: "Trace any shape · it closes itself"
-        case .select where model.selectionKind == .instantAlpha:
-            "Click · ⇧ add · ⌥ subtract"
-        case .select: "Drag it out · ⌘A selects all"
-        case .badge: "Click to drop \(model.nextBadgeNumber)"
+        case .text: "⌘↩ places it"
+        case .eyedropper: "⌥ from any tool"
+        case .select where model.selectionKind == .lasso: "Closes itself"
+        case .select where model.selectionKind == .instantAlpha: "⇧ add · ⌥ subtract"
+        case .select: "⌘A selects all"
+        case .badge: "Drops \(model.nextBadgeNumber) next"
         case .shape where model.shapeKind == .curve:
-            model.hasPendingShape ? "Now drag to bend it" : "Drag the line, then bend it"
+            model.hasPendingShape ? "Now drag to bend it" : "Drag, then bend it"
         case .shape where model.shapeKind == .polygon:
-            model.hasPendingShape ? "Click the first corner to close · ↩ to finish" : "Click each corner"
+            model.hasPendingShape ? "↩ to finish" : "Click each corner"
         default: nil
         }
     }
@@ -122,22 +153,29 @@ struct ToolOptions: View {
 
         case .brush:
             sizeControl
+            // Four tips, including the one that used to be its own rail button.
+            // Icons rather than words: "Round / Square / Soft / Spray" is four
+            // labels in a 238pt row, which is where truncation starts, and the
+            // footprints are more legible than their names anyway.
             OptionRow("Tip") {
                 OptionSegment(selection: $model.brushShape, options: [
-                    .init(value: .round, label: "Round"),
-                    .init(value: .square, label: "Square"),
-                    .init(value: .soft, label: "Soft"),
+                    .init(value: .round, symbol: "circle.fill", help: "Round"),
+                    .init(value: .square, symbol: "square.fill", help: "Square"),
+                    .init(value: .soft, symbol: "circle.dotted.circle", help: "Soft"),
+                    .init(value: .spray, symbol: "sprinkler.and.droplets.fill", help: "Spray"),
                 ])
             }
-
-        case .airbrush:
-            sizeControl
-            OptionRow("Flow") {
-                OptionSlider(
-                    value: $model.sprayDensity,
-                    range: 0.02...0.6,
-                    readout: "\(Int(model.sprayDensity * 100))%"
-                )
+            // Flow only means something while spraying, so it appears with the
+            // tip that has it rather than sitting greyed out under three that
+            // do not.
+            if model.brushShape.isSpray {
+                OptionRow("Flow") {
+                    OptionSlider(
+                        value: $model.sprayDensity,
+                        range: 0.02...0.6,
+                        readout: "\(Int(model.sprayDensity * 100))%"
+                    )
+                }
             }
 
         case .highlighter:
@@ -193,12 +231,12 @@ struct ToolOptions: View {
                 )
             }
             OptionRow("Font") {
-                Picker("", selection: $model.textFont) {
-                    ForEach(Self.fonts, id: \.self) { Text($0).tag($0) }
-                }
-                .labelsHidden()
-                .controlSize(.small)
-                .frame(maxWidth: isVertical ? .infinity : 124)
+                OptionMenu(
+                    selection: $model.textFont,
+                    options: Self.fonts,
+                    title: { $0 },
+                    previewsItself: true
+                )
             }
             OptionRow("Style") {
                 SegmentTrack {
@@ -314,7 +352,7 @@ struct ToolOptions: View {
                         model.brushSize = stop
                     } label: {
                         Capsule()
-                            .fill(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary.opacity(0.55)))
+                            .fill(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary.opacity(Tokens.Ink.muted)))
                             .frame(height: max(1.5, min(7, CGFloat(stop) / 4)))
                             .frame(maxWidth: .infinity)
                             .padding(.horizontal, 6)
@@ -334,61 +372,63 @@ struct ToolOptions: View {
         }
     }
 
-    private static let sizeStops = [1, 4, 12, 28]
+    /// **The first stop is the default size**, so the track is never showing
+    /// four identical unselected bars on a fresh launch.
+    ///
+    /// The stops used to be 1 / 4 / 12 / 28, chosen to mirror the four weights
+    /// the classic Size dropdown offered. But the brush opens at 2, which is not
+    /// one of them, so the row every new user saw first was a segmented control
+    /// with no segment selected — indistinguishable from a disabled one, and the
+    /// one row in the panel that never explained itself. 1px is the pencil's
+    /// whole job anyway, and the slider still reaches it.
+    static let sizeStops = [2, 6, 14, 28]
 
     // MARK: - Selection
 
     /// What a selection can do. Crop and Copy are on the rail because they are
     /// the common case; the rest live here, one glance away.
     ///
-    /// **Icons only in the side panel.** Four labelled buttons plus a size
-    /// read-out do not fit 258pt, and the panel is a fixed width, so they
-    /// truncated to `In…` and `D…` — a button whose label is one letter and an
-    /// ellipsis is worse than one with no label, because it looks broken rather
-    /// than deliberate. Each still carries its tooltip and accessibility label.
-    /// The bottom bar has the window's width and keeps the words.
+    /// **Icons only, both orientations.** These used to be labelled buttons, and
+    /// in a fixed 258pt panel four of them plus a size read-out truncated to
+    /// `In…` and `D…` — a label that is one letter and an ellipsis is worse than
+    /// no label, because it looks broken rather than deliberate. Dropping the
+    /// words in the side panel fixed that but left the bottom bar keeping them,
+    /// so the same four actions read two different ways depending on which edge
+    /// the toolbar was on, for four words nobody was reading. One rule instead:
+    /// a crop icon, an invert icon and a trash icon, each with its tooltip and
+    /// its accessibility label, which is how Preview's markup bar does it too.
     @ViewBuilder
     private var selectionActions: some View {
         if isVertical {
-            OptionRow("Size") {
-                HStack(spacing: 3) {
-                    if model.selection?.isRectangular == false {
-                        Image(systemName: "lasso")
-                            .font(.system(size: 9.5))
-                            .foregroundStyle(.primary.opacity(0.5))
-                    }
-                    Text(model.selectionSize.map { "\($0.width) × \($0.height)" } ?? "—")
-                        .font(Tokens.Text.pillValue)
-                        .foregroundStyle(.primary.opacity(0.7))
-                    Spacer(minLength: 0)
-                }
-            }
+            OptionRow("Size") { sizeReadout }
             OptionRow(nil) {
-                SegmentTrack {
-                    selectionActionButtons(labelled: false)
-                }
+                SegmentTrack { selectionActionButtons }
             }
         } else {
             HStack(spacing: Tokens.Space.tight) {
-                if let size = model.selectionSize {
-                    HStack(spacing: 3) {
-                        if model.selection?.isRectangular == false {
-                            Image(systemName: "lasso")
-                                .font(.system(size: 9.5))
-                                .foregroundStyle(.primary.opacity(0.5))
-                        }
-                        Text("\(size.width) × \(size.height)")
-                            .font(Tokens.Text.pillValue)
-                            .foregroundStyle(.primary.opacity(0.6))
-                    }
-                }
-                selectionActionButtons(labelled: true)
+                if model.selectionSize != nil { sizeReadout }
+                SegmentTrack { selectionActionButtons }
             }
         }
     }
 
+    private var sizeReadout: some View {
+        HStack(spacing: 3) {
+            if model.selection?.isRectangular == false {
+                Image(systemName: "lasso")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
+            }
+            Text(model.selectionSize.map { "\($0.width) × \($0.height)" } ?? "—")
+                .font(Tokens.Text.pillValue)
+                .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
+                .fixedSize()
+            Spacer(minLength: 0)
+        }
+    }
+
     @ViewBuilder
-    private func selectionActionButtons(labelled: Bool) -> some View {
+    private var selectionActionButtons: some View {
         let actions: [(String, String, () -> Void)] = {
             var list: [(String, String, () -> Void)] = [
                 ("Crop", "crop", { model.cropToSelection() }),
@@ -404,21 +444,20 @@ struct ToolOptions: View {
         }()
 
         ForEach(actions, id: \.0) { title, symbol, action in
-            if labelled {
-                OptionButton(title, symbol: symbol, action: action)
-            } else {
-                Button(action: action) {
-                    Image(systemName: symbol)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.primary.opacity(0.85))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Tokens.Size.segment)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(title)
-                .accessibilityLabel(title)
+            Button(action: action) {
+                Image(systemName: symbol)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
+                    // Equal shares along a side rail; intrinsic along the
+                    // bottom bar, where the track is not filling a column.
+                    .frame(maxWidth: isVertical ? .infinity : nil)
+                    .padding(.horizontal, isVertical ? 2 : 7)
+                    .frame(height: Tokens.Size.segment)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .help(title)
+            .accessibilityLabel(title)
         }
     }
 }
@@ -445,7 +484,7 @@ private struct ShapeGallery: View {
             } label: {
                 Image(systemName: kind.symbolName)
                     .font(.system(size: 12))
-                    .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.8))
+                    .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(Tokens.Ink.regular))
                     .frame(maxWidth: isVertical ? .infinity : 26)
                     .frame(height: 26)
                     .background {
@@ -463,7 +502,7 @@ private struct ShapeGallery: View {
         .frame(maxWidth: isVertical ? .infinity : nil)
         .background {
             RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
-                .fill(.primary.opacity(0.12))
+                .fill(.primary.opacity(Tokens.Fill.track))
         }
     }
 }
@@ -504,11 +543,11 @@ struct OptionRow<Content: View>: View {
         HStack(spacing: Tokens.Space.tight) {
             if isVertical {
                 Text(title ?? "")
-                    .foregroundStyle(.primary.opacity(0.6))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
                     .frame(width: Tokens.Size.optionLabel, alignment: .leading)
             } else if let title {
                 Text(title)
-                    .foregroundStyle(.primary.opacity(0.6))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
                     .fixedSize()
             }
             content
@@ -531,8 +570,76 @@ struct SegmentTrack<Content: View>: View {
         .frame(maxWidth: isVertical ? .infinity : nil)
         .background {
             RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
-                .fill(.primary.opacity(0.12))
+                .fill(.primary.opacity(Tokens.Fill.track))
         }
+    }
+}
+
+/// A one-of-many choice too long for a segmented track, wearing the panel's own
+/// material rather than the system's.
+///
+/// This replaces a plain `Picker`. A stock `NSPopUpButton` in this panel was a
+/// bezel, a fill and a corner radius none of the controls above or below it use,
+/// plus the only accent-blue chrome on screen that was not a selection — so a
+/// four-row panel was carrying three different control materials, and the odd one
+/// out was the row in the middle.
+///
+/// The menu itself is still a real `Menu`, so it keeps native keyboard
+/// navigation and the checkmark on the current item. Only the button is ours.
+struct OptionMenu<Value: Hashable>: View {
+    @Binding var selection: Value
+    let options: [Value]
+    let title: (Value) -> String
+    /// Renders each row of the menu in the thing it selects, where that helps.
+    /// A list of typeface names is the case that wants it.
+    var previewsItself: Bool = false
+
+    @Environment(\.optionsAxisIsVertical) private var isVertical
+    @State private var isHovering = false
+
+    var body: some View {
+        Menu {
+            ForEach(options, id: \.self) { option in
+                Button {
+                    selection = option
+                } label: {
+                    if previewsItself {
+                        Text(title(option)).font(.custom(title(option), size: 13))
+                    } else {
+                        Text(title(option))
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(title(selection))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 2)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
+            }
+            .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
+            .padding(.horizontal, 6)
+            .frame(maxWidth: isVertical ? .infinity : 124)
+            .frame(height: Tokens.Size.segment)
+            .background {
+                RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
+                    .fill(.primary.opacity(isHovering ? Tokens.Fill.hover : Tokens.Fill.cell))
+            }
+            .padding(2)
+            .background {
+                RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
+                    .fill(.primary.opacity(Tokens.Fill.track))
+            }
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .onHover { isHovering = $0 }
+        .animation(Tokens.Motion.micro, value: isHovering)
     }
 }
 
@@ -557,7 +664,7 @@ struct OptionSlider: View {
                 .labelsHidden()
             Text(readout)
                 .font(Tokens.Text.pillValue)
-                .foregroundStyle(.primary.opacity(0.85))
+                .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
                 .frame(minWidth: 26, alignment: .trailing)
         }
         .accessibilityElement(children: .combine)
@@ -622,7 +729,7 @@ struct OptionSegment<Value: Hashable>: View {
                             Text(option.label ?? "")
                         }
                     }
-                    .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.8))
+                    .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(Tokens.Ink.regular))
                     // Equal shares of the row in the side panel, intrinsic
                     // width along the bottom bar. Padding-driven widths were
                     // why "Round / Square / Soft" was three times the size of
@@ -650,12 +757,20 @@ struct OptionSegment<Value: Hashable>: View {
 /// Distinct from `OptionSegment`, which picks exactly one of a set: bold,
 /// italic and underline combine, so they are three toggles that happen to share
 /// a track rather than three states of one control.
+///
+/// **An unselected toggle still draws its cell.** `OptionSegment` can leave the
+/// off cells empty because one of them is always filled, so the track always
+/// says "these are the states of a control". Toggles can all be off at once,
+/// and three bare glyphs in an empty trough — directly above an Align row where
+/// one cell *is* filled — read as a control that is switched off rather than
+/// three you can press. The faint cell is what distinguishes off from disabled.
 struct OptionToggle: View {
     let symbol: String
     let help: String
     @Binding var isOn: Bool
 
     @Environment(\.optionsAxisIsVertical) private var isVertical
+    @State private var isHovering = false
 
     var body: some View {
         Button {
@@ -663,16 +778,24 @@ struct OptionToggle: View {
         } label: {
             Image(systemName: symbol)
                 .font(.system(size: 11))
-                .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.8))
+                .foregroundStyle(isOn ? Color.white : Color.primary.opacity(Tokens.Ink.regular))
                 .frame(maxWidth: isVertical ? .infinity : nil)
                 .padding(.horizontal, isVertical ? 2 : 7)
                 .frame(height: Tokens.Size.segment)
                 .background {
                     RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                        .fill(isOn ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.clear))
+                        .fill(
+                            isOn
+                                ? AnyShapeStyle(Color.accentColor)
+                                : AnyShapeStyle(.primary.opacity(
+                                    isHovering ? Tokens.Fill.hover : Tokens.Fill.cell
+                                ))
+                        )
                 }
                 .contentShape(Rectangle())
         }
+        .onHover { isHovering = $0 }
+        .animation(Tokens.Motion.micro, value: isHovering)
         .buttonStyle(.plain)
         .help(help)
         .accessibilityLabel(help)

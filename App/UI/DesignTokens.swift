@@ -41,9 +41,6 @@ enum Tokens {
     enum Size {
         /// Inner element of a segmented control.
         static let segment: CGFloat = 21
-        /// Height of one row in the options panel, so the rhythm is one
-        /// number rather than whatever each control happens to be.
-        static let optionRow: CGFloat = 25
         /// The options panel's label column.
         ///
         /// Fixed, so "Size", "Stroke", "Flow" and "Corner" all end at the same
@@ -62,16 +59,12 @@ enum Tokens {
         static let colourSwap: CGFloat = 18
         /// Glyph inside a tool cell — optically sized, not mathematically.
         static let toolGlyph: CGFloat = 19
-        /// The options pill.
-        static let pill: CGFloat = 44
         /// The same pair restated at full size inside the popover.
         static let colourPairLarge: CGFloat = 28
         /// A swatch in the always-visible palette.
         static let swatch: CGFloat = 16
         /// Every capsule in the top header shares one optical height.
         static let headerControl: CGFloat = 32
-        /// Compact floating readout at the lower edge of the canvas.
-        static let statusStrip: CGFloat = 30
         /// One square in the transparency grid behind the artwork.
         static let transparencyTile: CGFloat = 8
     }
@@ -84,17 +77,60 @@ enum Tokens {
     enum Radius {
         static let rail: CGFloat = 16
         static let cell: CGFloat = 11
-        static let pill: CGFloat = 15
         /// The options panel: tighter than the rail, so it reads as attached to
         /// it rather than as a second window floating nearby.
         static let panel: CGFloat = 12
-        static let popover: CGFloat = 14
         /// The well a grid sits in, inside the popover.
         static let well: CGFloat = 10
         static let segmentTrack: CGFloat = 7
         static let segmentInner: CGFloat = 5
         static let chip: CGFloat = 8
+        /// A small button living inside a chip: a header cell's hover fill, one
+        /// action in the floating bar.
+        static let control: CGFloat = 6
         static let swatch: CGFloat = 4
+    }
+
+    // MARK: - Ink and fill
+
+    /// **The opacity scale.** Five steps for text, four for fills.
+    ///
+    /// Every label in this app is a system colour at some opacity, which is what
+    /// lets one set of views track light, dark, accent and Increase Contrast. The
+    /// risk in that is drift: two labels meant to read as equals end up at 0.82
+    /// and 0.85, a hover lands on 0.10 in one control and 0.14 in the next, and
+    /// nothing looks *wrong* anywhere while the whole surface reads as
+    /// accidental. Naming the steps by the job they do is what stops that,
+    /// because "the value beside a label" has one answer instead of a range.
+    enum Ink {
+        /// A document title, or a live value the eye should land on first.
+        static let strong: Double = 0.92
+        /// A control's own glyph or label — the default for anything pressable.
+        static let regular: Double = 0.82
+        /// A value or read-out beside a label.
+        static let muted: Double = 0.6
+        /// A hint, a caption, a unit.
+        static let faint: Double = 0.42
+        /// A control that cannot be used. Still legible, clearly not available.
+        static let disabled: Double = 0.28
+    }
+
+    /// Tonal fills, in the same spirit: a track, the cell inside it, the answer
+    /// to a pointer, and a hairline.
+    enum Fill {
+        /// The trough a segmented control or a grid sits in.
+        static let track: Double = 0.12
+        /// The faintest step: an unselected cell *inside* a track, or the well a
+        /// grid sits in. Present, so an all-off toggle group still reads as
+        /// three keys rather than three loose glyphs.
+        ///
+        /// One value for both because they are the same job — recessing
+        /// something a little without drawing an edge — and they were 0.06,
+        /// 0.07 and 0.08 in three different files before this.
+        static let cell: Double = 0.07
+        /// The pointer is over this.
+        static let hover: Double = 0.12
+        static let separator: Double = 0.14
     }
 
     // MARK: - Elevation
@@ -167,9 +203,9 @@ enum Tokens {
         /// was.
         static let swatchPairs = 7
 
-        /// Chrome should hug its controls. The old shared 90pt thickness made
-        /// the bottom layout inherit the side rail's proportions and read as a
-        /// dock. Each orientation now sizes to the content it actually carries.
+        /// Chrome hugs its controls: the old 90pt thickness read as a dock
+        /// rather than a toolbar. What replaced it is `thickness` below, which
+        /// is derived from `cross` — the widest control the rail carries.
         static let padding: CGFloat = 5
         static let sectionSpacing: CGFloat = Space.tight
         static let colourInset: CGFloat = Space.hair

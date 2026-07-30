@@ -940,12 +940,14 @@ struct PixelateTests {
     }
 }
 
-@Suite("Airbrush")
+/// The airbrush, which is now the brush's spray tip rather than its own tool.
+@Suite("Spray tip")
 struct AirbrushTests {
 
     private func sprayed(density: Double = 0.5, size: Int = 20) -> PaintEngine {
         let engine = PaintEngine(canvas: Bitmap(width: 80, height: 80, fill: .white))
-        engine.settings.tool = .airbrush
+        engine.settings.tool = .brush
+        engine.settings.brushShape = .spray
         engine.settings.brushSize = size
         engine.settings.sprayDensity = density
         engine.colours.foreground = .black
@@ -966,7 +968,7 @@ struct AirbrushTests {
                 #expect(abs(x - 40) <= 11 && abs(y - 40) <= 11, "stray dot at \(x), \(y)")
             }
         }
-        #expect(marked > 0, "the airbrush laid down nothing at all")
+        #expect(marked > 0, "the spray tip laid down nothing at all")
     }
 
     @Test("Holding still keeps building coverage")
@@ -992,9 +994,33 @@ struct AirbrushTests {
         engine.continueStroke(to: PixelPoint(x: 50, y: 50))
         engine.endStroke()
 
-        #expect(engine.undoStack.undoActionName == "Airbrush")
+        // Named for the tip, not the tool, the way a rectangle undoes as
+        // "Rectangle" rather than "Shape".
+        #expect(engine.undoStack.undoActionName == "Spray")
         engine.undo()
         #expect(engine.canvas == before)
+    }
+
+    @Test("The rail no longer carries a separate airbrush button")
+    func airbrushIsNotATool() {
+        #expect(!ToolKind.allCases.map(\.rawValue).contains("airbrush"))
+        // Still reachable, as a tip.
+        #expect(Brush.Shape.allCases.contains(.spray))
+    }
+
+    @Test("Only the brush sprays, however the tip is set")
+    func onlyTheBrushSprays() {
+        // The eraser, highlighter and shape tools all borrow `brushShape` for
+        // their diameter. None of them may inherit its spray behaviour, and none
+        // may end up with a spray-masked nib either.
+        for tool in ToolKind.allCases {
+            var settings = ToolSettings(tool: tool, brushShape: .spray)
+            settings.brushSize = 12
+            #expect(settings.isSpraying == (tool == .brush), "\(tool) disagreed")
+            if tool != .brush {
+                #expect(settings.nib.shape != .spray, "\(tool) kept a spray nib")
+            }
+        }
     }
 
     @Test("The same seed sprays the same dots")
@@ -1123,6 +1149,55 @@ struct MultiStepShapeTests {
 
         engine.resetBadgeNumbering()
         #expect(engine.nextBadgeNumber == 1)
+    }
+
+    /// Undoing a badge has to hand its number back.
+    ///
+    /// The counter used to live outside the undo record, so `⌘Z` put the pixels
+    /// back and left the sequence advanced: the badge vanished from the canvas
+    /// and the next stamp came out as 4 anyway. What you could see and what the
+    /// tool was about to continue no longer matched.
+    @Test("Undo and redo carry the badge counter with them")
+    func badgeCounterFollowsUndo() {
+        let engine = PaintEngine(canvas: Bitmap(width: 300, height: 100, fill: .white))
+        engine.settings.tool = .badge
+        engine.settings.brushSize = 10
+        engine.colours.foreground = PaintColour(hex: "FF3B30")!
+
+        for x in [40, 120, 200] { engine.beginStroke(at: PixelPoint(x: x, y: 50)) }
+        #expect(engine.nextBadgeNumber == 4)
+
+        engine.undo()
+        #expect(engine.nextBadgeNumber == 3, "undo did not hand back the number it used")
+        engine.undo()
+        #expect(engine.nextBadgeNumber == 2)
+
+        engine.redo()
+        #expect(engine.nextBadgeNumber == 3, "redo did not re-consume the number")
+
+        // And a badge dropped after undoing reuses the freed number rather than
+        // skipping to 4.
+        engine.undo()
+        engine.beginStroke(at: PixelPoint(x: 260, y: 50))
+        #expect(engine.undoStack.undoActionName == "Badge 2")
+        #expect(engine.nextBadgeNumber == 3)
+    }
+
+    @Test("Undoing a non-badge edit leaves the counter alone")
+    func unrelatedUndoDoesNotDisturbTheCounter() {
+        let engine = PaintEngine(canvas: Bitmap(width: 200, height: 100, fill: .white))
+        engine.settings.tool = .badge
+        engine.settings.brushSize = 10
+        engine.beginStroke(at: PixelPoint(x: 40, y: 50))
+        #expect(engine.nextBadgeNumber == 2)
+
+        engine.settings.tool = .brush
+        engine.beginStroke(at: PixelPoint(x: 150, y: 20))
+        engine.continueStroke(to: PixelPoint(x: 180, y: 40))
+        engine.endStroke()
+        engine.undo()
+
+        #expect(engine.nextBadgeNumber == 2, "a brush undo moved the badge counter")
     }
 
     @Test("Every drawn shape marks its own box and no more")

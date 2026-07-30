@@ -16,8 +16,7 @@ hover and in the Tools menu.
 | | Tool | Behaviour |
 |---|---|---|
 | `P` | **Pencil** | Always a hard 1px nib. Not size-aware on purpose — that is the promise of the tool; making it size-aware would make it a small brush. |
-| `B` | **Brush** | Round, square or soft tip, 1–96px. Soft antialiases over the outer ring. |
-| `A` | **Airbrush** | Scatters coverage weighted to the centre; **keeps spraying while you hold still**, which is the whole feel of the tool. Flow control sets density. Seeded randomness, so a given engine sprays reproducibly. |
+| `B` | **Brush** | Four tips at 1–96px. Round and square are hard-edged; soft antialiases over the outer ring; **spray is the airbrush** — it scatters coverage weighted to the centre and **keeps spraying while you hold still**, which is the whole feel of it. Flow sets density, and appears only for the spray tip. Seeded randomness, so a given engine sprays reproducibly. Spray used to be its own rail button; it is a nib, not a job. |
 | `H` | **Highlighter** | Chisel nib and a coverage buffer: overlapping passes within one stroke **never darken**. Drag back over your own line and it stays one flat tone, the way a real highlighter does. |
 | `E` | **Eraser** | Lays down the *background* colour — which is what makes it read as removing paint. Right-drag inverts that pairing. |
 

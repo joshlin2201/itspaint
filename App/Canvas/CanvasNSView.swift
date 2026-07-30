@@ -827,7 +827,7 @@ final class CanvasNSView: NSView {
     private var sprayTimer: Timer?
 
     private func startSprayingIfNeeded(at point: PixelPoint, button: PointerButton) {
-        guard let model, model.tool.isSpray else { return }
+        guard let model, model.isSpraying else { return }
         sprayTimer?.invalidate()
         let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {

@@ -24,13 +24,13 @@ struct Tooltip: View {
             if let shortcut {
                 Text(shortcut)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.75))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
                     .frame(minWidth: 15)
                     .padding(.vertical, 1.5)
                     .padding(.horizontal, 4)
                     .background {
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(.primary.opacity(0.14))
+                            .fill(.primary.opacity(Tokens.Fill.separator))
                     }
                     .overlay {
                         // A keycap reads as a key. Writing "(P)" in the label

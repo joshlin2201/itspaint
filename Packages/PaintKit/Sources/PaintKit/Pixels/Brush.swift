@@ -20,6 +20,19 @@ public struct Brush: Equatable, Sendable {
         case round
         /// Antialiased circle with a soft falloff over the outer pixel ring.
         case soft
+        /// A round footprint that lands *stochastically*: the mask is the area
+        /// the spray can reach, and coverage builds inside it while the button
+        /// is held. This is the airbrush.
+        ///
+        /// It lives here rather than as its own rail tool because it is a nib,
+        /// not a job — the same size control, the same colour, the same drag.
+        /// Round, square, soft and spray are four answers to "what does the
+        /// brush leave behind", and the tool set already keeps variations inside
+        /// the tool that owns them.
+        case spray
+
+        /// Builds coverage over time rather than stamping it once.
+        public var isSpray: Bool { self == .spray }
     }
 
     public let shape: Shape
@@ -83,7 +96,9 @@ public struct Brush: Equatable, Sendable {
                 case .square:
                     mask[index] = 255
 
-                case .round:
+                // Spray reaches a round area; which pixels inside it actually
+                // land is the spray raster's decision, per step, from density.
+                case .round, .spray:
                     mask[index] = (dx * dx + dy * dy).squareRoot() <= radius - 0.25 ? 255 : 0
 
                 case .soft:

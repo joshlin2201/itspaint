@@ -251,7 +251,7 @@ public final class PaintEngine {
         }
 
         if tool.isFreehand {
-            let stepDirty = tool.isSpray
+            let stepDirty = settings.isSpraying
                 ? Raster.spray(
                     activeBrush,
                     colour: strokeColour(for: button).rgba8,
@@ -281,9 +281,10 @@ public final class PaintEngine {
             return .empty
 
         case let .freehand(before, last, dirty, button):
-            // The airbrush keeps spraying where it is: repeating the same point
-            // is how holding still builds density, so it must not early-out.
-            let stepDirty = settings.tool.isSpray
+            // A spray tip keeps spraying where it is: repeating the same
+            // point is how holding still builds density, so it must not
+            // early-out.
+            let stepDirty = settings.isSpraying
                 ? Raster.sprayLine(
                     from: last,
                     to: point,
@@ -411,7 +412,11 @@ public final class PaintEngine {
 
         case let .freehand(before, _, dirty, _):
             gesture = .idle
-            recordEdit(name: settings.tool.displayName, before: before, dirty: dirty)
+            // The variation names the edit, not the tool that owns it — the
+            // same rule the shape case below follows, where a rectangle undoes
+            // as "Rectangle" rather than as "Shape". A spray stroke is a spray.
+            let name = settings.isSpraying ? "Spray" : settings.tool.displayName
+            recordEdit(name: name, before: before, dirty: dirty)
             return refreshed.union(dirty)
 
         case let .highlight(before, _, _, dirty, _):
@@ -1008,7 +1013,7 @@ public final class PaintEngine {
         let disc = colours.colour(for: button)
         let number = "\(nextBadgeNumber)"
 
-        let dirty = commitSingleShot("Badge \(number)") { canvas in
+        let dirty = commitSingleShot("Badge \(number)", badgeNumber: nextBadgeNumber) { canvas in
             var touched = Raster.fillEllipse(in: rect, colour: disc.rgba8, into: &canvas)
             // The numeral takes the contrasting colour, so a badge stays
             // readable whatever colour is loaded.
@@ -1129,6 +1134,9 @@ public final class PaintEngine {
         _ = cancelStroke()
         let floatingDirty = discardFloating()
         guard let edit = undoStack.undo(on: &canvas) else { return floatingDirty }
+        // A badge is a counter as well as some pixels. Undoing one hands its
+        // number back, so the next stamp reuses it instead of skipping it.
+        if let number = edit.badgeNumber { nextBadgeNumber = number }
         return edit.dirtyRect.union(floatingDirty)
     }
 
@@ -1136,18 +1144,22 @@ public final class PaintEngine {
     public func redo() -> PixelRect {
         _ = cancelStroke()
         guard let edit = undoStack.redo(on: &canvas) else { return .empty }
+        if let number = edit.badgeNumber { nextBadgeNumber = number + 1 }
         return edit.dirtyRect
     }
 
     // MARK: - Internals
 
-    private func recordEdit(name: String, before: Bitmap, dirty: PixelRect) {
+    private func recordEdit(
+        name: String, before: Bitmap, dirty: PixelRect, badgeNumber: Int? = nil
+    ) {
         guard !dirty.isEmpty else { return }
         undoStack.record(
             PixelEdit(
                 name: name,
                 before: RectPatch(capturing: dirty, from: before),
-                after: RectPatch(capturing: dirty, from: canvas)
+                after: RectPatch(capturing: dirty, from: canvas),
+                badgeNumber: badgeNumber
             )
         )
     }
@@ -1161,12 +1173,12 @@ public final class PaintEngine {
     }
 
     private func commitSingleShot(
-        _ name: String, _ body: (inout Bitmap) -> PixelRect
+        _ name: String, badgeNumber: Int? = nil, _ body: (inout Bitmap) -> PixelRect
     ) -> PixelRect {
         let before = canvas
         let dirty = body(&canvas)
         guard !dirty.isEmpty else { return .empty }
-        recordEdit(name: name, before: before, dirty: dirty)
+        recordEdit(name: name, before: before, dirty: dirty, badgeNumber: badgeNumber)
         return dirty
     }
 

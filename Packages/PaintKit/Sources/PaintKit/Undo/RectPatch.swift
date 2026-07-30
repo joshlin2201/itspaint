@@ -72,11 +72,29 @@ public struct PixelEdit: Equatable, Sendable {
         }
     }
 
-    public init(name: String, before: RectPatch, after: RectPatch, resize: Resize? = nil) {
+    /// The step number this edit consumed, if it was a badge.
+    ///
+    /// **The one piece of non-pixel state an edit carries.** The badge tool is a
+    /// counter, and restoring pixels is not enough to reverse it: undoing a badge
+    /// put the artwork back and left the counter advanced, so the next stamp
+    /// skipped a number and the sequence you could see on the canvas stopped
+    /// matching the one the tool was about to continue.
+    ///
+    /// Recorded here rather than recomputed from the stack because
+    /// `trimToBudget` drops the oldest edits — a count of surviving badge edits
+    /// would silently reset the sequence on a long session, renumbering badges
+    /// that are still on screen.
+    public let badgeNumber: Int?
+
+    public init(
+        name: String, before: RectPatch, after: RectPatch,
+        resize: Resize? = nil, badgeNumber: Int? = nil
+    ) {
         self.name = name
         self.before = before
         self.after = after
         self.resize = resize
+        self.badgeNumber = badgeNumber
     }
 
     /// An edit that replaces the whole canvas, size and all.

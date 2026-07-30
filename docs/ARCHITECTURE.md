@@ -113,7 +113,7 @@ it, every mouse-moved event costs a full-canvas redraw. There is a test for this
 
 | Case | Tools | Committed |
 |---|---|---|
-| `.freehand` | pencil, brush, airbrush, eraser | continuously; one undo step per stroke |
+| `.freehand` | pencil, brush (including the spray tip), eraser | continuously; one undo step per stroke |
 | `.highlight` | highlighter | accumulates coverage, recomposites from the pre-stroke snapshot so overlaps never darken |
 | `.shape` | shape tool, pixelate | live preview, rolled back and redrawn each step |
 | `.bend` | curve, second step | preview from the chord's snapshot |

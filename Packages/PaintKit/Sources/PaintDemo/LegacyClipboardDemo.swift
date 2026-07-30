@@ -95,7 +95,8 @@ enum LegacyClipboardDemo {
         for x in stride(from: 70, through: 930, by: 5) { engine.continueStroke(to: PixelPoint(x: x, y: 500 + Int(28 * sin(Double(x) / 72)))) }
         engine.endStroke()
 
-        engine.settings.tool = .airbrush
+        engine.settings.tool = .brush
+        engine.settings.brushShape = .spray
         engine.settings.brushSize = 40
         engine.settings.sprayDensity = 0.09
         engine.colours.foreground = purple

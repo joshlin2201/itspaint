@@ -294,3 +294,72 @@ struct FloodFillTests {
         #expect(dirty.isEmpty)
     }
 }
+
+/// The bucket's default tolerance has to work on a *photograph of a screen*,
+/// which is the only kind of image this app is usually pointed at.
+///
+/// It shipped at 0. On real artwork that fills nothing at all — a flat region
+/// of a screenshot has no two equal pixels once JPEG noise and Retina
+/// downscaling have been through it, so the tool looked broken rather than
+/// strict. Measured on an actual capture, an exact-match fill on the flat blue
+/// of a menu bar covered 0.00%.
+///
+/// The fixture here is that situation in miniature: a flat field carrying the
+/// ±3 per-channel noise a screenshot carries, against a neighbour far enough
+/// away to be a real boundary. Both halves of the requirement are checked,
+/// because moving the default up is only safe while it still stops at an edge.
+@Suite("Bucket default tolerance")
+struct BucketToleranceTests {
+
+    /// A flat colour plus deterministic per-channel noise, and a second field
+    /// 60 away — about the gap between two adjacent regions of window chrome.
+    private func noisyPair() -> Bitmap {
+        var bmp = Bitmap(width: 40, height: 20, fill: .white)
+        for y in 0..<20 {
+            for x in 0..<40 {
+                // Deterministic, so a failure is reproducible.
+                let n = UInt8((x * 7 + y * 13) % 7)  // 0...6, i.e. ±3 around 3
+                let base: UInt8 = x < 20 ? 100 : 160
+                bmp.setPixel(
+                    RGBA8(r: base + n, g: base + n, b: base + n, a: 255),
+                    at: PixelPoint(x: x, y: y)
+                )
+            }
+        }
+        return bmp
+    }
+
+    @Test("Exact match fills almost nothing on noisy artwork")
+    func exactMatchIsUseless() {
+        var bmp = noisyPair()
+        let filled = Raster.floodFill(
+            from: PixelPoint(x: 4, y: 4), with: RGBA8(r: 255, g: 0, b: 0, a: 255), tolerance: 0, into: &bmp
+        )
+        // 20x20 is 400px of left field; an exact match reaches a handful.
+        #expect(filled.width * filled.height < 40, "exact match covered \(filled)")
+    }
+
+    @Test("The shipped default covers the whole noisy field")
+    func defaultCoversTheField() {
+        var bmp = noisyPair()
+        let tolerance = ToolSettings().fillTolerance
+        #expect(tolerance > 6, "the default must clear the artifact floor, not sit in it")
+
+        let filled = Raster.floodFill(
+            from: PixelPoint(x: 4, y: 4), with: RGBA8(r: 255, g: 0, b: 0, a: 255), tolerance: tolerance, into: &bmp
+        )
+        #expect(filled.width == 20 && filled.height == 20, "default covered \(filled), not the field")
+    }
+
+    @Test("The shipped default still stops at a real edge")
+    func defaultRespectsABoundary() {
+        var bmp = noisyPair()
+        let tolerance = ToolSettings().fillTolerance
+        Raster.floodFill(
+            from: PixelPoint(x: 4, y: 4), with: RGBA8(r: 255, g: 0, b: 0, a: 255), tolerance: tolerance, into: &bmp
+        )
+        // The far field must be untouched: a default that bleeds across a
+        // 60-step boundary is worse than one that fills nothing.
+        #expect(bmp.unsafePixel(at: PixelPoint(x: 30, y: 10)) != RGBA8(r: 255, g: 0, b: 0, a: 255))
+    }
+}

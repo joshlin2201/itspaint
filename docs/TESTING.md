@@ -77,12 +77,14 @@ Four tests, and they take about ten minutes to write:
 2. **It undoes to exactly the pixels that were there.** `#expect(engine.canvas == before)`
    catches half-restored patches that a spot check misses.
 3. **It is one undo step, named for the Edit menu.**
-   `#expect(engine.undoStack.undoActionName == "Airbrush")`
+   `#expect(engine.undoStack.undoActionName == "Spray")` — named for the
+   variation, not the tool that owns it, the way a rectangle undoes as
+   "Rectangle" rather than "Shape".
 4. **The degenerate input does nothing** — an empty string, a zero-size drag, a
    click with no drag. `#expect(!engine.canUndo)` proves it did not record an
    empty edit.
 
-Randomness gets a fifth: **it must be reproducible**. The airbrush owns a seeded
+Randomness gets a fifth: **it must be reproducible**. The spray tip owns a seeded
 `SprayRandom`, so `#expect(run() == run())` is a real test. Randomness that
 cannot be reproduced cannot be tested, and a tool nobody can test silently rots.
 

@@ -40,7 +40,19 @@ public struct ToolSettings: Equatable, Sendable {
         brushSize: Int = 2,
         brushShape: Brush.Shape = .round,
         shapeStyle: ShapeStyle = .outline,
-        fillTolerance: Int = 0,
+        // **Not zero.** An exact-match bucket is the right default for flat
+        // synthetic artwork and the wrong one for everything this app is
+        // actually pointed at. Measured on a real screenshot, an exact-match
+        // fill on the flat blue of a menu bar covers 0.00% — the tool appears
+        // broken, because JPEG noise and Retina downscaling mean no two pixels
+        // in a "flat" region are equal.
+        //
+        // The same sweep says where the ceiling is. Coverage is stable from 8
+        // through 32 (2.7% → 3.2% on that menu bar), then falls off a cliff:
+        // at 48 a probe in dark window chrome jumps from 4% to 91% because
+        // adjacent near-blacks in a dark UI are within 48 of each other. 16
+        // clears the artifact floor with the cliff still three times away.
+        fillTolerance: Int = 16,
         cornerRadius: Int = 12,
         highlighterOpacity: Double = 0.38,
         pixelateBlockSize: Int = 12,
@@ -89,9 +101,30 @@ public struct ToolSettings: Equatable, Sendable {
         case .brush:
             (brushShape, max(1, brushSize))
         default:
-            (brushShape == .soft ? .round : brushShape, max(1, brushSize))
+            // Everything else borrows the brush's diameter but not its tip:
+            // a shape outline is a hard edge, and neither soft falloff nor a
+            // spray footprint means anything for one.
+            (brushShape == .round ? .round : hardEquivalent, max(1, brushSize))
         }
     }
+
+    /// The tip a tool that only wants a diameter should use.
+    private var hardEquivalent: Brush.Shape {
+        switch brushShape {
+        case .soft, .spray, .round: .round
+        case .square: .square
+        }
+    }
+
+    /// Whether the current stroke sprays rather than stamps.
+    ///
+    /// **The tip decides, and only the brush's tip.** This used to be
+    /// `ToolKind.isSpray`, which meant the airbrush had to be its own rail
+    /// button to exist at all. Spray is now a nib, so the question is about the
+    /// nib — and it is scoped to the brush because the pencil is a fixed 1px
+    /// point, and a spraying eraser or highlighter is not a thing anyone asked
+    /// for even though both borrow `brushShape` for their diameter.
+    public var isSpraying: Bool { tool == .brush && brushShape.isSpray }
 
     /// The brush the current settings resolve to, mask and all.
     public var brush: Brush {

@@ -7,6 +7,72 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+### Fixed
+- **The step badge counter appeared to stick.** `PaintEngine` is deliberately
+  UI-free and so not `@Observable`, and both the rail cell and the panel hint
+  read the counter through a computed passthrough — invisible to SwiftUI, so
+  they showed whatever number they had rendered first and only moved when
+  something else happened to invalidate them. The counter is now mirrored on
+  `EditorModel` and synced only when it genuinely changes, which keeps the
+  notification exact: reading `revision` instead would re-render the rail on
+  every mouse-moved event of a stroke to track a number that moves once per
+  badge.
+- **Undoing a badge left the counter advanced.** The pixels came back and the
+  next stamp still skipped a number, so the sequence on the canvas stopped
+  matching the one the tool was about to continue. A badge edit now records the
+  number it consumed; undo hands it back and redo takes it again. Recorded on
+  the edit rather than counted from the stack, because trimming the history
+  drops the oldest edits and would silently renumber badges still on screen.
+
+### Changed
+- **The selection actions are icons in both orientations.** Labelled, they
+  truncated to `In…` and `D…` in the fixed-width side panel; dropping the words
+  there left the bottom bar still carrying them, so the same four actions read
+  two different ways depending on which edge the toolbar was on. One rule now,
+  each with its tooltip and accessibility label.
+- **The airbrush is now the brush's spray tip**, not its own rail button. It
+  differed from the brush by one thing — whether coverage builds while you hold
+  still — so it was a nib, not a job. Tip is now Round / Square / Soft / Spray,
+  Flow appears only for Spray, and the rail is eleven cells instead of twelve.
+  A spray stroke undoes as "Spray", the way a rectangle undoes as "Rectangle"
+  rather than "Shape". `A` is no longer a tool shortcut.
+- **The paint bucket now matches loosely by default** (tolerance 16, was 0). On
+  a real screenshot an exact-match fill covers nothing at all: once JPEG noise
+  and Retina downscaling have been through a "flat" region, no two pixels in it
+  are equal. Measured on a capture, the flat blue of a menu bar filled 0.00% at
+  tolerance 0. Coverage is stable from 8 through 32 and then falls off a cliff —
+  at 48 a probe in dark window chrome jumps from 4% to 91%, because adjacent
+  near-blacks in a dark UI are within 48 of each other. 16 clears the noise with
+  the cliff still three times away.
+- **The brush size stops are 2 / 6 / 14 / 28** (were 1 / 4 / 12 / 28). The brush
+  opens at 2, which was not one of them, so the stop row opened with no segment
+  selected — indistinguishable from a disabled control. 1px is the pencil's job
+  and the slider still reaches it.
+- **The step badge's rail cell shows the number it will drop next**, in outline
+  weight. It used to read `1` forever while the panel beside it said "Drops 4
+  next", and it was the only filled glyph in a rail of outline strokes.
+- **The Font row wears the panel's own material.** A stock pop-up button gave
+  the Text panel a third control material in four rows, and the only accent-blue
+  chrome on screen that was not a selection. The menu is still native; the
+  button is not. Each face now previews itself.
+- **Bold, italic and underline draw their cells when off.** All three off in an
+  empty trough, directly above an Align row where one cell is always filled,
+  read as a switched-off control rather than three you can press.
+- **The zoom percentage is the Actual Size button.** There was a dedicated cell
+  behind a divider *and* a tap gesture on the percentage doing the same thing,
+  and the dedicated one wore the glyph that means fit-or-full-screen everywhere
+  else. One control now, and it hovers and presses like its neighbours.
+- **Tool hints carry only what a pointer cannot show you** — a modifier key or a
+  second stage of a gesture. "Drag its edge to move · corners resize · ⌘↩ places
+  it" was three clauses in three grammars that wrapped to a second line and made
+  the Text panel a different height from every other panel.
+- The floating paste bar says **Crop** rather than "Crop to it", and Discard is
+  marked as the destructive one instead of matching the reversible action beside
+  it.
+- One opacity scale (`Tokens.Ink`, `Tokens.Fill`) behind the chrome, replacing
+  24 hand-picked values that included 0.5, 0.55, 0.6 and 0.62 for the same job.
+  The rail's colour chips are drawn at the same radius as the popover's.
+
 ## [0.11.0] — 2026-07-29
 
 **Releases are now signed with a Developer ID and notarised.** The ticket is

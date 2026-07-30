@@ -25,13 +25,13 @@ struct ColourPopover: View {
                 .padding(Tokens.Space.tight)
                 .background {
                     RoundedRectangle(cornerRadius: Tokens.Radius.well, style: .continuous)
-                        .fill(.primary.opacity(0.08))
+                        .fill(.primary.opacity(Tokens.Fill.cell))
                 }
 
             if !model.recentColours.isEmpty {
                 Text("Recent")
                     .font(Tokens.Text.popoverHint)
-                    .foregroundStyle(.primary.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
                 HStack(spacing: Tokens.Space.hair) {
                     ForEach(Array(model.recentColours.enumerated()), id: \.offset) { _, colour in
                         swatch(colour)
@@ -47,7 +47,7 @@ struct ColourPopover: View {
                     Text("Other colour…")
                 }
                 .font(Tokens.Text.popoverHint)
-                .foregroundStyle(.primary.opacity(0.75))
+                .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -73,7 +73,7 @@ struct ColourPopover: View {
                     .font(Tokens.Text.popoverTitle)
                 Text("X swaps · ⇧⌘C opens this")
                     .font(Tokens.Text.popoverHint)
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
             }
 
             Spacer(minLength: 0)

@@ -17,7 +17,7 @@ comparing us will compare us to.
 | Capability | Windows 11 Paint | ItsPaint | Note |
 |---|---|---|---|
 | Pencil / brush / eraser | ✅ | ✅ | |
-| Pen, highlighter | ✅ | ✅ | Plus airbrush, which Paint dropped |
+| Pen, highlighter | ✅ | ✅ | Plus a spray tip on the brush, the airbrush Paint dropped |
 | Shapes | ✅ ~23 | ✅ 15 | Plus dash styles and per-shape fill mode |
 | Text | ✅ revamped, own sub-toolbar | ✅ + bold / italic / underline, resize handles | Ours rasterises on commit; theirs stays editable in a layer |
 | Fill | ✅ | ✅ + tolerance | Paint's bucket has no tolerance control |

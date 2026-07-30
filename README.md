@@ -16,11 +16,11 @@ window.
 
 <br>
 
-![ItsPaint marking up a pasted event-plan screenshot](docs/images/editor-window.png)
+![ItsPaint showing a feature tour drawn with the app](docs/images/editor-window.png)
 
-<sub>A pasted plan, highlighted and annotated in ItsPaint. Reproduce the canvas
-with <code>swift run --package-path Packages/PaintKit paint-demo --scene
-clipboard out.png</code>.</sub>
+<sub>The artwork in this screenshot was produced by PaintKit, the same engine
+used by the editor. The sample is reproducible with
+<code>swift run --package-path Packages/PaintKit paint-demo out.png</code>.</sub>
 
 </div>
 
@@ -38,19 +38,6 @@ clipboard out.png</code>.</sub>
 - **Rotate by any angle**, with the canvas growing to fit the corners.
 - **Native documents and common exports** with no third-party dependencies,
   accounts, telemetry, or cloud service.
-
-## Quick edits, ready to send
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/images/quick-sketch-window.png" alt="A simple room layout sketched in ItsPaint"></td>
-    <td width="50%"><img src="docs/images/transparency-window.png" alt="A paper-airplane sticker with its background removed in ItsPaint"></td>
-  </tr>
-  <tr>
-    <td><strong>Sketch the idea.</strong> Draw a layout, route, or quick correction.</td>
-    <td><strong>Keep transparency.</strong> Remove a plain background with Instant Alpha.</td>
-  </tr>
-</table>
 
 ## Install
 
@@ -90,7 +77,7 @@ Build and run the **ItsPaint** scheme with `⌘R`. Xcode 16 or later is required
 
 | Group | Tools |
 |---|---|
-| **Draw** | Pencil, Brush, Airbrush, Highlighter, Eraser |
+| **Draw** | Pencil, Brush (round / square / soft / spray), Highlighter, Eraser |
 | **Insert** | Shape, Text, Step Badge, Fill, Eyedropper |
 | **Select** | Rectangle, Ellipse, Lasso, Instant Alpha |
 | **Effects** | Pixelate |
@@ -115,11 +102,11 @@ editable `.itspaint` document.
 | Shortcut | Action | Shortcut | Action |
 |---|---|---|---|
 | `P` | Pencil | `B` | Brush |
-| `A` | Airbrush | `H` | Highlighter |
-| `E` | Eraser | `U` | Shape |
-| `T` | Text | `N` | Step Badge |
-| `K` | Fill | `I` | Eyedropper |
-| `M` | Select | `R` | Pixelate |
+| `H` | Highlighter | `E` | Eraser |
+| `U` | Shape | `T` | Text |
+| `N` | Step Badge | `K` | Fill |
+| `I` | Eyedropper | `M` | Select |
+| `R` | Pixelate | | |
 | `X` | Swap colours | `[` / `]` | Change tool size |
 | `Space` | Pan | `⌥1`–`⌥9` | Choose a shape |
 

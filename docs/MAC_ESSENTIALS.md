@@ -13,10 +13,9 @@ implemented. This is the checklist a reviewer (or App Review) walks.
 |---|---|---|---|---|
 | `P` | Pencil | | `T` | Text |
 | `B` | Brush | | `N` | Step badge |
-| `A` | Airbrush | | `K` | Fill |
-| `H` | Highlighter | | `I` | Eyedropper |
-| `E` | Eraser | | `M` | Select |
-| `U` | Shape | | | |
+| `H` | Highlighter | | `K` | Fill |
+| `E` | Eraser | | `I` | Eyedropper |
+| `U` | Shape | | `M` | Select |
 | `R` | Pixelate (mosaic) | | | |
 
 The lasso and Instant Alpha are *kinds* of selection, not separate tools —

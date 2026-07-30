@@ -2,18 +2,24 @@ import Foundation
 
 /// The tool set.
 ///
-/// Twelve rail tools, grouped by job. Variations stay inside the tool that owns
-/// them: fifteen shapes share one Shape button, and four ways to select share
-/// one Select button. This keeps Airbrush and the Polygon shape available
-/// without turning every variation into another rail button.
+/// Eleven rail tools, grouped by job. Variations stay inside the tool that owns
+/// them: fifteen shapes share one Shape button, four ways to select share one
+/// Select button, and four nibs — including the airbrush — share one Brush
+/// button. This keeps the whole set available without turning every variation
+/// into another rail button.
 ///
-/// The set also covers screenshot markup directly: Highlighter, arrows, step
-/// badges, crop, and Pixelate all sit one action away.
+/// **Airbrush used to be the twelfth.** It was a rail cell that differed from
+/// Brush by one thing: whether coverage builds while you hold still. Same size
+/// control, same colour, same drag. That is a nib, not a job, so it moved into
+/// the Tip row where round, square and soft already live, and the rail got one
+/// cell shorter on the axis a picture needs most.
+///
+/// The set covers screenshot markup directly: Highlighter, arrows, step badges,
+/// crop, and Pixelate all sit one action away.
 public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
     // Draw
     case pencil
     case brush
-    case airbrush
     case highlighter
     case eraser
     // Insert
@@ -32,7 +38,6 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
         switch self {
         case .pencil: "Pencil"
         case .brush: "Brush"
-        case .airbrush: "Airbrush"
         case .highlighter: "Highlighter"
         case .eraser: "Eraser"
         case .shape: "Shape"
@@ -51,12 +56,13 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
         switch self {
         case .pencil: "pencil"
         case .brush: "paintbrush"
-        case .airbrush: "sprinkler.and.droplets.fill"
         case .highlighter: "highlighter"
         case .eraser: "eraser"
         case .shape: "square.on.circle"
         case .text: "textformat"
-        case .badge: "1.circle.fill"
+        // Outline, like every other tool. The rail overrides this with the
+        // number actually about to be dropped; this is the menu fallback.
+        case .badge: "1.circle"
         // SF Symbols has no paint bucket, so the rail draws its own (see
         // `BucketGlyph`); this is the fallback for menus and the accessibility
         // description.
@@ -73,7 +79,6 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
         switch self {
         case .pencil: "p"
         case .brush: "b"
-        case .airbrush: "a"
         case .highlighter: "h"
         case .eraser: "e"
         case .shape: "u"
@@ -88,14 +93,10 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
 
     public var isFreehand: Bool {
         switch self {
-        case .pencil, .brush, .airbrush, .highlighter, .eraser: true
+        case .pencil, .brush, .highlighter, .eraser: true
         default: false
         }
     }
-
-    /// Sprays rather than stamps: coverage builds while the button is held,
-    /// even when the pointer is still.
-    public var isSpray: Bool { self == .airbrush }
 
     /// Drags out a rectangle that is a *region*, not a mark.
     public var isRegionDrag: Bool {
@@ -107,7 +108,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
 
     public var usesBrushSize: Bool {
         switch self {
-        case .brush, .airbrush, .highlighter, .eraser, .shape, .badge: true
+        case .brush, .highlighter, .eraser, .shape, .badge: true
         default: false
         }
     }
@@ -120,7 +121,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
     /// would imply an area those tools do not have.
     public var showsBrushPreview: Bool {
         switch self {
-        case .pencil, .brush, .airbrush, .highlighter, .eraser, .shape, .badge: true
+        case .pencil, .brush, .highlighter, .eraser, .shape, .badge: true
         default: false
         }
     }
@@ -133,7 +134,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
     /// Rail order, grouped by job. Three short runs scan far faster than one
     /// undifferentiated column.
     public static let groups: [[ToolKind]] = [
-        [.pencil, .brush, .airbrush, .highlighter, .eraser],
+        [.pencil, .brush, .highlighter, .eraser],
         [.shape, .text, .badge, .fill, .eyedropper],
         [.select, .pixelate],
     ]
