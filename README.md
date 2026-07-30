@@ -54,7 +54,11 @@ clipboard out.png</code>.</sub>
 
 ## Install
 
-Download the latest beta from [Releases](https://github.com/joshlin2201/itspaint/releases),
+```bash
+brew install --cask joshlin2201/itspaint/itspaint
+```
+
+Or download the latest beta from [Releases](https://github.com/joshlin2201/itspaint/releases),
 open the disk image, and drag **ItsPaint** to Applications.
 
 Releases are signed with a Developer ID and notarised by Apple, so Gatekeeper
