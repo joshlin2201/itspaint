@@ -1100,14 +1100,14 @@ public final class PaintEngine {
         _ = cancelStroke()
         let floatingDirty = discardFloating()
         guard let edit = undoStack.undo(on: &canvas) else { return floatingDirty }
-        return edit.before.rect.union(floatingDirty)
+        return edit.dirtyRect.union(floatingDirty)
     }
 
     @discardableResult
     public func redo() -> PixelRect {
         _ = cancelStroke()
         guard let edit = undoStack.redo(on: &canvas) else { return .empty }
-        return edit.after.rect
+        return edit.dirtyRect
     }
 
     // MARK: - Internals

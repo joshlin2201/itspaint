@@ -113,6 +113,18 @@ public struct PixelEdit: Equatable, Sendable {
         before.byteCount + after.byteCount + (resize?.byteCount ?? 0)
     }
 
+    /// The area a caller has to repaint after undoing or redoing this edit.
+    ///
+    /// **Not `before.rect`.** A resize edit carries whole canvases and leaves
+    /// both patches empty, so reading the patch rect reported *nothing* dirty —
+    /// which meant undoing a resize swapped the canvas underneath a view that
+    /// never repainted, and never told anyone the size had changed either. The
+    /// union of both canvases covers the shrink and the grow directions alike.
+    public var dirtyRect: PixelRect {
+        guard let resize else { return before.rect }
+        return resize.before.bounds.union(resize.after.bounds)
+    }
+
     public func undo(on bitmap: inout Bitmap) {
         if let resize { bitmap = resize.before } else { before.apply(to: &bitmap) }
     }

@@ -209,6 +209,7 @@ final class EditorModel {
 
     init(engine: PaintEngine) {
         self.engine = engine
+        self.lastKnownCanvasSize = (engine.canvas.width, engine.canvas.height)
         self.tool = engine.settings.tool
         self.shapeKind = engine.settings.shapeKind
         self.brushSize = engine.settings.brushSize
@@ -251,6 +252,9 @@ final class EditorModel {
             palette = metadata.palette
         }
         lastKnownUndoCount = 0
+        // Re-seed: an open or a revert is not a resize, and comparing against
+        // the previous document's size would announce one.
+        lastKnownCanvasSize = (canvas.width, canvas.height)
         pointerPosition = nil
         revision &+= 1
     }
@@ -305,16 +309,22 @@ final class EditorModel {
     /// go and resize by hand before you can see what you just pasted.
     @ObservationIgnored var onCanvasResized: ((_ width: Int, _ height: Int) -> Void)?
 
-    @ObservationIgnored private var lastKnownCanvasSize: (width: Int, height: Int)?
+    /// Seeded at init, **not** lazily on first use.
+    ///
+    /// Lazy seeding swallowed the first resize: the initial `noteChange` found
+    /// no baseline, recorded the already-grown size and returned without
+    /// announcing anything. Pasting an oversized image as the very first action
+    /// in a document therefore grew the canvas and left the window alone — the
+    /// exact case the hook exists for.
+    @ObservationIgnored private var lastKnownCanvasSize: (width: Int, height: Int) = (0, 0)
 
     /// Notice a size change and tell whoever is listening. Called from the one
     /// place every pixel change already funnels through.
     private func noteCanvasSizeIfChanged() {
-        let size = (canvas.width, canvas.height)
-        defer { lastKnownCanvasSize = size }
-        guard let last = lastKnownCanvasSize else { return }
-        guard last != size else { return }
-        onCanvasResized?(size.0, size.1)
+        let size = (width: canvas.width, height: canvas.height)
+        guard lastKnownCanvasSize != size else { return }
+        lastKnownCanvasSize = size
+        onCanvasResized?(size.width, size.height)
     }
 
     /// Pulls engine-side changes (eyedropper, paste's tool switch) back to the UI.

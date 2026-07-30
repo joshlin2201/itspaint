@@ -236,3 +236,71 @@ struct FreeformRotateTests {
         }
     }
 }
+
+/// Undo and redo have to *report* what they changed, not just do it.
+///
+/// A resize edit carries whole canvases and leaves both rect patches empty, so
+/// asking the patch what was dirty answered "nothing". The canvas was replaced
+/// and the view was told to repaint zero pixels.
+@Suite("Resize undo reports its dirty area")
+@MainActor
+struct ResizeDirtyRectTests {
+
+    @Test("Undoing a growth reports an area covering both sizes")
+    func undoReportsUnion() {
+        let engine = PaintEngine(canvas: Bitmap(width: 100, height: 100, fill: .white))
+        engine.paste(Bitmap(width: 300, height: 200, fill: PaintColour(hex: "FF0000")!.rgba8))
+        engine.commitFloating()
+        #expect(engine.canvas.width == 300)
+
+        // Two edits: the canvas growing to fit, then the pixels going down.
+        // Walk back until the size actually changes and check *that* step
+        // reported something to repaint.
+        var resizeDirty = PixelRect.empty
+        while engine.canUndo {
+            let before = engine.canvas.width
+            let dirty = engine.undo()
+            if engine.canvas.width != before { resizeDirty = dirty; break }
+        }
+
+        #expect(!resizeDirty.isEmpty, "undoing a resize reported nothing to repaint")
+        // Wide enough to cover the larger of the two canvases.
+        #expect(resizeDirty.width >= 300)
+        #expect(resizeDirty.height >= 200)
+        #expect(engine.canvas.width == 100)
+    }
+
+    @Test("Redoing a growth also reports it")
+    func redoReportsUnion() {
+        let engine = PaintEngine(canvas: Bitmap(width: 100, height: 100, fill: .white))
+        engine.paste(Bitmap(width: 300, height: 200, fill: PaintColour(hex: "FF0000")!.rgba8))
+        engine.commitFloating()
+        while engine.canUndo { _ = engine.undo() }
+        #expect(engine.canvas.width == 100)
+
+        var resizeDirty = PixelRect.empty
+        while engine.canRedo {
+            let before = engine.canvas.width
+            let dirty = engine.redo()
+            if engine.canvas.width != before { resizeDirty = dirty; break }
+        }
+
+        #expect(!resizeDirty.isEmpty, "redoing a resize reported nothing to repaint")
+        #expect(resizeDirty.width >= 300)
+        #expect(engine.canvas.width == 300)
+    }
+
+    @Test("An ordinary edit still reports only the pixels it touched")
+    func normalEditStaysScoped() {
+        // The whole point of rect patches: a small stroke on a big canvas must
+        // not invalidate the whole thing.
+        let engine = PaintEngine(canvas: Bitmap(width: 400, height: 400, fill: .white))
+        engine.settings.tool = .pencil
+        engine.beginStroke(at: PixelPoint(x: 10, y: 10))
+        engine.endStroke(at: PixelPoint(x: 20, y: 20))
+
+        let dirty = engine.undo()
+        #expect(!dirty.isEmpty)
+        #expect(dirty.width < 100, "a small stroke invalidated \(dirty.width)px")
+    }
+}
