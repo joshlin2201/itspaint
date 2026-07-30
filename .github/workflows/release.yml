@@ -244,7 +244,7 @@ jobs:
               --apple-id "$NOTARY_APPLE_ID" \
               --password "$NOTARY_PASSWORD" \
               --team-id "${NOTARY_TEAM_ID:-$SIGN_TEAM}" \
-              --wait --timeout 60m 2>&1 | tee "$SUBMIT_LOG"
+              --wait --timeout 75m 2>&1 | tee "$SUBMIT_LOG"
             SUBMIT_STATUS=${PIPESTATUS[0]}
             set -e
             # Surface the id even on failure: a submission that timed out here
@@ -252,14 +252,25 @@ jobs:
             # only way to find out why it was rejected.
             SUBMISSION_ID="$(awk '/^ *id: /{print $2; exit}' "$SUBMIT_LOG")"
             echo "Notarisation submission id: ${SUBMISSION_ID:-unknown}"
-            if [[ $SUBMIT_STATUS -ne 0 ]]; then
+            # A wait that ran out is **not** a rejection. Apple queues the
+            # submission and keeps working on it; both of this project's first
+            # two submissions were Accepted well after our wait gave up. So a
+            # timeout leaves the artifacts intact and unstapled rather than
+            # throwing away a green build, and says exactly how to finish it.
+            if grep -q "Timeout of" "$SUBMIT_LOG"; then
+              echo "::warning::Notarisation did not finish inside the wait. The submission is still queued at Apple."
+              echo "::warning::Check it with: xcrun notarytool log $SUBMISSION_ID --keychain-profile <profile>"
+              echo "::warning::Once accepted, re-run this workflow to notarise and staple a fresh build."
+            elif [[ $SUBMIT_STATUS -ne 0 ]]; then
+              # A real failure — rejected, bad credentials, malformed archive.
               echo "notarytool failed; inspect with:" >&2
-              echo "  xcrun notarytool log ${SUBMISSION_ID:-<id>} --apple-id … --team-id …" >&2
+              echo "  xcrun notarytool log ${SUBMISSION_ID:-<id>} --keychain-profile <profile>" >&2
               exit $SUBMIT_STATUS
+            else
+              xcrun stapler staple "$DMG"
+              xcrun stapler staple "$APP"
+              NOTARISED=true
             fi
-            xcrun stapler staple "$DMG"
-            xcrun stapler staple "$APP"
-            NOTARISED=true
           else
             echo "::warning::Not notarised — NOTARY_APPLE_ID / NOTARY_PASSWORD are unset."
           fi
