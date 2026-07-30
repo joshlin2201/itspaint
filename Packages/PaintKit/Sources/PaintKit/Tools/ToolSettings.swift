@@ -81,6 +81,20 @@ public struct ToolSettings: Equatable, Sendable {
     /// Range of the size control, and the bounds every size step honours.
     public static let sizeRange = 1...96
 
+    /// The four one-click sizes, mirroring the weights the classic Size dropdown
+    /// offered.
+    ///
+    /// **Here rather than in the options panel** because the first stop has to be
+    /// the size a fresh brush opens at. When these lived beside the view that
+    /// draws them, the two numbers were in different modules and drifted: the
+    /// stops were 1 / 4 / 12 / 28 while the brush opened at 2, so the row every
+    /// new user met was a segmented control with no segment selected —
+    /// indistinguishable from a disabled one. Same file, one test, cannot drift.
+    ///
+    /// 1px is deliberately absent: that is the pencil's whole job, and the slider
+    /// still reaches it.
+    public static let sizeStops = [2, 6, 14, 28]
+
     /// Shape and diameter the current settings resolve to.
     ///
     /// Split out from `brush` because building a brush also builds its coverage

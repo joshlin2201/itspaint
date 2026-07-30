@@ -19,6 +19,15 @@ final class DrawingDocument: NSDocument {
     /// way instead of silently converting the user's PNG into something else.
     private var sourceFormat: ImageCodec.Format?
 
+    /// Kept so it can be torn down: without this, every document ever opened
+    /// leaves an entry in the notification centre for the life of the process.
+    ///
+    /// Removed in `close()` rather than `deinit` because the token is not
+    /// `Sendable`, and a `deinit` is nonisolated — Swift 6 will not let one touch
+    /// main-actor state, which is the correct complaint. `close()` is the
+    /// documented teardown point and it runs on the main actor.
+    private var clipboardObserver: NSObjectProtocol?
+
     static let defaultCanvasSize = (width: 1280, height: 800)
 
     // MARK: - Lifecycle
@@ -65,6 +74,10 @@ final class DrawingDocument: NSDocument {
     override func close() {
         // Otherwise a stale closure keeps writing into a closed document.
         ColourPanelController.shared.relinquish(owner: model.colourPanelOwner)
+        if let clipboardObserver {
+            NotificationCenter.default.removeObserver(clipboardObserver)
+            self.clipboardObserver = nil
+        }
         super.close()
     }
 
@@ -134,6 +147,18 @@ final class DrawingDocument: NSDocument {
             guard let window, let self, Settings.shared.resizeWindowWithCanvas else { return }
             self.growWindow(window, toFitCanvas: (width, height))
         }
+
+        // The clipboard is the one piece of state that changes while this app is
+        // *not* frontmost — copying a screenshot happens somewhere else, which is
+        // the whole workflow. Re-reading on activation is what keeps the Paste
+        // button from being stale the moment it matters most.
+        clipboardObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.model.refreshClipboardState() }
+        }
+        model.refreshClipboardState()
 
         let controller = NSWindowController(window: window)
         controller.shouldCascadeWindows = true

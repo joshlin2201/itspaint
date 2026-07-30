@@ -188,6 +188,10 @@ extension DrawingDocument {
             return true
 
         case #selector(paste(_:)):
+            // Menu validation runs as the menu opens, which is a fine moment to
+            // look: change-count guarded, so this costs nothing when nobody has
+            // copied anything.
+            model.refreshClipboardState()
             return model.canPaste
 
         case #selector(selectShapeFromMenu(_:)):

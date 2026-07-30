@@ -198,7 +198,20 @@ struct TitlebarScrim: View {
 /// a screenshot usually is: you would be marking something up and the readout
 /// would be sitting on top of it. The header had unused space and these have a
 /// natural home in it.
-struct WindowActions: View {
+/// What you do *to* the document: the clipboard, history, and zoom.
+///
+/// **This is what the middle of the header is for.** The title sat on the left,
+/// every control sat on the right, and between them ran about 1,100pt of nothing
+/// on a normal window — the emptiest band in the app, directly above the
+/// artwork. Preview, Keynote and Xcode all put the controls you actually work
+/// with in the *centre* of the titlebar; the ones you reach for at the end of a
+/// session go to the far edge.
+///
+/// Cut, copy and paste live here rather than in the tool rail because they are
+/// not tools. The rail is a list of things that make marks; the clipboard acts on
+/// the document, like undo and zoom, and grouping it with them is what keeps the
+/// rail a short list you can scan.
+struct WorkingActions: View {
     @Bindable var model: EditorModel
 
     var body: some View {
@@ -208,6 +221,25 @@ struct WindowActions: View {
         let _ = model.revision
 
         HStack(spacing: Tokens.Space.tight) {
+            HeaderGroup {
+                HeaderButton(
+                    symbol: "scissors", title: "Cut",
+                    shortcut: "⌘X", isEnabled: model.hasSelection
+                ) { model.cutSelection() }
+                HeaderButton(
+                    symbol: "square.on.square", title: "Copy",
+                    shortcut: "⌘C", isEnabled: model.hasSelection
+                ) { model.copySelection() }
+                HeaderButton(
+                    // `clipboard` when there is something on it, and the same
+                    // glyph without its page when there is not — so the button
+                    // says *why* it is unavailable rather than just being dim.
+                    symbol: model.canPaste ? "doc.on.clipboard" : "clipboard",
+                    title: model.canPaste ? "Paste image" : "Nothing to paste",
+                    shortcut: "⌘V", isEnabled: model.canPaste
+                ) { model.paste() }
+            }
+
             HeaderGroup {
                 HeaderButton(
                     symbol: "arrow.uturn.backward", title: "Undo",
@@ -243,22 +275,34 @@ struct WindowActions: View {
                     isEnabled: model.zoom < (EditorModel.zoomSteps.last ?? 1)
                 ) { model.zoomIn() }
             }
-
-            HeaderGroup {
-                // Share is in the File menu, but a markup app's whole purpose
-                // is getting the result to someone else — burying its most
-                // common last step one menu down is the wrong emphasis.
-                ShareButton()
-                HeaderButton(symbol: "doc.on.doc", title: "Duplicate", shortcut: "⇧⌘S") {
-                    model.duplicateDocument()
-                }
-            }
         }
     }
 
     private var zoomLabel: String {
         let percent = model.zoom * 100
         return percent < 100 ? String(format: "%.0f%%", percent) : "\(Int(percent))%"
+    }
+}
+
+/// What you do *with* the finished thing, at the far edge.
+///
+/// Separated from the working cluster on purpose. Share and Duplicate are the
+/// last two actions of a session, not part of the loop — sitting them beside Undo
+/// gave a destructive-ish and a terminal action the same weight as the one you
+/// press forty times an hour.
+struct DocumentActions: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
+        HeaderGroup {
+            // Share is in the File menu, but a markup app's whole purpose is
+            // getting the result to someone else — burying its most common last
+            // step one menu down is the wrong emphasis.
+            ShareButton()
+            HeaderButton(symbol: "doc.on.doc", title: "Duplicate", shortcut: "⇧⌘S") {
+                model.duplicateDocument()
+            }
+        }
     }
 }
 

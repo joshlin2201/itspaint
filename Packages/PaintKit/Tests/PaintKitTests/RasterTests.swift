@@ -295,6 +295,37 @@ struct FloodFillTests {
     }
 }
 
+/// The size-stop row has to have something selected the moment it appears.
+///
+/// It is a segmented control, so "nothing selected" is indistinguishable from
+/// "disabled" — and the stops shipped as 1 / 4 / 12 / 28 while the brush opens at
+/// 2, so the very first thing a new user saw was four unselected bars. The two
+/// numbers used to live in different modules, which is exactly why nothing caught
+/// it; they are now in the same file as each other and as this test.
+@Suite("Size stops")
+struct SizeStopTests {
+
+    @Test("The default brush size is the first stop")
+    func defaultSizeIsAStop() {
+        let stops = ToolSettings.sizeStops
+        let fresh = ToolSettings().brushSize
+        #expect(
+            stops.first == fresh,
+            "the brush opens at \(fresh) but the stops start at \(stops.first as Int?), so the stop row opens with no segment selected"
+        )
+    }
+
+    @Test("Every stop is reachable and they ascend")
+    func stopsAreOrderedAndInRange() {
+        let stops = ToolSettings.sizeStops
+        #expect(stops == stops.sorted())
+        #expect(Set(stops).count == stops.count)
+        for stop in stops {
+            #expect(ToolSettings.sizeRange.contains(stop), "\(stop) is outside the slider's range")
+        }
+    }
+}
+
 /// The bucket's default tolerance has to work on a *photograph of a screen*,
 /// which is the only kind of image this app is usually pointed at.
 ///

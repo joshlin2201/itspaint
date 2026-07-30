@@ -112,33 +112,3 @@ struct ToolbarGeometryTests {
         #expect(total <= usable, "the rail needs \(total)pt but only \(usable)pt is on offer")
     }
 }
-
-/// The size-stop row has to have something selected the moment it appears.
-///
-/// It is a segmented control, so "nothing selected" is indistinguishable from
-/// "disabled" — and the stops shipped as 1 / 4 / 12 / 28 while the brush opens at
-/// 2, so the very first thing a new user saw was four unselected bars. The two
-/// numbers live in different targets, which is exactly why nothing caught it.
-@Suite("Size stops")
-struct SizeStopTests {
-
-    @Test("The default brush size is one of the stops")
-    func defaultSizeIsAStop() {
-        let stops = ToolOptions.sizeStops
-        let fresh = ToolSettings().brushSize
-        #expect(
-            stops.contains(fresh),
-            "the brush opens at \(fresh), which is not one of \(stops), so the stop row opens with no segment selected"
-        )
-    }
-
-    @Test("Every stop is reachable and they ascend")
-    func stopsAreOrderedAndInRange() {
-        let stops = ToolOptions.sizeStops
-        #expect(stops == stops.sorted())
-        #expect(Set(stops).count == stops.count)
-        for stop in stops {
-            #expect(ToolSettings.sizeRange.contains(stop), "\(stop) is outside the slider's range")
-        }
-    }
-}

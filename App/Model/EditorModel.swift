@@ -261,6 +261,11 @@ final class EditorModel {
         self.isTextUnderlined = engine.settings.textStyle.isUnderlined
         self.foreground = engine.colours.foreground
         self.background = engine.colours.background
+        // Seed rather than leave the cache empty. A document opened while the
+        // clipboard already holds a screenshot is the most common way this app
+        // gets used, and it would have shown Paste disabled until something else
+        // happened to refresh it.
+        refreshClipboardState()
     }
 
     convenience init(canvas: Bitmap) {
@@ -500,8 +505,29 @@ final class EditorModel {
         noteChange(engine.deleteSelection())
     }
 
-    var canPaste: Bool {
-        Bitmap.canDecode(pasteboard: .general)
+    /// Whether the clipboard is holding something this app can paste.
+    ///
+    /// **Cached against the pasteboard's change count.** Asking the pasteboard
+    /// directly is cross-process IPC, and a header button that reads it would ask
+    /// on every SwiftUI render pass — including every frame of a drag. The change
+    /// count is the cheap way to know whether the answer could possibly have
+    /// moved, which it only does when someone copies something.
+    private(set) var canPaste: Bool = false
+
+    @ObservationIgnored private var seenPasteboardChange = -1
+
+    /// Re-read the clipboard if it has changed since the last look.
+    ///
+    /// Called when the app or this window becomes active, which is exactly when
+    /// the answer can have changed without us: the whole point of this app is
+    /// that you copy a screenshot *somewhere else* and come back here to mark it
+    /// up, so the interesting transition always happens while we are not frontmost.
+    func refreshClipboardState() {
+        let change = NSPasteboard.general.changeCount
+        guard change != seenPasteboardChange else { return }
+        seenPasteboardChange = change
+        let available = Bitmap.canDecode(pasteboard: .general)
+        if canPaste != available { canPaste = available }
     }
 
     func paste() {

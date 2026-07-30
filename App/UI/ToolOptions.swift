@@ -346,7 +346,7 @@ struct ToolOptions: View {
         }
         OptionRow(nil) {
             SegmentTrack {
-                ForEach(Self.sizeStops, id: \.self) { stop in
+                ForEach(ToolSettings.sizeStops, id: \.self) { stop in
                     let isSelected = model.brushSize == stop
                     Button {
                         model.brushSize = stop
@@ -372,16 +372,6 @@ struct ToolOptions: View {
         }
     }
 
-    /// **The first stop is the default size**, so the track is never showing
-    /// four identical unselected bars on a fresh launch.
-    ///
-    /// The stops used to be 1 / 4 / 12 / 28, chosen to mirror the four weights
-    /// the classic Size dropdown offered. But the brush opens at 2, which is not
-    /// one of them, so the row every new user saw first was a segmented control
-    /// with no segment selected — indistinguishable from a disabled one, and the
-    /// one row in the panel that never explained itself. 1px is the pencil's
-    /// whole job anyway, and the slider still reaches it.
-    static let sizeStops = [2, 6, 14, 28]
 
     // MARK: - Selection
 

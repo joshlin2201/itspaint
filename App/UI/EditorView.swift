@@ -314,28 +314,58 @@ struct EditorView: View {
 
     // MARK: - Rows
 
+    /// **Three zones: what this is, what you are doing, what you do with it.**
+    ///
+    /// The working cluster is centred on the *window*, not spaced between its
+    /// neighbours. Two flexible spacers would put it at the midpoint of whatever
+    /// is left over, which means it slides every time the filename changes length
+    /// — a control you have to re-find is a control you stop reaching for. Centred
+    /// on the window it is in the same place in every document.
+    ///
+    /// Below `centredClusterMinimum` there is not room for three zones without
+    /// the cluster colliding with the title, so the row falls back to the layout
+    /// it had before: everything trailing, title truncating. Shedding a layout is
+    /// the same trick the rail uses when it drops palette columns.
     private var titleRow: some View {
-        HStack(spacing: Tokens.Space.comfortable) {
-            // Clear the traffic lights.
-            Color.clear.frame(width: Tokens.Chrome.trafficLightClearance, height: 1)
+        GeometryReader { proxy in
+            let hasRoomToCentre = proxy.size.width >= Self.centredClusterMinimum
 
-            DocumentTitle(
-                name: model.documentName,
-                isEdited: model.isEdited,
-                size: model.canvasSize
-            )
-            // The title yields before the controls do. A long filename should
-            // truncate in the middle, not push Undo off the window.
-            .layoutPriority(-1)
+            ZStack {
+                if hasRoomToCentre {
+                    WorkingActions(model: model)
+                        .fixedSize()
+                }
 
-            Spacer(minLength: Tokens.Space.base)
+                HStack(spacing: Tokens.Space.comfortable) {
+                    // Clear the traffic lights.
+                    Color.clear.frame(width: Tokens.Chrome.trafficLightClearance, height: 1)
 
-            WindowActions(model: model)
-                .fixedSize()
+                    DocumentTitle(
+                        name: model.documentName,
+                        isEdited: model.isEdited,
+                        size: model.canvasSize
+                    )
+                    // The title yields before the controls do. A long filename
+                    // should truncate in the middle, not push Undo off the window.
+                    .layoutPriority(-1)
+
+                    Spacer(minLength: Tokens.Space.base)
+
+                    if !hasRoomToCentre {
+                        WorkingActions(model: model).fixedSize()
+                    }
+                    DocumentActions(model: model).fixedSize()
+                }
+            }
+            .padding(.horizontal, Tokens.Space.comfortable)
+            .frame(height: Tokens.Chrome.titleReserve, alignment: .center)
         }
-        .padding(.horizontal, Tokens.Space.comfortable)
-        .frame(height: Tokens.Chrome.titleReserve, alignment: .center)
+        .frame(height: Tokens.Chrome.titleReserve)
     }
+
+    /// Traffic lights, a title worth reading, the cluster, and the document
+    /// actions, with the gaps between them. Below this the cluster overlaps.
+    private static let centredClusterMinimum: CGFloat = 940
 
     private var readOutRow: some View {
         PointerReadout(model: model)
