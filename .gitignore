@@ -32,3 +32,4 @@ fastlane/Preview.html
 TestResults*.xcresult
 *.profraw
 *.profdata
+.worktrees/

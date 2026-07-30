@@ -58,7 +58,7 @@ enum SocialPreview {
             into: &canvas
         )
         TextRenderer.draw(
-            "Paste, mark up,",
+            "A focused paint app",
             in: PixelRect(x: 74, y: 286, width: 430, height: 46),
             style: TextRenderer.Style(
                 fontName: "Helvetica",
@@ -68,7 +68,7 @@ enum SocialPreview {
             into: &canvas
         )
         TextRenderer.draw(
-            "and send.",
+            "for macOS.",
             in: PixelRect(x: 74, y: 334, width: 430, height: 46),
             style: TextRenderer.Style(
                 fontName: "Helvetica",

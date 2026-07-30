@@ -34,10 +34,5 @@ let package = Package(
             dependencies: ["PaintKit"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(
-            name: "PaintDemoTests",
-            dependencies: ["PaintDemo"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
-        ),
     ]
 )

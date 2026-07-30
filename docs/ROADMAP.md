@@ -89,10 +89,16 @@ already exists.
   `xattr`. What made it slow was not configuration: the first submissions sat
   over an hour in Apple's queue while CI treated a ran-out wait as a rejection,
   and once one had cleared the rest took under two minutes.
-- **A Homebrew cask.** `brew install --cask itspaint` is how Mac developers
-  install Mac software. One small PR, permanent discoverability, automatic
-  updates. **Unblocked now that releases are notarised** — this is the next
-  distribution step.
+- ~~**A Homebrew cask.**~~ **Shipped as a personal tap:**
+  `brew install --cask joshlin2201/itspaint/itspaint`
+  ([joshlin2201/homebrew-itspaint](https://github.com/joshlin2201/homebrew-itspaint)).
+  Verified with `brew style`, `brew livecheck`, `brew install --cask` and
+  `brew uninstall --zap`, then reinstalled from the published remote. The
+  **official** `homebrew-cask` repo needs 30 forks **or** 30 watchers **or** 75
+  stars — tripled to 90/90/**225** when the repository owner submits it — and a
+  repository at least 30 days old. So the official cask is gated on exposure
+  rather than on anything we build. Same cask file either way; only the venue
+  changes. See [GROWTH](GROWTH.md).
 - **PaintKit published as a standalone package.** It is already separate,
   dependency-free and covered by 211 of its own tests. A README and a tag turn
   it into something other people can build on — and into the thing that
