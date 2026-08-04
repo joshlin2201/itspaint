@@ -35,7 +35,8 @@ window.
   than it, and the window follows, so nothing is cropped when you place it.
 - **Rotate by any angle**, with the canvas growing to fit the corners.
 - **Native documents and common exports** with no third-party dependencies,
-  accounts, telemetry, or cloud service.
+  accounts, telemetry, or cloud service — and [three commands](#no-network-and-how-to-check)
+  that check it.
 
 ## Install
 
@@ -121,6 +122,44 @@ Export supports PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF, and ICO when the
 corresponding encoder is available in the installed macOS version. The export
 panel includes format and scale controls. Formats without alpha are flattened
 onto the second colour.
+
+## No network, and how to check
+
+ItsPaint never contacts anything. That is a claim, so here is how to falsify it.
+
+The sandbox is the part that does not require trusting the source. Neither
+`com.apple.security.network.client` nor `.server` is requested, so the kernel
+refuses a socket regardless of what the code asks for:
+
+```bash
+codesign -d --entitlements - --xml /Applications/ItsPaint.app | plutil -p -
+```
+
+Three entitlements come back — the sandbox itself, read-write access to the
+files chosen in an open or save panel, and app-scoped bookmarks so recent
+documents reopen without re-prompting. Nothing else.
+
+Nothing links against a networking framework, and nothing links outside the
+system at all:
+
+```bash
+otool -L /Applications/ItsPaint.app/Contents/MacOS/ItsPaint
+```
+
+No `CFNetwork`, no `Network.framework`, no bundled dylib — every entry on both
+architectures is an Apple framework or the Swift runtime.
+
+In the source, across 5,838 lines of engine and 8,251 lines of app:
+
+```bash
+grep -rniE 'URLSession|NWConnection|import Network|CFSocket|getaddrinfo' App Packages
+```
+
+Zero matches. `Package.swift` declares no external dependency, so there is no
+third-party code to audit behind that.
+
+None of this is a promise about future versions. It is three commands that run
+against the build you have.
 
 ## Design and implementation
 

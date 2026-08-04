@@ -8,6 +8,14 @@ version may still carry breaking changes to the document format.
 ## [Unreleased]
 
 ### Added
+- **The privacy claim is now checkable rather than asserted.** "No network,
+  accounts or telemetry" is the kind of line every app writes, so the README now
+  carries the three commands that test it against an installed build: the
+  entitlements the binary actually ships with (no `network.client`, no
+  `network.server`, so the sandbox refuses a socket whatever the code does), the
+  `otool -L` output (no `CFNetwork`, no `Network.framework`, nothing outside the
+  system on either architecture), and a `grep` for the networking APIs across
+  the source, which returns nothing.
 - **A README workflow reel** (`docs/images/markup-reel.gif`): paste a settings
   sheet, drop three step badges, pixelate the API token — nine seconds, 150 KB,
   and every frame is a real editor window rendered by `WindowCaptureTests`,
