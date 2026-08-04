@@ -5,7 +5,7 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
-## [Unreleased]
+## [0.12.0] — 2026-08-03
 
 ### Added
 - **The privacy claim is now checkable rather than asserted.** "No network,
@@ -316,6 +316,7 @@ First public beta.
   one would be a dependency this app does not have. AVIF covers the same need.
 - Text is pixels once committed; re-editing means undo and retype.
 
-[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/joshlin2201/itspaint/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/joshlin2201/itspaint/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/joshlin2201/itspaint/releases/tag/v0.10.0

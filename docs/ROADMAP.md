@@ -4,7 +4,7 @@ Where this goes next, in the order it should go, with the reasoning attached.
 Anything not listed here is not planned; anything in **Not planned** is a settled
 no rather than an open question.
 
-Status: **0.11.0 beta.** The engine and the chrome are done and tested; what
+Status: **0.12.0 beta.** The engine and the chrome are done and tested; what
 remains is depth in markup and the last mile to a shippable release.
 
 ---
@@ -156,8 +156,8 @@ still carry breaking changes to the document format.
 3. Bump `MARKETING_VERSION` in `project.yml`, then `xcodegen generate`.
 4. Tag the commit **on `public/main`** and push the tag there:
    ```bash
-   git tag -a v0.11.0 <public/main sha> -m "ItsPaint 0.11.0"
-   git push public v0.11.0
+   git tag -a v0.12.0 <public/main sha> -m "ItsPaint 0.12.0"
+   git push public v0.12.0
    ```
    The tag has to point into the published history. `public/main` and the
    local archive branch share no ancestor — see *Two histories* below — so a
