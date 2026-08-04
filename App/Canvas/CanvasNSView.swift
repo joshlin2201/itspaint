@@ -64,6 +64,19 @@ final class CanvasNSView: NSView {
         layer.shadowOffset = CGSize(width: 0, height: -6)
         layer.borderWidth = 0.5
         layer.borderColor = NSColor.white.withAlphaComponent(0.10).cgColor
+        updateShadowPath()
+    }
+
+    /// Tell Core Animation the silhouette instead of making it find one.
+    ///
+    /// Without a path, a shadow on a non-masking layer is computed by rendering
+    /// the layer offscreen and blurring its alpha — over the whole canvas, every
+    /// time it is dirtied. The canvas is a rectangle and always has been, so the
+    /// search is pure waste. Re-set whenever the frame changes, because a stale
+    /// path would draw the shadow of the previous canvas size.
+    private func updateShadowPath() {
+        guard let layer else { return }
+        layer.shadowPath = CGPath(rect: bounds, transform: nil)
     }
 
     override var acceptsFirstResponder: Bool { true }
@@ -86,6 +99,7 @@ final class CanvasNSView: NSView {
         )
         guard frame.size != size else { return }
         setFrameSize(size)
+        updateShadowPath()
         // Re-run the clip view's centring. Without this the scroll view
         // keeps the origin it computed when the document view was still
         // zero-sized, and the artwork sits off to one side.

@@ -1,6 +1,16 @@
 import CoreGraphics
 import Foundation
 
+/// Keeps one canvas buffer alive for as long as Core Graphics reads it.
+///
+/// A class, so `Unmanaged` can hand Core Graphics an ownership token; `let`, so
+/// the buffer it shares with the canvas can never move under an image that is
+/// already pointing at it.
+private final class PixelStorage {
+    let pixels: [RGBA8]
+    init(_ pixels: [RGBA8]) { self.pixels = pixels }
+}
+
 /// Conversion between `Bitmap` and Core Graphics.
 ///
 /// The canvas format was chosen so this bridge is a memory reinterpretation
@@ -25,15 +35,40 @@ public extension Bitmap {
         return bytes
     }
 
-    /// Snapshot as a `CGImage`. The data is copied, so the image stays valid
-    /// after the bitmap is mutated — required, because the view holds onto the
-    /// last drawn image while the next stroke is already writing.
-    /// One copy, not two: reading through `withUnsafeBytes` avoids the
-    /// copy-on-write that a mutable pointer into a second reference forces,
-    /// and this runs on every repaint of the canvas.
+    /// Snapshot as a `CGImage`, sharing the canvas storage rather than copying
+    /// it.
+    ///
+    /// This used to memcpy the whole raster into a `Data` on every call — a
+    /// 131 MB copy per repaint on a 33-megapixel screenshot, and another one
+    /// per save, per export, per copy-to-clipboard. Retaining the array in a box
+    /// instead is O(1): the image and the canvas share one buffer until the next
+    /// stroke writes, and copy-on-write then hands the *canvas* a fresh buffer,
+    /// which is exactly the guarantee the old copy was buying — the image stays
+    /// valid while the next stroke is already painting.
+    ///
+    /// The escaping base address is safe for precisely that reason: `storage`
+    /// holds the only other reference, never mutates it, and outlives the image
+    /// because Core Graphics releases the box itself.
     func makeCGImage() -> CGImage? {
-        let data = pixels.withUnsafeBytes { Data($0) }
-        guard let provider = CGDataProvider(data: data as CFData) else { return nil }
+        let storage = PixelStorage(pixels)
+        let byteCount = pixels.count * MemoryLayout<RGBA8>.stride
+        guard byteCount > 0,
+              let base = storage.pixels.withUnsafeBytes(\.baseAddress)
+        else { return nil }
+
+        let box = Unmanaged.passRetained(storage)
+        guard let provider = CGDataProvider(
+            dataInfo: box.toOpaque(),
+            data: base,
+            size: byteCount,
+            releaseData: { info, _, _ in
+                guard let info else { return }
+                Unmanaged<PixelStorage>.fromOpaque(info).release()
+            }
+        ) else {
+            box.release()
+            return nil
+        }
         return CGImage(
             width: width,
             height: height,

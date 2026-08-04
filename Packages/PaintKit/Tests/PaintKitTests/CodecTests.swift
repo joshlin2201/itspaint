@@ -95,6 +95,23 @@ struct CoreGraphicsBridgeTests {
         ) == nil)
         #expect(Bitmap(cgImage: smallSource, resizedTo: (8_193, 4_096)) == nil)
     }
+
+    @Test("A CGImage keeps its pixels after the canvas paints over them")
+    func imageOutlivesTheCanvasItCameFrom() throws {
+        // The image shares the canvas buffer instead of copying it, so this is
+        // the guarantee that makes that safe: the view holds the last image it
+        // drew while the next stroke is already writing, and it must keep
+        // showing what it was given.
+        var canvas = Bitmap(width: 8, height: 8, fill: .white)
+        canvas.setPixel(RGBA8(r: 10, g: 20, b: 30), at: PixelPoint(x: 4, y: 4))
+
+        let image = try #require(canvas.makeCGImage())
+        canvas.fillAll(with: RGBA8(r: 255, g: 0, b: 0))
+
+        let snapshot = try #require(Bitmap(cgImage: image))
+        #expect(snapshot.pixel(at: PixelPoint(x: 4, y: 4)) == RGBA8(r: 10, g: 20, b: 30))
+        #expect(snapshot.pixel(at: PixelPoint(x: 0, y: 0)) == .white)
+    }
 }
 
 @Suite("Image codec")
@@ -294,6 +311,26 @@ struct ImageCodecTests {
     func missingFileErrors() {
         let url = URL(fileURLWithPath: "/definitely/not/here-\(UUID().uuidString).png")
         #expect(throws: (any Error).self) { try ImageCodec.decode(contentsOf: url) }
+    }
+
+    @Test("Writing replaces the file in place and leaves no scratch behind")
+    func writeIsAtomicAndTidy() throws {
+        // Saving encodes straight into a sibling temporary rather than building
+        // the whole file in memory first. The rename has to be complete: an
+        // overwrite that lands, and a directory with nothing extra left in it.
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("itspaint-write-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("art.png")
+
+        try ImageCodec.write(Bitmap(width: 4, height: 4, fill: .white), to: url)
+        let replacement = sampleBitmap()
+        try ImageCodec.write(replacement, to: url)
+
+        let reloaded = try ImageCodec.decode(contentsOf: url)
+        #expect(reloaded == replacement)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["art.png"])
     }
 
     @Test("Every codec error offers a next step")

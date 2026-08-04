@@ -274,6 +274,34 @@ struct UndoStackTests {
         #expect(engine.undoStack.undoCount < 5)
     }
 
+    @Test("The history budget follows the canvas instead of a fixed ceiling")
+    func budgetTracksCanvasSize() {
+        // A budget that ignores the canvas is wrong in both directions: it
+        // starves a sketch and it lets one screenshot retain half a gigabyte.
+        let sketch = UndoStack.budget(forCanvasBytes: 1200 * 800 * 4)
+        let screenshot = UndoStack.budget(forCanvasBytes: Bitmap.maximumPixelCount * 4)
+        #expect(sketch == 1200 * 800 * 4 * 12)
+        #expect(UndoStack.budget(forCanvasBytes: 64 * 64 * 4) == UndoStack.minimumByteBudget)
+        #expect(screenshot == UndoStack.maximumByteBudget)
+        #expect(screenshot < 512 * 1024 * 1024)
+
+        // A trim of a large canvas keeps *one* whole-canvas pair, not a stack
+        // of them.
+        let engine = PaintEngine(canvas: Bitmap(width: 1400, height: 1000, fill: .white))
+        for _ in 0..<8 {
+            engine.replaceCanvas(
+                with: Bitmap(width: 1400, height: 1000, fill: .white),
+                actionName: "Resize"
+            )
+            engine.replaceCanvas(
+                with: Bitmap(width: 1000, height: 700, fill: .white),
+                actionName: "Resize"
+            )
+        }
+        #expect(engine.undoStack.byteCount <= engine.undoStack.byteBudget)
+        #expect(engine.undoStack.byteBudget <= UndoStack.maximumByteBudget)
+    }
+
     @Test("Read-only tools never enter undo history")
     func eyedropperIsNotAnEdit() {
         let engine = PaintEngine(width: 16, height: 16)

@@ -83,17 +83,20 @@ final class DrawingDocument: NSDocument {
 
     override class var autosavesInPlace: Bool { true }
 
-    /// Autosave only the native package.
-    ///
-    /// A `.itspaint` document is ours, so writing it in the background is exactly
-    /// what the user expects. An imported PNG or JPEG is *their* file, and
-    /// silently re-encoding it in the background is data loss waiting to
-    /// happen — a lossy format would degrade on every autosave, and any
-    /// metadata the original carried is gone. Imported images require an
-    /// explicit Save.
-    override var autosavingFileType: String? {
-        fileType == Self.packageType ? Self.packageType : nil
-    }
+    // `autosavingFileType` is deliberately NOT overridden.
+    //
+    // It used to return nil for imported images, to keep an autosave from
+    // silently re-encoding someone's JPEG. What that actually bought was worse:
+    // `autosavesInPlace` promises AppKit that changes are already safe on disk,
+    // so closing an edited PNG asked nothing and threw the edit away — trim a
+    // screenshot, press ⌘Q, and the work was gone. The same nil also leaves
+    // `hasUnautosavedChanges` stuck true, so every close re-enters the autosave
+    // machinery that cannot run.
+    //
+    // Nothing here sets `NSDocumentController.autosavingDelay`, so there is no
+    // periodic autosave to degrade a lossy file: the only automatic write
+    // happens when the document closes, which is the moment the user would have
+    // pressed Save anyway.
 
     override var windowNibName: NSNib.Name? { nil }
 

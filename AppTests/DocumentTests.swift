@@ -518,13 +518,15 @@ struct DrawingDocumentTests {
         #expect(!document.isDocumentEdited)
     }
 
-    @Test("Only the native package autosaves in place")
-    func autosaveIsScopedToNativeDocuments() throws {
-        // An imported PNG is the user's original file; background re-encoding
-        // it is data loss waiting to happen.
+    @Test("Every document autosaves as the type it was opened as")
+    func autosaveCoversImportedDocuments() throws {
+        // A nil autosaving type is not "leave the user's file alone" — with
+        // `autosavesInPlace`, AppKit stops asking to save on close because it
+        // believes the document already wrote itself. Trimming a PNG and
+        // quitting threw the edit away in silence.
         let imported = DrawingDocument()
         imported.fileType = "public.png"
-        #expect(imported.autosavingFileType == nil)
+        #expect(imported.autosavingFileType == "public.png")
 
         let native = DrawingDocument()
         native.fileType = DrawingDocument.packageType

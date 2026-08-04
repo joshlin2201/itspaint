@@ -130,12 +130,6 @@ public enum ImageTransform {
                 Raster.matches(bitmap.unsafePixel(at: PixelPoint(x: $0, y: y)), border, tolerance: tolerance)
             }
         }
-        func columnIsBorder(_ x: Int) -> Bool {
-            (0..<bitmap.height).allSatisfy {
-                Raster.matches(bitmap.unsafePixel(at: PixelPoint(x: x, y: $0)), border, tolerance: tolerance)
-            }
-        }
-
         var top = 0
         while top < bitmap.height, rowIsBorder(top) { top += 1 }
         // Entirely one colour: trimming would leave nothing, so decline.
@@ -143,6 +137,18 @@ public enum ImageTransform {
 
         var bottom = bitmap.height - 1
         while bottom > top, rowIsBorder(bottom) { bottom -= 1 }
+
+        // Only the rows that survived the first pass. The rows above `top` and
+        // below `bottom` are already known to be border, so including them in
+        // the column scan re-reads pixels whose answer is settled — on a
+        // screenshot with a thick top bar that is most of the image, walked
+        // down the memory-hostile axis.
+        func columnIsBorder(_ x: Int) -> Bool {
+            (top...bottom).allSatisfy {
+                Raster.matches(bitmap.unsafePixel(at: PixelPoint(x: x, y: $0)), border, tolerance: tolerance)
+            }
+        }
+
         var left = 0
         while left < bitmap.width, columnIsBorder(left) { left += 1 }
         var right = bitmap.width - 1

@@ -61,6 +61,42 @@ version may still carry breaking changes to the document format.
   is already open.
 
 ### Fixed
+- **Editing an imported image and quitting threw the edit away, in silence.**
+  Trim a screenshot, press `⌘Q`, and nothing asked and nothing saved: the
+  document claimed `autosavesInPlace`, which tells AppKit the work is already on
+  disk, while `autosavingFileType` returned nil for anything that was not our
+  own package, which meant no autosave ever ran. The nil also left the document
+  permanently holding unautosaved changes, so every close re-entered an autosave
+  that could not happen — the shape of a beachball. Every document now autosaves
+  as the type it was opened as. Nothing sets an autosaving delay, so a lossy
+  original is still only re-encoded when the document closes, which is when a
+  Save would have re-encoded it anyway.
+- **A save cost four copies of the artwork, at once, on the main thread.** The
+  encoder built the whole file in memory and then handed `Data` another copy of
+  it to write — on top of the canvas and the `CGImage` — so saving a
+  33-megapixel screenshot briefly needed most of a gigabyte, with the UI held
+  for the duration. Core Graphics now encodes straight into the file. Still
+  atomic: the bytes land in a sibling temporary that replaces the original only
+  once the encode has finished.
+- **Undo history was budgeted at 512 MB per document, regardless of canvas.**
+  Half the RAM of an 8 GB Mac, retained by one window, and the edits that change
+  the canvas *size* — trim, crop, rotate, paste-to-fit — each carry two whole
+  canvases. The budget now follows the canvas (about a dozen full-canvas edits,
+  floored at 32 MB and capped at 256 MB), so a sketch keeps a deep history and a
+  screenshot cannot quietly retain a gigabyte of pixels.
+- **The canvas was copied whole on every repaint.** Handing the drawn snapshot
+  to Core Graphics memcpy'd the entire raster — 131 MB per repaint on a
+  33-megapixel canvas, and again per save, per export, per copy. The image now
+  shares the canvas buffer and copy-on-write gives the *next* stroke the fresh
+  one, which is the same guarantee for none of the copying.
+- **The canvas shadow was recomputed by rendering the canvas offscreen.** A
+  layer shadow with no path makes Core Animation blur the layer's own alpha to
+  find a silhouette — over the whole artwork, every time it is dirtied. The
+  canvas is a rectangle, so it now says so.
+- **Trim scanned pixels it had already ruled out.** The column pass walked the
+  full height of the image, including the rows the row pass had just proved were
+  border. It now walks only the rows that survived — on a screenshot with a
+  thick top bar, most of the work was in the part already decided.
 - **The Place / Crop / Discard bar outlived the content it acts on.** Placing a
   float and then undoing past it left the bar up over nothing, offering to place
   something that was no longer there, with a blank size chip beside it. The same

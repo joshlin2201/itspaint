@@ -17,8 +17,11 @@ public struct Bitmap: Equatable, Sendable {
 
     /// Largest decoded or generated raster accepted by the editor.
     ///
-    /// 33,554,432 RGBA8 pixels are 128 MiB before undo or rendering overhead.
-    /// The limit includes a full 8K UHD frame (7,680 × 4,320).
+    /// 33,554,432 RGBA8 pixels are 128 MiB of canvas. Measured, a document that
+    /// size settles around three times that once the drawn snapshot and the
+    /// decoder's transients are counted, and the undo budget is bounded
+    /// separately (`UndoStack.budget(forCanvasBytes:)`). The limit includes a
+    /// full 8K UHD frame (7,680 × 4,320).
     public static let maximumPixelCount = 33_554_432
 
     /// The single size gate for imported, generated, and transformed rasters.
@@ -70,6 +73,10 @@ public struct Bitmap: Equatable, Sendable {
 
     @inlinable public var bounds: PixelRect { PixelRect(x: 0, y: 0, width: width, height: height) }
     @inlinable public var count: Int { pixels.count }
+
+    /// Heap cost of the raster itself, which is what the undo budget is sized
+    /// against.
+    @inlinable public var byteCount: Int { pixels.count * MemoryLayout<RGBA8>.stride }
 
     @inlinable
     public func isInBounds(_ p: PixelPoint) -> Bool {

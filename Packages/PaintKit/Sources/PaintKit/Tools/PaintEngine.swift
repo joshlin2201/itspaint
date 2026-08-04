@@ -104,7 +104,9 @@ public final class PaintEngine {
         canvas: Bitmap,
         settings: ToolSettings = ToolSettings(),
         colours: ColourPair = ColourPair(),
-        undoByteBudget: Int = UndoStack.defaultByteBudget
+        // `nil` lets the history budget follow the canvas, which is what every
+        // document wants; a number pins it, which is what a test wants.
+        undoByteBudget: Int? = nil
     ) {
         self.canvas = canvas
         self.settings = settings
@@ -1265,7 +1267,8 @@ public final class PaintEngine {
                 before: RectPatch(capturing: dirty, from: before),
                 after: RectPatch(capturing: dirty, from: canvas),
                 badgeNumber: badgeNumber
-            )
+            ),
+            canvasBytes: canvas.byteCount
         )
     }
 
@@ -1274,7 +1277,13 @@ public final class PaintEngine {
     /// Whole-canvas rather than a patch, because a patch is addressed in canvas
     /// coordinates and cannot describe an edit that moved every coordinate.
     private func recordResize(name: String, from before: Bitmap) {
-        undoStack.record(PixelEdit.resizing(name, from: before, to: canvas))
+        undoStack.record(
+            PixelEdit.resizing(name, from: before, to: canvas),
+            // The larger of the two, so shrinking to a thumbnail cannot budget
+            // the history that still holds the full-size canvas as if it were
+            // thumbnail-sized.
+            canvasBytes: max(before.byteCount, canvas.byteCount)
+        )
     }
 
     private func commitSingleShot(

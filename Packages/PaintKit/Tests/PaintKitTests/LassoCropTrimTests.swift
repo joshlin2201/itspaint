@@ -257,6 +257,21 @@ struct TrimTests {
         #expect(engine.canvas.width < 80)
     }
 
+    @Test("Trim lands on the exact content box, however lopsided the border")
+    func trimsToExactBounds() {
+        // The column scan only walks the rows the row scan left alive, so a
+        // thick top border and a thin bottom one have to produce the same box
+        // as a symmetric one.
+        var canvas = Bitmap(width: 40, height: 30, fill: .white)
+        canvas.fill(PixelRect(x: 5, y: 21, width: 4, height: 8), with: .black)
+        let engine = PaintEngine(canvas: canvas)
+
+        #expect(engine.trimBorders())
+        #expect(engine.canvas.width == 4)
+        #expect(engine.canvas.height == 8)
+        #expect(engine.canvas.pixels.allSatisfy { $0 == .black })
+    }
+
     @Test("Trim is refused on an image with no border")
     func refusesWhenNothingToTrim() {
         var canvas = Bitmap(width: 40, height: 40, fill: .white)

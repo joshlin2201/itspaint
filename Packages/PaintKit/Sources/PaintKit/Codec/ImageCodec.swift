@@ -272,6 +272,78 @@ public enum ImageCodec {
         quality: Double = 0.9,
         matte: PaintColour = .white
     ) throws -> Data {
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            output as CFMutableData,
+            format.utType.identifier as CFString,
+            1,
+            nil
+        ) else {
+            throw CodecError.encodeFailed(format)
+        }
+        try encode(bitmap, as: format, quality: quality, matte: matte, into: destination)
+        return output as Data
+    }
+
+    /// Encode straight into `url`.
+    ///
+    /// **Not `encode(…)` followed by `Data.write`.** That route holds the whole
+    /// encoded image in memory and then hands `Data` another copy of it to write
+    /// — on top of the canvas and the `CGImage`, four full-size buffers live at
+    /// once for a save the user experiences as one click. Core Graphics writes
+    /// its own output to the file descriptor instead, so a save costs the canvas
+    /// and nothing else.
+    ///
+    /// Still atomic: the bytes land in a sibling temporary file that replaces
+    /// `url` only once the encoder has finished, so a failure halfway through
+    /// cannot leave the user with a truncated version of their artwork.
+    public static func write(
+        _ bitmap: Bitmap,
+        to url: URL,
+        as format: Format? = nil,
+        quality: Double = 0.9,
+        matte: PaintColour = .white
+    ) throws {
+        let resolved = format ?? Format.inferred(from: url) ?? .png
+        let fileManager = FileManager.default
+        let temporary = url.deletingLastPathComponent()
+            .appendingPathComponent(".itspaint-\(UUID().uuidString).\(resolved.fileExtension)")
+
+        guard let destination = CGImageDestinationCreateWithURL(
+            temporary as CFURL,
+            resolved.utType.identifier as CFString,
+            1,
+            nil
+        ) else {
+            throw CodecError.encodeFailed(resolved)
+        }
+        do {
+            try encode(bitmap, as: resolved, quality: quality, matte: matte, into: destination)
+        } catch {
+            try? fileManager.removeItem(at: temporary)
+            throw error
+        }
+
+        do {
+            if fileManager.fileExists(atPath: url.path) {
+                _ = try fileManager.replaceItemAt(url, withItemAt: temporary)
+            } else {
+                try fileManager.moveItem(at: temporary, to: url)
+            }
+        } catch {
+            try? fileManager.removeItem(at: temporary)
+            throw error
+        }
+    }
+
+    /// The one place a bitmap becomes encoded bytes, whatever the destination.
+    private static func encode(
+        _ bitmap: Bitmap,
+        as format: Format,
+        quality: Double,
+        matte: PaintColour,
+        into destination: CGImageDestination
+    ) throws {
         var source = bitmap
         if !format.supportsAlpha {
             source = flattened(bitmap, onto: matte)
@@ -284,16 +356,6 @@ public enum ImageCodec {
             throw CodecError.encodeFailed(format)
         }
 
-        let output = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            output as CFMutableData,
-            format.utType.identifier as CFString,
-            1,
-            nil
-        ) else {
-            throw CodecError.encodeFailed(format)
-        }
-
         var properties: [CFString: Any] = [:]
         if format.supportsQuality {
             properties[kCGImageDestinationLossyCompressionQuality] = max(0, min(1, quality))
@@ -303,19 +365,6 @@ public enum ImageCodec {
         guard CGImageDestinationFinalize(destination) else {
             throw CodecError.encodeFailed(format)
         }
-        return output as Data
-    }
-
-    public static func write(
-        _ bitmap: Bitmap,
-        to url: URL,
-        as format: Format? = nil,
-        quality: Double = 0.9,
-        matte: PaintColour = .white
-    ) throws {
-        let resolved = format ?? Format.inferred(from: url) ?? .png
-        let data = try encode(bitmap, as: resolved, quality: quality, matte: matte)
-        try data.write(to: url, options: .atomic)
     }
 
     /// Scale the artwork into the nearest legal icon square, centred, with
