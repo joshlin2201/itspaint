@@ -55,6 +55,12 @@ fails on age **and** on every metric. Earliest eligibility is around
 **2026-08-28**, and because Josh owns the repo the bar is the 225-star column
 unless a third party submits it.
 
+**The cheaper door is the left-hand column.** Any *one* of 30 forks, 30
+watchers or 75 stars is enough when someone other than the author submits it,
+and 30 watchers is a tenth of the work of 225 stars. The people who file real
+issues are the ones to ask, once they have used it for a while — not on the day
+they report a bug.
+
 That inverts the order this document was written in. The cask is not what
 unblocks distribution; **distribution is what unblocks the cask**, and 225 stars
 is the concrete number the posting work below is aiming at.
@@ -76,7 +82,7 @@ none of the work is wasted; only the venue changes.
 
 ### Two things to fix before submitting upstream
 
-**Stop marking releases as pre-releases.** This is the larger of the two, and it
+**~~Stop marking releases as pre-releases~~ — done in 0.12.0.** This is the larger of the two, and it
 is not about the version number — nothing in current policy requires 1.0. It is
 that `homebrew-cask`'s autobump and both of its GitHub livecheck strategies
 discard pre-releases outright (`github_releases.rb` does
@@ -87,6 +93,11 @@ pre-release filter. Worse, the flag is a public statement that this is not the
 channel you recommend for most users, while the unversioned cask is supposed to
 track exactly that channel. Drop the flag and the cask simplifies to a bare
 `strategy :github_latest` and the objection disappears.
+
+The flag came off 0.12.0 and the tap's cask now carries exactly that bare
+`strategy :github_latest`; `brew livecheck` resolves 0.12.0 against it. The
+non-standard git-tag block, and the paragraph of comment explaining why it had
+to exist, are gone.
 
 **Disclose the AI assistance.** `homebrew-cask`'s CONTRIBUTING requires stating
 in the PR that an LLM was used and which one, requires that you have reviewed it
