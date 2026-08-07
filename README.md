@@ -2,11 +2,11 @@
 
 # ItsPaint
 
-### A focused paint app for macOS.
+### MS Paint for the Mac. Native, free, and under 3 MB.
 
-Open an image, make a quick edit, and export it without setting up a workspace.
-ItsPaint keeps its drawing tools, colours, and palette visible in one native Mac
-window.
+A blank canvas at the size you asked for, an image dropped on top of another
+one, a screenshot marked up and out the door. No workspace to set up, no
+account, no subscription, no trial.
 
 [![CI](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml/badge.svg)](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/joshlin2201/itspaint?include_prereleases&sort=semver&label=beta)](https://github.com/joshlin2201/itspaint/releases)
@@ -22,21 +22,25 @@ window.
 
 </div>
 
-## Highlights
+## The Mac never shipped a Paint, and the usual answers each miss something
 
-- **Twelve visible tools** for drawing, markup, text, selection, colour, and
-  pixelation.
-- **Fifteen shapes** with solid, dashed, or dotted outlines and optional fills.
-- **A 48pt tool rail** — one cell thick on either edge — that moves between the
-  left and bottom of the window.
-- **Precise canvas control** with pointer-centred zoom, nearest-neighbour display
-  above 100%, pixel grids, and live tool footprints.
-- **Paste without losing anything** — the canvas grows to hold an image larger
-  than it, and the window follows, so nothing is cropped when you place it.
-- **Rotate by any angle**, with the canvas growing to fit the corners.
-- **Native documents and common exports** with no third-party dependencies,
-  accounts, telemetry, or cloud service — and [three commands](#no-network-and-how-to-check)
-  that check it.
+Preview cannot make a blank canvas. Paintbrush has not kept up with macOS. The
+capable editors are a gigabyte and cost money, and several of the free ones turn
+out to be a trial. So here is the list people actually write out in those
+threads, and what each one is in ItsPaint:
+
+| What people ask for | How it works here |
+|---|---|
+| A blank canvas at the size I choose | `⌘N`, then `Image ▸ Canvas size…` for exact pixels. Set the size you usually want in Settings and `⌘N` is already right |
+| Drop an image on top of another image | Drag it in from the Finder or paste with `⌘V`. A dropped image lands centred on the pointer |
+| Move and scale it before it sticks | It arrives floating: drag the image, or drag its corner handles |
+| Don't crop it when it's bigger than the canvas | The canvas grows to hold it and the window follows |
+| Crop | Drag a selection, then `⌘K` |
+| Zoom out far enough to see all of it | `⌘9` fits it to the window, and it goes well below 100% |
+| A colour picked off the image, as hex | Eyedropper, or `⌥` from any tool. Every swatch shows its hex |
+| Show up in right-click ▸ Open With | Registered as an editor for PNG, JPEG, TIFF, BMP, GIF and HEIC |
+| Mark up a screenshot properly | Auto-numbered step badges, arrows, highlighter, and pixelate for anything you'd rather not publish |
+| Be free, and stay free | MIT, no account, no telemetry, no trial, no upsell |
 
 ## Install
 
@@ -71,6 +75,22 @@ open ItsPaint.xcodeproj
 ```
 
 Build and run the **ItsPaint** scheme with `⌘R`. Xcode 16 or later is required.
+
+## Highlights
+
+- **Twelve visible tools** for drawing, markup, text, selection, colour, and
+  pixelation.
+- **Fifteen shapes** with solid, dashed, or dotted outlines and optional fills.
+- **A 48pt tool rail** — one cell thick on either edge — that moves between the
+  left and bottom of the window.
+- **Precise canvas control** with pointer-centred zoom, nearest-neighbour display
+  above 100%, pixel grids, and live tool footprints.
+- **Rotate by any angle**, with the canvas growing to fit the corners.
+- **Universal and notarised** — one build for Apple silicon and Intel, signed
+  with a Developer ID, so it opens with no Gatekeeper detour.
+- **Native documents and common exports** with no third-party dependencies,
+  accounts, telemetry, or cloud service — and [three commands](#no-network-and-how-to-check)
+  that check it.
 
 ## Tools
 
