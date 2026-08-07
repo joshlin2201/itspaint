@@ -9,7 +9,7 @@ one, a screenshot marked up and out the door. No workspace to set up, no
 account, no subscription, no trial.
 
 [![CI](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml/badge.svg)](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/joshlin2201/itspaint?include_prereleases&sort=semver&label=beta)](https://github.com/joshlin2201/itspaint/releases)
+[![Latest release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&label=release&color=success)](https://github.com/joshlin2201/itspaint/releases)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white)](https://github.com/joshlin2201/itspaint/releases)
 [![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
@@ -22,7 +22,9 @@ account, no subscription, no trial.
 
 <img src="docs/images/remove-background.gif" width="830" alt="A product shot on a flat page, then the same window with the background gone and the checkerboard showing through">
 
-<sub><b>Image ▸ Remove Background</b> — one command, no model, no network, and it declines rather than guessing when the page is not separable.</sub>
+<sub><b>Image ▸ Remove Background</b> — one command, no model, no network, and it declines rather
+than guessing when the page is not separable.
+<a href="docs/BACKGROUND_REMOVAL.md">How it works, in thirty-five lines</a>.</sub>
 
 </div>
 
@@ -198,6 +200,11 @@ App/                 AppKit document lifecycle, canvas, and SwiftUI interface
 PaintKit stores pixels as premultiplied RGBA8 and returns the changed rectangle
 from every edit. The canvas redraws only that area, and undo history is bounded
 by memory rather than by a fixed number of steps.
+
+[**Background removal without a model**](docs/BACKGROUND_REMOVAL.md) is a
+worked example of both layers: four corner-seeded flood selections unioned
+through the same combiner `⇧`-click uses, and a coverage guard that declines
+rather than returning a nearly blank canvas.
 
 Run the test suites with:
 
