@@ -20,6 +20,11 @@ import Testing
 ///       -destination 'platform=macOS' \
 ///       test -only-testing:ItsPaintTests/WindowCaptureTests
 ///
+/// The Remove Background reel is ITSPAINT_ALPHA_REEL_DIR=<dir> plus
+/// ITSPAINT_ALPHA_REEL_SUBJECT=<subject.png with alpha>. The app is
+/// sandboxed, so <dir> has to be inside its container — the tmp directory
+/// under ~/Library/Containers/com.joshlin.itspaint/Data works.
+///
 /// The README reel works the same way with ITSPAINT_REEL_DIR=<dir>, and the
 /// frames assemble into docs/images/markup-reel.gif with ffmpeg:
 ///
@@ -136,6 +141,75 @@ struct WindowCaptureTests {
         }
 
         try snap()
+        document.close()
+    }
+
+    /// Renders the Remove Background reel: a subject sitting on a flat page,
+    /// then the same window one command later with the page gone.
+    ///
+    /// The fixture is any PNG with alpha — `paint-demo --scene chameleon`
+    /// output — flattened onto a page
+    /// colour, so the "before" is manufactured from the "after" and the frames
+    /// cannot disagree with each other. Set `ITSPAINT_ALPHA_REEL_DIR` and
+    /// `ITSPAINT_ALPHA_REEL_SUBJECT`.
+    @Test("Captures the Remove Background reel when its environment is set")
+    func captureAlphaReel() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let reelDir = environment["ITSPAINT_ALPHA_REEL_DIR"],
+              let subjectPath = environment["ITSPAINT_ALPHA_REEL_SUBJECT"] else { return }
+        let directory = URL(fileURLWithPath: reelDir, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let subject = try ImageCodec.decode(contentsOf: URL(fileURLWithPath: subjectPath))
+        let page = PaintColour(hex: "EEF1F5") ?? .white
+        let document = DrawingDocument()
+        let model = document.model
+        model.engine.reset(to: ImageCodec.flattened(subject, onto: page))
+        // The eraser's chip is the compact one, and it is the tool a person
+        // would otherwise be reaching for — which is the point of the reel.
+        model.selectTool(.eraser)
+        document.fileURL = directory.appendingPathComponent("product-shot.png")
+        document.makeWindowControllers()
+        document.showWindows()
+        let window = try #require(document.windowControllers.first?.window)
+        window.makeKeyAndOrderFront(nil)
+
+        var patience = 100
+        while !NSApp.isActive && patience > 0 {
+            NSApp.activate(ignoringOtherApps: true)
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+            patience -= 1
+        }
+
+        var frame = 0
+        func snap() throws {
+            for _ in 0..<6 {
+                RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+            }
+            frame += 1
+            try Self.writeWindowPNG(
+                window, to: directory.appendingPathComponent(String(format: "frame-%02d.png", frame))
+            )
+        }
+
+        // Hold on the flat page, take it away, hold on the result. Two holds a
+        // side, because a two-frame GIF reads as a glitch rather than a change.
+        try snap()
+        try snap()
+        let before = model.engine.canvas
+        model.removeBackground()
+        // Remove Background declines when the flood would take essentially the
+        // whole canvas, which is the correct answer for a small subject on a
+        // big page — and a silent no-op would ship a reel of five identical
+        // frames. Fail here instead.
+        #expect(
+            model.engine.canvas != before,
+            "Remove Background declined on this subject, so the reel has nothing to show"
+        )
+        try snap()
+        try snap()
+        try snap()
+
         document.close()
     }
 

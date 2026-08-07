@@ -20,6 +20,10 @@ account, no subscription, no trial.
 
 <img src="docs/images/markup-reel.gif" width="830" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
 
+<img src="docs/images/remove-background.gif" width="830" alt="A product shot on a flat page, then the same window with the background gone and the checkerboard showing through">
+
+<sub><b>Image ▸ Remove Background</b> — one command, no model, no network, and it declines rather than guessing when the page is not separable.</sub>
+
 </div>
 
 ## The Mac never shipped a Paint, and the usual answers each miss something
