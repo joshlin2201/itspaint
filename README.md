@@ -217,6 +217,25 @@ package. That is why the engine tests need no simulator, no GUI session and no
 Xcode project, and why most changes to how ItsPaint draws can be made and
 verified with a text editor and a terminal.
 
+### Using the engine on its own
+
+PaintKit is a product of the root package, so it can be a dependency of anything
+that wants a raster canvas without an editor around it:
+
+```swift
+.package(url: "https://github.com/joshlin2201/itspaint.git", from: "0.12.1")
+```
+
+```swift
+import PaintKit
+
+let engine = PaintEngine(width: 800, height: 600)
+engine.removeBackground()            // false when the page is not separable
+```
+
+`0.12.1` is a package tag, not an app release — the app is unchanged from
+`0.12.0`, and only tags from `0.12.1` onward carry the root manifest.
+
 Run the test suites with:
 
 ```bash

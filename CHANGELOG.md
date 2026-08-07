@@ -5,6 +5,25 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## [0.12.1] — 2026-08-07
+
+A package release. **The app is unchanged from 0.12.0** — there is no new disk
+image and the Homebrew cask and Mac App Store both still serve 0.12.0.
+
+### Added
+- **The engine is declared at the repository root**, so `swift build`,
+  `swift test` and `.package(url:)` all work against a fresh clone. Previously
+  the only manifest was `Packages/PaintKit/Package.swift`, which meant Swift's
+  own tooling could not see a package here at all: tools that look for a root
+  manifest — including the Swift Package Index, which reads the repository tree
+  non-recursively — found nothing, and `swift test` in a clone failed before it
+  started. The root manifest adds no targets and duplicates no source; it points
+  `path:` at the same directories, and CI diffs `dump-package` between the two
+  manifests so they cannot drift apart.
+- `PaintKit` is now a resolvable product:
+  `.package(url: "https://github.com/joshlin2201/itspaint.git", from: "0.12.1")`.
+  Earlier tags predate the root manifest, so `0.12.1` is the floor.
+
 ## [0.12.0] — 2026-08-03
 
 ### Added
