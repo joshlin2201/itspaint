@@ -48,8 +48,9 @@ threads, and what each one is in ItsPaint:
 brew install --cask joshlin2201/itspaint/itspaint
 ```
 
-Or download the latest beta from [Releases](https://github.com/joshlin2201/itspaint/releases),
-open the disk image, and drag **ItsPaint** to Applications.
+Or get it free on the [Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12),
+or download the disk image from [Releases](https://github.com/joshlin2201/itspaint/releases),
+open it, and drag **ItsPaint** to Applications.
 
 Releases are signed with a Developer ID and notarised by Apple, so Gatekeeper
 opens them with no extra steps — no Control-click, and nothing to clear from the
