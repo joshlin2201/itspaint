@@ -29,6 +29,27 @@ jobs:
       # measure the compiler, not the algorithm.
       - name: Test PaintKit (release, includes performance budgets)
         run: swift test -c release --package-path Packages/PaintKit
+      # A second manifest sits at the repository root so that a plain `swift build`,
+      # a `.package(url:)` dependency and the Swift Package Index can all see the
+      # engine. It vends the same targets from the same directories, so the two can
+      # only disagree by mistake — this is what notices.
+      - name: Root and nested manifests agree
+        run: |
+          names() {
+            swift package --package-path "$1" dump-package | python3 -c \
+              'import json,sys; d=json.load(sys.stdin); print(sorted(p["name"] for p in d["products"]), sorted(t["name"] for t in d["targets"]))'
+          }
+          root=$(names .)
+          nested=$(names Packages/PaintKit)
+          echo "root:   $root"
+          echo "nested: $nested"
+          if [ "$root" != "$nested" ]; then
+            echo "::error::Package.swift and Packages/PaintKit/Package.swift declare different products or targets."
+            exit 1
+          fi
+      # What someone gets from `git clone && swift build`, with no Xcode project.
+      - name: Build from the repository root
+        run: swift build
 
   app:
     name: App build and tests

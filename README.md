@@ -78,10 +78,15 @@ To build from source:
 ```bash
 git clone https://github.com/joshlin2201/itspaint.git
 cd itspaint
-open ItsPaint.xcodeproj
+swift test                # the engine — no Xcode project, no dependencies
+open ItsPaint.xcodeproj   # the app — build and run with ⌘R
 ```
 
-Build and run the **ItsPaint** scheme with `⌘R`. Xcode 16 or later is required.
+The drawing engine is a plain Swift package declared at the repository root, so
+`swift build` and `swift test` run the whole engine suite in a fresh clone with a
+command-line Swift toolchain and nothing else. Xcode 16 or later is needed only
+for the app shell — the `ItsPaint` scheme, and the AppKit tests that need a GUI
+session.
 
 ## Highlights
 
@@ -206,20 +211,26 @@ worked example of both layers: four corner-seeded flood selections unioned
 through the same combiner `⇧`-click uses, and a coverage guard that declines
 rather than returning a nearly blank canvas.
 
+PaintKit imports Foundation, CoreGraphics, ImageIO, CoreText and
+UniformTypeIdentifiers, and nothing else — no AppKit, no SwiftUI, no third-party
+package. That is why the engine tests need no simulator, no GUI session and no
+Xcode project, and why most changes to how ItsPaint draws can be made and
+verified with a text editor and a terminal.
+
 Run the test suites with:
 
 ```bash
-swift test --package-path Packages/PaintKit
-swift test -c release --package-path Packages/PaintKit
+swift test                    # engine, from the repository root
+swift test -c release         # engine, including the throughput budgets
 xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
   -destination 'platform=macOS' test
 ```
 
 ## Release notes
 
-ItsPaint is in public beta. Released builds are signed with a Developer ID and
-notarised. Text becomes pixels when committed, and WebP export is not available
-because macOS does not provide a WebP encoder.
+ItsPaint is released and under active development. Builds are signed with a
+Developer ID and notarised. Text becomes pixels when committed, and WebP export
+is not available because macOS does not provide a WebP encoder.
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and
 [docs/README.md](docs/README.md) for the design, architecture, feature reference,
