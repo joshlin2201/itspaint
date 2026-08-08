@@ -5,8 +5,7 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
-## Unreleased
-
+## [0.13.0] — 2026-08-07
 ### Added
 - **Snap to grid** — `⇧⌘'`, with 8, 16, 32 and 64px spacings under View ▸ Grid
   Spacing, remembered across documents and launches.
@@ -56,7 +55,6 @@ version may still carry breaking changes to the document format.
   cut, copy and paste kept working beside it. The header band now sits above the
   tool chrome.
 
-## [0.13.0] — 2026-08-07
 
 ### Fixed
 - **The highlighter no longer draws in the pen's colour.** It took the current
