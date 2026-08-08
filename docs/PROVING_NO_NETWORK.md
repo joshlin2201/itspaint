@@ -77,13 +77,28 @@ otool -L /Applications/ItsPaint.app/Contents/MacOS/ItsPaint
 ```
 
 Every line is under `/System/Library/Frameworks` or `/usr/lib`, on both architectures
-(`lipo -archs` reports `x86_64 arm64`). No `CFNetwork`. No `Network.framework`. No
-bundled `.dylib`, no vendored SDK, no analytics framework — nothing that ships inside the
-app at all.
+(`lipo -archs` reports `x86_64 arm64`). No `CFNetwork`, no `Network.framework`, no bundled
+`.dylib`, no vendored SDK, no analytics framework.
 
-That last part is what makes the claim about *dependencies* checkable rather than
-promised. An app can have a clean source tree and still link a binary blob that phones
-home; this is the command that would show it.
+**Be precise about what this does and does not prove.** `otool -L` lists the *linked*
+libraries of *one* Mach-O. It says nothing about which of them makes network calls, and
+three things evade it entirely: code linked statically into the executable leaves no
+`-L` line at all, a bundle loaded later with `dlopen` is not a load command, and an
+embedded helper or XPC service is a separate binary you would have to check separately.
+
+For this app that last gap is closable by looking:
+
+```bash
+find /Applications/ItsPaint.app -type f -perm -u+x -exec file {} \; | grep Mach-O
+```
+
+One result — `Contents/MacOS/ItsPaint`. There is no `Frameworks/`, no `XPCServices/` and
+no `PlugIns/` directory in the bundle, so "the main executable" and "everything that ships"
+are the same set, and one `otool -L` covers it.
+
+The static-linking and `dlopen` gaps are not closed by this command in any app, and that
+is the honest reason command 1 comes first: the sandbox refuses the connection whether the
+code arrived linked, statically bound, or loaded at runtime.
 
 ## 3. The source
 
@@ -127,9 +142,13 @@ A comment is not enforcement — the enforcement is the missing key. But the com
 stops a future contributor from adding `network.client` for a quick fix without noticing
 they are spending something.
 
-**Prefer the open panel to a broad file entitlement.** `files.user-selected.read-write`
-means the *user's* choice in the panel grants access, one file at a time. It replaces
-blanket read of the disk, and it is why `assets.pictures.read-write` is not needed.
+**Prefer the user's choice to a broad file entitlement.** `files.user-selected.read-write`
+grants nothing by itself — access arrives as a security-scoped bookmark for each item the
+user actually picks, in an open or save panel or by dragging it in. It replaces blanket
+read of the disk, and it is why `assets.pictures.read-write` is not needed here. Note that
+`files.bookmarks.app-scope`, which this app also requests, is what lets that access outlive
+the panel, so recent documents reopen without re-prompting. Worth being clear-eyed about:
+the pair means access persists, one user-chosen item at a time, rather than expiring.
 
 **Check what actually shipped, not what you configured.** These are different, and the gap
 is where the surprises live:
