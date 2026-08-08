@@ -28,6 +28,26 @@ public enum TextRenderer {
         public var isItalic: Bool
         public var isUnderlined: Bool
 
+        /// A contrasting rim drawn *outside* the glyphs, or `nil` for none.
+        ///
+        /// **This is a legibility fix before it is a style.** Annotation text
+        /// goes on top of a screenshot, and a screenshot is not a colour — it is
+        /// a light sidebar next to a dark editor next to a photograph. Any single
+        /// text colour is unreadable somewhere in that frame, and the usual
+        /// answer, "pick a colour that works", cannot be picked once for an
+        /// image the app has never seen.
+        ///
+        /// A rim in the opposite tone makes one colour work everywhere, which is
+        /// why every tool that annotates screenshots ends up with one and why
+        /// ex-Skitch users name it specifically as the thing they lost — "the
+        /// default annotation font with the white border".
+        public var haloColour: PaintColour?
+
+        /// Rim thickness as a fraction of the point size, so it holds its
+        /// proportion at 12pt and at 96pt instead of vanishing or swallowing the
+        /// letterforms.
+        public var haloWidth: Double
+
         public enum Alignment: String, CaseIterable, Codable, Sendable, Identifiable {
             case left, centre, right
             public var id: String { rawValue }
@@ -55,7 +75,12 @@ public enum TextRenderer {
             alignment: Alignment = .left,
             isBold: Bool = false,
             isItalic: Bool = false,
-            isUnderlined: Bool = false
+            isUnderlined: Bool = false,
+            // On by default. Text over a screenshot without a rim is the defect,
+            // not the plain version — and a default nobody discovers is the same
+            // as not having built it.
+            haloColour: PaintColour? = .white,
+            haloWidth: Double = 0.08
         ) {
             self.fontName = fontName
             self.pointSize = max(6, pointSize)
@@ -64,6 +89,8 @@ public enum TextRenderer {
             self.isBold = isBold
             self.isItalic = isItalic
             self.isUnderlined = isUnderlined
+            self.haloColour = haloColour
+            self.haloWidth = max(0, haloWidth)
         }
 
         /// The font these settings resolve to, traits and all.
@@ -98,23 +125,35 @@ public enum TextRenderer {
     ) -> PixelRect {
         guard !string.isEmpty, !rect.isEmpty else { return .empty }
 
-        let attributed = attributedString(string, style: style)
-        let framesetter = CTFramesetterCreateWithAttributedString(attributed)
         let path = CGPath(rect: CGRect(x: 0, y: 0, width: rect.width, height: rect.height), transform: nil)
-        let frame = CTFramesetterCreateFrame(
-            framesetter, CFRangeMake(0, 0), path, nil
-        )
+
+        func frame(isHaloPass: Bool) -> CTFrame {
+            let attributed = attributedString(string, style: style, isHaloPass: isHaloPass)
+            return CTFramesetterCreateFrame(
+                CTFramesetterCreateWithAttributedString(attributed), CFRangeMake(0, 0), path, nil
+            )
+        }
+
+        // **Two passes, rim then body.** The rim is stroke-only and therefore
+        // hollow; drawing the filled text over it leaves the stroke showing on
+        // the outside only, which is the whole point — a rim that ate the letter
+        // it was meant to make legible would be worse than no rim.
+        let wantsHalo = style.haloColour != nil && style.haloWidth > 0
+        let passes = wantsHalo ? [frame(isHaloPass: true), frame(isHaloPass: false)]
+                               : [frame(isHaloPass: false)]
 
         bitmap.drawWithCoreGraphics { context in
-            context.saveGState()
-            // The surrounding context is flipped so canvas coordinates work;
-            // CoreText draws glyphs in its own y-up space, so flip back inside
-            // the text box or every line renders mirrored.
-            context.translateBy(x: CGFloat(rect.minX), y: CGFloat(rect.minY + rect.height))
-            context.scaleBy(x: 1, y: -1)
-            context.textMatrix = .identity
-            CTFrameDraw(frame, context)
-            context.restoreGState()
+            for pass in passes {
+                context.saveGState()
+                // The surrounding context is flipped so canvas coordinates work;
+                // CoreText draws glyphs in its own y-up space, so flip back inside
+                // the text box or every line renders mirrored.
+                context.translateBy(x: CGFloat(rect.minX), y: CGFloat(rect.minY + rect.height))
+                context.scaleBy(x: 1, y: -1)
+                context.textMatrix = .identity
+                CTFrameDraw(pass, context)
+                context.restoreGState()
+            }
         }
         return rect.intersection(bitmap.bounds)
     }
@@ -132,7 +171,9 @@ public enum TextRenderer {
         return (Int(size.width.rounded(.up)), Int(size.height.rounded(.up)))
     }
 
-    private static func attributedString(_ string: String, style: Style) -> CFAttributedString {
+    private static func attributedString(
+        _ string: String, style: Style, isHaloPass: Bool = false
+    ) -> CFAttributedString {
         let font = style.makeFont()
 
         // The setting borrows the pointer, so it has to stay valid for the
@@ -158,6 +199,20 @@ public enum TextRenderer {
         if style.isUnderlined {
             attributes[kCTUnderlineStyleAttributeName as NSAttributedString.Key] =
                 CTUnderlineStyle.single.rawValue
+        }
+        // The rim is its own pass (see `draw`). CoreText's negative stroke width
+        // looks like the shortcut for this and is not: measured on Helvetica, a
+        // negative width centres the stroke on the glyph outline and eats inward,
+        // so at 8% of the point size the *entire* body of "Il", "W" and "Step 1"
+        // was consumed at both 18pt and 40pt — 290 dark pixels became 0. Half of
+        // the stroke lands inside the letter, and thin stems are thinner than
+        // half a rim.
+        if isHaloPass, let halo = style.haloColour {
+            attributes[kCTForegroundColorAttributeName as NSAttributedString.Key] = halo.cgColor
+            attributes[kCTStrokeColorAttributeName as NSAttributedString.Key] = halo.cgColor
+            // Positive: stroke only. The body arrives with the second pass.
+            attributes[kCTStrokeWidthAttributeName as NSAttributedString.Key] =
+                style.haloWidth * 100
         }
         return NSAttributedString(string: string, attributes: attributes) as CFAttributedString
     }

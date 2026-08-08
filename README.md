@@ -111,6 +111,9 @@ session.
 - **Drag the image straight out** into Slack, Mail or the Finder — no save panel,
   no file left on the Desktop. The selection if there is one, the whole canvas if
   not.
+- **Annotation text stays readable on any screenshot** — a contrasting rim,
+  on by default, because one text colour cannot work across a light panel and a
+  dark one.
 - **Fifteen shapes** with solid, dashed, or dotted outlines and optional fills.
 - **A one-cell tool rail** — 34pt, the width of the widest control it carries —
   that moves between the left and bottom of the window.

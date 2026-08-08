@@ -8,6 +8,23 @@ version may still carry breaking changes to the document format.
 ## Unreleased
 
 ### Added
+- **Text carries a contrasting rim, by default.** Annotation text goes on top of
+  a screenshot, and a screenshot is not a colour — it is a light sidebar beside a
+  dark editor beside a photograph. Any single text colour is illegible somewhere
+  in that frame, and "pick a colour that works" cannot be picked once for an
+  image the app has never seen. A rim in the opposite tone makes one colour work
+  everywhere.
+
+  On by default: text over a screenshot *without* a rim is the defect, and a
+  default nobody finds is the same as not having built it. `haloColour: nil`
+  turns it off.
+
+  CoreText's negative stroke width looks like the one-attribute shortcut for this
+  and is not — it centres the stroke on the glyph outline and eats inward. At 8%
+  of the point size that consumed the entire body of "Il", "W" and "Step 1" at
+  both 18pt and 40pt; 290 dark pixels became 0. The rim is its own stroke-only
+  pass with the filled text drawn over it, which leaves the stroke showing on the
+  outside only.
 - **Drag the image out of the window.** A handle sits with cut, copy and paste in
   the header; dragging it carries the current selection, or the whole canvas when
   there is none, into Slack, Mail, the Finder, or anything else that accepts a

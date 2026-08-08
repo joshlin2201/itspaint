@@ -563,3 +563,70 @@ struct ImageTransformTests {
         #expect(skewed == bitmap)
     }
 }
+
+@Suite("Text halo")
+struct TextHaloTests {
+
+    /// The rim is the reason annotation text is legible on a screenshot, so the
+    /// test is the thing that would actually break: **are there light pixels
+    /// between the dark glyph and the dark background?**
+    ///
+    /// Not a snapshot. It counts pixels of the halo colour that exist with the
+    /// rim on and do not exist with it off, which fails on the change that would
+    /// silently drop the effect — a positive stroke width, a lost attribute, a
+    /// colour that resolves to clear.
+    @Test("A halo puts its own colour between the glyph and a dark background")
+    func haloSeparatesGlyphFromBackground() {
+        let box = PixelRect(x: 0, y: 0, width: 120, height: 60)
+
+        func render(halo: PaintColour?) -> Bitmap {
+            var canvas = Bitmap(width: 120, height: 60, fill: RGBA8(r: 32, g: 32, b: 32))
+            // "Il" at the default width on purpose: the thinnest stems in the
+            // alphabet are what a rim destroys first, and the default is what
+            // ships.
+            let style = TextRenderer.Style(pointSize: 40, colour: .black, haloColour: halo)
+            _ = TextRenderer.draw("Il", in: box, style: style, into: &canvas)
+            return canvas
+        }
+
+        func whiteish(_ bitmap: Bitmap) -> Int {
+            bitmap.pixels.count { $0.r > 200 && $0.g > 200 && $0.b > 200 }
+        }
+        func blackish(_ bitmap: Bitmap) -> Int {
+            bitmap.pixels.count { $0.r < 24 && $0.g < 24 && $0.b < 24 }
+        }
+
+        let rimmed = render(halo: .white)
+        let plain = render(halo: nil)
+
+        #expect(whiteish(plain) == 0, "a dark glyph on a dark ground should produce no light pixels")
+        #expect(whiteish(rimmed) > 0, "the halo drew nothing")
+
+        // **Both halves, or the test is worthless.** Checking only for light pixels
+        // passed just as happily against the first, broken implementation, which
+        // used CoreText's negative stroke width and consumed the entire glyph:
+        // light pixels present, letter gone. Measured, "Il" at 40pt went from 290
+        // dark pixels to 0. Asserting the body survives is what separates a rim
+        // around a letter from an outline where a letter used to be.
+        let plainBody = blackish(plain)
+        #expect(plainBody > 0)
+        #expect(blackish(rimmed) > plainBody / 2,
+                "the rim ate the glyph: \(blackish(rimmed)) of \(plainBody) dark pixels left")
+    }
+
+    @Test("The rim scales with the point size rather than being a fixed width")
+    func haloScalesWithPointSize() {
+        func rimPixels(pointSize: Double) -> Int {
+            var canvas = Bitmap(width: 200, height: 140, fill: RGBA8(r: 32, g: 32, b: 32))
+            let style = TextRenderer.Style(
+                pointSize: pointSize, colour: .black, haloColour: .white
+            )
+            _ = TextRenderer.draw("I", in: PixelRect(x: 0, y: 0, width: 200, height: 140), style: style, into: &canvas)
+            return canvas.pixels.count { $0.r > 200 && $0.g > 200 && $0.b > 200 }
+        }
+
+        // A fraction of the point size, so the big one has a proportionally
+        // thicker rim — a fixed width would nearly vanish at 96pt.
+        #expect(rimPixels(pointSize: 96) > rimPixels(pointSize: 24) * 2)
+    }
+}
