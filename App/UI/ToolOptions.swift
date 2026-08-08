@@ -180,6 +180,7 @@ struct ToolOptions: View {
 
         case .highlighter:
             sizeControl
+            OptionRow("Colour") { HighlighterInks(model: model) }
             OptionRow("Ink") {
                 OptionSlider(
                     value: $model.highlighterOpacity,
@@ -458,6 +459,60 @@ struct ToolOptions: View {
 ///
 /// Picking one also arms the shape tool, so the gallery is a way *in* rather
 /// than a setting you can only reach once you are already there.
+/// The highlighter's own inks, so picking one does not disturb the pen.
+///
+/// The last cell is the colour pair. Before this the highlighter *only* had that
+/// behaviour, which made a fresh document's highlighter translucent black.
+private struct HighlighterInks: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(ToolSettings.highlighterInks, id: \.name) { ink in
+                swatch(
+                    fill: Color(ink.colour.cgColor),
+                    isSelected: model.highlighterColour == ink.colour,
+                    label: ink.name
+                ) { model.highlighterColour = ink.colour }
+            }
+            // A pencil over the pair's colour. Without the glyph this cell is a
+            // plain black square on a dark panel — indistinguishable from a
+            // disabled control, when what it means is "use whatever the pen has".
+            swatch(
+                fill: Color(model.foreground.cgColor),
+                isSelected: model.highlighterColour == nil,
+                label: "Follow the current colour"
+            ) { model.highlighterColour = nil }
+            .overlay {
+                Image(systemName: "pencil")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(model.foreground.prefersDarkContrast ? .black : .white)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private func swatch(
+        fill: Color, isSelected: Bool, label: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
+                .fill(fill)
+                .frame(height: 20)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
+                        .strokeBorder(
+                            isSelected ? Color.accentColor : Color.primary.opacity(0.18),
+                            lineWidth: isSelected ? 2 : 1
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(label)
+    }
+}
+
 private struct ShapeGallery: View {
     @Bindable var model: EditorModel
     let columns: Int

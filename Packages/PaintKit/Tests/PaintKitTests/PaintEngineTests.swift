@@ -1288,3 +1288,45 @@ struct MultiStepShapeTests {
         }
     }
 }
+
+@Suite("Highlighter colour")
+struct HighlighterColourTests {
+
+    /// The tool used to take the colour pair, which meant a fresh document's
+    /// highlighter was translucent black. This is the check that it no longer
+    /// follows the pen.
+    @Test("The highlighter keeps its own colour when the pen changes")
+    func highlighterDoesNotFollowTheForeground() {
+        let engine = PaintEngine(width: 40, height: 20)
+        engine.colours.foreground = .black
+        engine.settings.tool = .highlighter
+        engine.settings.brushSize = 12
+
+        engine.beginStroke(at: PixelPoint(x: 5, y: 10))
+        engine.endStroke(at: PixelPoint(x: 35, y: 10))
+
+        let marked = try! #require(engine.canvas.pixel(at: PixelPoint(x: 20, y: 10)))
+        // Yellow over white: red and green stay high, blue is pulled down. A
+        // highlighter that had followed the black pen would darken all three
+        // about equally.
+        #expect(marked.r > 200, "expected a yellow wash, got r=\(marked.r) g=\(marked.g) b=\(marked.b)")
+        #expect(marked.g > 200)
+        #expect(marked.b < marked.r - 30, "no yellow cast — the highlighter followed the pen")
+    }
+
+    @Test("Clearing the tool colour restores following the pair")
+    func nilColourFollowsThePair() {
+        let engine = PaintEngine(width: 40, height: 20)
+        engine.settings.tool = .highlighter
+        engine.settings.brushSize = 12
+        engine.settings.highlighterColour = nil
+        engine.colours.foreground = PaintColour(hex: "FF0000")!
+
+        engine.beginStroke(at: PixelPoint(x: 5, y: 10))
+        engine.endStroke(at: PixelPoint(x: 35, y: 10))
+
+        let marked = try! #require(engine.canvas.pixel(at: PixelPoint(x: 20, y: 10)))
+        #expect(marked.r > marked.g + 30 && marked.r > marked.b + 30,
+                "expected a red wash from the pair, got r=\(marked.r) g=\(marked.g) b=\(marked.b)")
+    }
+}

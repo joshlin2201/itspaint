@@ -13,6 +13,19 @@ public struct ToolSettings: Equatable, Sendable {
     public var cornerRadius: Int
     /// Highlighter opacity, 0...1.
     public var highlighterOpacity: Double
+    /// The highlighter's own colour, remembered apart from the colour pair.
+    ///
+    /// **Sharing the pair made the tool close to useless.** It took the current
+    /// foreground and applied the opacity, so the highlighter a fresh document
+    /// hands you is translucent *black* — a grey smear. Getting yellow meant
+    /// changing the global colour, highlighting, then changing it back before
+    /// drawing anything else, every single time. The complaint in the wild is
+    /// exactly this: "the pen and the highlighter should be separate and each one
+    /// has a color."
+    ///
+    /// Yellow, because that is what a highlighter is. `nil` restores following
+    /// the pair.
+    public var highlighterColour: PaintColour?
     /// Mosaic cell size for the pixelate tool.
     public var pixelateBlockSize: Int
     /// Whether shape outlines are solid, dashed or dotted.
@@ -55,6 +68,7 @@ public struct ToolSettings: Equatable, Sendable {
         fillTolerance: Int = 16,
         cornerRadius: Int = 12,
         highlighterOpacity: Double = 0.38,
+        highlighterColour: PaintColour? = PaintColour(hex: "FFE24D"),
         pixelateBlockSize: Int = 12,
         strokeDash: Raster.Dash = .solid,
         selectionKind: SelectionKind = .rectangle,
@@ -70,6 +84,7 @@ public struct ToolSettings: Equatable, Sendable {
         self.fillTolerance = min(255, max(0, fillTolerance))
         self.cornerRadius = max(0, cornerRadius)
         self.highlighterOpacity = min(1, max(0.05, highlighterOpacity))
+        self.highlighterColour = highlighterColour
         self.pixelateBlockSize = max(2, pixelateBlockSize)
         self.strokeDash = strokeDash
         self.selectionKind = selectionKind
@@ -77,6 +92,19 @@ public struct ToolSettings: Equatable, Sendable {
         self.sprayDensity = min(1, max(0.02, sprayDensity))
         self.textStyle = textStyle
     }
+
+    /// The inks a highlighter actually comes in.
+    ///
+    /// Four, not a full picker: a highlighter's job is to leave the text under it
+    /// readable, which rules out most of the palette before taste enters. These
+    /// are the colours a real pack contains, and the last one is the pair for
+    /// anyone who wants something else.
+    public static let highlighterInks: [(name: String, colour: PaintColour)] = [
+        ("Yellow", PaintColour(hex: "FFE24D")!),
+        ("Green", PaintColour(hex: "8CE99A")!),
+        ("Pink", PaintColour(hex: "FF8FC8")!),
+        ("Blue", PaintColour(hex: "74C0FC")!),
+    ]
 
     /// Range of the size control, and the bounds every size step honours.
     public static let sizeRange = 1...96

@@ -90,6 +90,7 @@ final class EditorModel {
     var selectionTolerance: Int { didSet { engine.settings.selectionTolerance = selectionTolerance } }
     var cornerRadius: Int { didSet { engine.settings.cornerRadius = cornerRadius } }
     var highlighterOpacity: Double { didSet { engine.settings.highlighterOpacity = highlighterOpacity } }
+    var highlighterColour: PaintColour? { didSet { engine.settings.highlighterColour = highlighterColour } }
     var pixelateBlockSize: Int { didSet { engine.settings.pixelateBlockSize = pixelateBlockSize } }
 
     var foreground: PaintColour {
@@ -249,6 +250,7 @@ final class EditorModel {
         self.selectionTolerance = engine.settings.selectionTolerance
         self.cornerRadius = engine.settings.cornerRadius
         self.highlighterOpacity = engine.settings.highlighterOpacity
+        self.highlighterColour = engine.settings.highlighterColour
         self.pixelateBlockSize = engine.settings.pixelateBlockSize
         self.selectionKind = engine.settings.selectionKind
         self.strokeDash = engine.settings.strokeDash

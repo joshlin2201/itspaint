@@ -1316,7 +1316,15 @@ public final class PaintEngine {
     }
 
     private func highlighterColour(for button: PointerButton) -> RGBA8 {
-        var colour = colours.colour(for: button)
+        // The tool's own colour when it has one, the pair when it does not — and
+        // the right button still means "the other colour", so a right-drag with a
+        // dedicated highlighter colour falls back to the pair rather than
+        // silently highlighting in the same shade as a left-drag.
+        var colour = if let own = settings.highlighterColour, button == .primary {
+            own
+        } else {
+            colours.colour(for: button)
+        }
         colour.alpha = settings.highlighterOpacity
         return colour.rgba8
     }

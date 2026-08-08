@@ -54,6 +54,13 @@ struct WindowCaptureTests {
         let window = try #require(document.windowControllers.first?.window)
         window.makeKeyAndOrderFront(nil)
 
+        // Optional: open a specific tool's options panel, so a capture can show
+        // a control that only exists while that tool is selected.
+        if let toolName = environment["ITSPAINT_CAPTURE_TOOL"],
+           let tool = ToolKind(rawValue: toolName) {
+            document.model.selectTool(tool)
+        }
+
         // The traffic lights only take their colours once the app is active,
         // and activation is asynchronous.
         var patience = 100

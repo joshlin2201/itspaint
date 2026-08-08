@@ -7,6 +7,15 @@ version may still carry breaking changes to the document format.
 
 ## Unreleased
 
+### Fixed
+- **The highlighter no longer draws in the pen's colour.** It took the current
+  foreground and applied its opacity, so the highlighter a fresh document handed
+  you was translucent black — a grey smear — and getting yellow meant changing
+  the global colour, highlighting, then changing it back before drawing anything
+  else. It now keeps its own ink, defaulting to yellow, with green, pink and blue
+  beside it and a fifth cell that follows the colour pair for anyone who wants
+  something else. The right button still means "the other colour".
+
 ### Added
 - **Text carries a contrasting rim, by default.** Annotation text goes on top of
   a screenshot, and a screenshot is not a colour — it is a light sidebar beside a

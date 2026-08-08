@@ -131,7 +131,7 @@ session.
 
 | Group | Tools |
 |---|---|
-| **Draw** | Pencil, Brush (round / square / soft / spray), Highlighter, Eraser |
+| **Draw** | Pencil, Brush (round / square / soft / spray), Highlighter (own ink, four colours), Eraser |
 | **Insert** | Shape, Text, Step Badge, Fill, Eyedropper |
 | **Select** | Rectangle, Ellipse, Lasso, Instant Alpha |
 | **Effects** | Pixelate |
