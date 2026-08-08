@@ -84,7 +84,7 @@ means the notarisation check itself needs no network:
 
 ```bash
 shasum -a 256 -c checksums.txt
-xcrun stapler validate ItsPaint-0.12.0.dmg
+xcrun stapler validate ItsPaint-0.13.0.dmg
 ```
 
 ItsPaint requires macOS 14 Sonoma or later.
