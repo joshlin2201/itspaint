@@ -168,8 +168,33 @@ coverage check, and one tolerance compare, and it is `@inline(__always)`.
 | Code | a framework | 35 lines over an existing fill |
 
 The gap in that table is real and it is not going to be closed by tuning a
-threshold. If you need a person cut out of a park, use a model. ItsPaint is under 3 MB
-and does the other case exactly.
+threshold. If you need a person cut out of a park, use a model.
+
+### "macOS already has this in Preview"
+
+It does, and that is the honest first objection to this whole page. Preview has a
+**Remove Background** button, and it is a subject-lifting model — the same family
+of thing Windows 11 Paint uses. So the question is not free-versus-paid, it is
+which failure you want.
+
+|  | Preview | This |
+|---|---|---|
+| Asks | "what is the subject?" | "what is the page?" |
+| Person in a park | works | **declines** |
+| Flat page, hard edge | a matte, with a soft fringe | the exact pixels |
+| Result | probabilistic | deterministic — same input, same output, always |
+| When unsure | returns its best guess | returns `false` and changes nothing |
+
+For a photograph Preview is the better tool and you should use it. For a product
+shot on a white sweep, a logo, a scan, or a screenshot — the cases this exists
+for — a flood fill over a flat region is not an approximation of subject
+lifting, it is the exact answer, and it cannot invent a fringe that was not
+there.
+
+The part worth taking from this page is not that a flood fill beats a model. It
+is that a *bounded* problem sometimes has an exact solution hiding inside code
+you already shipped, and 35 lines over the paint bucket is a cheaper thing to own
+than a dependency on somebody's matting framework.
 
 ## Verifying the claims
 
