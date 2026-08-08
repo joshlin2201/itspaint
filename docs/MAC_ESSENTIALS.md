@@ -161,9 +161,13 @@ missing.
 | Xcode 26 | Required for App Store uploads from 2026-04-28 |
 | No private API | Verified — the one private selector used early (`_setMenuName:`) was removed |
 
-**Not done, and not automatable from here:** App Store Connect record, pricing,
-screenshots (16:10 at 2880×1800), and submission. Those need the Apple Developer
-account and interactive steps.
+Everything submittable is staged in [APP_STORE.md](APP_STORE.md): the listing
+copy, the 2880×1800 screenshots (`scripts/appstore-screenshots.sh`), the
+archive and export script (`scripts/appstore-archive.sh`), and the App Store
+Connect API sequence that files a version and submits it for review. Archive,
+upload, version record, release notes and submission all run from the command
+line. What is left for a person is the EU trader declaration and trademark
+clearance — legal statements, not API calls.
 
 ### Signing and notarisation
 

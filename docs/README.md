@@ -18,6 +18,7 @@ Three about where it goes and who else is in the space:
 | **[COMPETITIVE.md](COMPETITIVE.md)** | The capability map against Windows 11 Paint and macOS Markup, the rest of the field, and the two empty slots the positioning comes from. |
 | **[CAPTURE.md](CAPTURE.md)** | Replacing the screenshot workflow: everything macOS's own capture tools do, four routes in ranked by what they cost the user in permissions, and the integration surfaces that cost nothing. |
 | **[GROWTH.md](GROWTH.md)** | Distribution, where to post and what to say, the utility worth building to attract contributors, and which money models survive the constraints in PHILOSOPHY. |
+| **[APP_STORE.md](APP_STORE.md)** | The Mac App Store submission kit: every App Store Connect field pre-written, the archive/export script, the screenshot pipeline, and the steps only the account holder can do. |
 
 Two more, kept for the reasoning rather than as current reference:
 

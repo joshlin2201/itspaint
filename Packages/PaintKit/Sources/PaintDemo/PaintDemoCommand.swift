@@ -54,6 +54,23 @@ struct PaintDemoCommand {
             }
         }
 
+        if let index = arguments.firstIndex(of: "--appstore") {
+            guard arguments.count > index + 2 else {
+                writeError("Usage: paint-demo --appstore <reel-final-frame.png> <output-dir>\n")
+                return 2
+            }
+            do {
+                try AppStoreScreenshots.run(
+                    reelFrame: url(for: arguments[index + 1], currentDirectory: currentDirectory),
+                    outputDir: url(for: arguments[index + 2], currentDirectory: currentDirectory)
+                )
+                return 0
+            } catch {
+                writeError("App Store screenshots failed: \(error)\n")
+                return 1
+            }
+        }
+
         if arguments.first == "--scene" {
             guard arguments.count == 3, let scene = DemoScene(rawValue: arguments[1]) else {
                 printSceneUsage()
@@ -103,6 +120,7 @@ struct PaintDemoCommand {
           paint-demo --bench
           paint-demo --icon [output-directory]
           paint-demo --social <window-capture> <output.png>
+          paint-demo --appstore <reel-final-frame.png> <output-dir>
         """)
     }
 }
