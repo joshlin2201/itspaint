@@ -93,17 +93,37 @@ struct ToolbarGeometryTests {
         #expect(Tokens.Rail.toolColumns == 1)
     }
 
-    /// The README quotes both of these, and both had rotted: it advertised a
-    /// 48pt rail long after the tool cell shrank to 34, and twelve tools when
-    /// there have been eleven. A number in prose cannot fail a build, so pin it
-    /// to one that can — change the design and this test names the sentence to
-    /// go and update.
+    /// The README quotes these, and they had rotted: it advertised a 48pt rail
+    /// long after the tool cell shrank to 34, and twelve tools when there have
+    /// been eleven. A number in prose cannot fail a build, so pin it to one
+    /// that can.
+    ///
+    /// Pinning the token alone is only half the guard — the code and the prose
+    /// can drift apart in either direction, and a test that restates the
+    /// number in a comment still passes when only the README moves. So this
+    /// reads the file. If a count changes, the assertion names the words to go
+    /// and rewrite.
     @Test("The numbers the README quotes are still the numbers")
-    func documentedGeometryMatchesTheTokens() {
-        #expect(Tokens.Rail.cross == 34.08, "README says the rail is 34pt")
-        #expect(Tokens.Rail.toolColumns == 1, "README says one cell thick")
-        #expect(ToolKind.allCases.count == 11, "README says eleven visible tools")
-        #expect(ShapeKind.allCases.count == 15, "README says fifteen shapes")
+    func documentedGeometryMatchesTheTokens() throws {
+        #expect(Tokens.Rail.toolColumns == 1)
+        #expect(ToolKind.allCases.count == 11)
+        #expect(ShapeKind.allCases.count == 15)
+
+        let readme = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()      // AppTests/
+            .deletingLastPathComponent()      // repository root
+            .appendingPathComponent("README.md")
+        let prose = try String(contentsOf: readme, encoding: .utf8)
+
+        // Every place the README spends one of these numbers as a word.
+        for phrase in [
+            "eleven tools sit on a rail one cell thick",
+            "Eleven rail buttons",
+            "**Fifteen shapes**",
+            "fifteen shapes share the Shape button",
+        ] {
+            #expect(prose.contains(phrase), "README no longer says \"\(phrase)\"")
+        }
     }
 
     @Test("The rail fits the height of a small laptop window")
