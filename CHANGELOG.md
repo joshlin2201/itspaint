@@ -5,7 +5,7 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
-## [Unreleased]
+## [0.13.1] — 2026-08-08
 ### Fixed
 - **Remove Background no longer refuses the images it is for.** The guard that
   keeps it from erasing a picture compared *coverage* against 92%, so anything
