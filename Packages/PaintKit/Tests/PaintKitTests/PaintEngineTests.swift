@@ -1330,3 +1330,65 @@ struct HighlighterColourTests {
                 "expected a red wash from the pair, got r=\(marked.r) g=\(marked.g) b=\(marked.b)")
     }
 }
+
+@Suite("Instant Alpha selections can be moved")
+struct InstantAlphaDragTests {
+
+    /// Sets up a red square on white and selects it with Instant Alpha.
+    private func engineWithSelection() -> PaintEngine {
+        var canvas = Bitmap(width: 60, height: 60, fill: .white)
+        canvas.fill(PixelRect(x: 10, y: 10, width: 20, height: 20), with: RGBA8(r: 255, g: 0, b: 0))
+        let engine = PaintEngine(canvas: canvas)
+        engine.settings.tool = .select
+        engine.settings.selectionKind = .instantAlpha
+        engine.beginStroke(at: PixelPoint(x: 20, y: 20))
+        _ = engine.endStroke(at: PixelPoint(x: 20, y: 20))
+        return engine
+    }
+
+    /// The reported bug: after Instant Alpha you could not move what you had
+    /// just selected, because a press inside the marquee made a *new* selection
+    /// instead of lifting it.
+    @Test("Dragging inside the marquee lifts it and moves it")
+    func dragMovesTheSelection() {
+        let engine = engineWithSelection()
+        #expect(engine.selection != nil, "Instant Alpha produced no selection")
+
+        engine.beginStroke(at: PixelPoint(x: 20, y: 20))
+        _ = engine.continueStroke(to: PixelPoint(x: 40, y: 35))
+        _ = engine.endStroke(at: PixelPoint(x: 40, y: 35))
+
+        // The region is now floating content that has moved, not a fresh
+        // selection sitting where the old one was.
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 20, y: 20)) == .white,
+                "the region was never lifted from where it started")
+    }
+
+    /// The behaviour the old exclusion existed to protect: Instant Alpha's
+    /// marquee is usually a background covering most of the canvas, so a click
+    /// inside it still has to be able to select something else.
+    @Test("Clicking without moving still re-selects at that point")
+    func clickStillReselects() {
+        let engine = engineWithSelection()
+        let before = engine.canvas
+
+        engine.beginStroke(at: PixelPoint(x: 22, y: 22))
+        _ = engine.endStroke(at: PixelPoint(x: 22, y: 22))
+
+        #expect(engine.canvas.pixels == before.pixels,
+                "a click lifted the selection instead of re-selecting")
+        #expect(engine.selection != nil)
+    }
+
+    @Test("A press inside the marquee that never moves leaves the canvas alone")
+    func pendingPressIsInert() {
+        let engine = engineWithSelection()
+        let before = engine.canvas
+
+        engine.beginStroke(at: PixelPoint(x: 20, y: 20))
+        // Inside the slop — not a drag.
+        _ = engine.continueStroke(to: PixelPoint(x: 21, y: 21))
+
+        #expect(engine.canvas.pixels == before.pixels, "a jitter lifted the selection")
+    }
+}

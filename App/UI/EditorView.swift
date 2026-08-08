@@ -49,6 +49,16 @@ struct EditorView: View {
 
             titleRow
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                // **Above the tool chrome, which is drawn after it.** Share is
+                // the one control in this row that is an NSViewRepresentable
+                // rather than a SwiftUI Button — it hosts a real NSButton so its
+                // popover can anchor to itself — and a hosted AppKit view can be
+                // occluded for hit-testing by SwiftUI siblings that come later in
+                // the stack, even where they draw nothing. That matches the
+                // report exactly: cut, copy and paste kept working while Share
+                // alone stopped responding. The header band belongs to the
+                // header.
+                .zIndex(1)
 
             readOutRow
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)

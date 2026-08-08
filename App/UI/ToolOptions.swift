@@ -391,7 +391,11 @@ struct ToolOptions: View {
     @ViewBuilder
     private var selectionActions: some View {
         if isVertical {
-            OptionRow("Size") { sizeReadout }
+            // "Selection", not "Size". Every tool's own row is already labelled
+            // Size, so a badge with its size slider open showed the word twice,
+            // once for the badge and once for the marquee, with different units
+            // under each.
+            OptionRow("Selection") { sizeReadout }
             OptionRow(nil) {
                 SegmentTrack { selectionActionButtons }
             }

@@ -64,7 +64,15 @@ public final class PaintEngine {
         case resizeFloating(handle: FloatingSelection.Handle)
         /// Bending a chord that has already been drawn — the curve's second step.
         case bend(before: Bitmap, a: PixelPoint, b: PixelPoint, dirty: PixelRect, button: PointerButton)
+        /// A press inside an Instant Alpha selection, before it is known whether
+        /// this is a click (re-select here) or a drag (move what is selected).
+        case pointSelectPending(origin: PixelPoint, operation: SelectionOperation)
     }
+
+    /// How far the pointer must travel before a press inside a point-select
+    /// marquee counts as a drag rather than a click. Small enough that moving
+    /// feels immediate, large enough to survive the hand-shake in a click.
+    private static let dragSlop = 3
 
     // MARK: - Multi-step shapes
 
@@ -160,6 +168,21 @@ public final class PaintEngine {
         // Dragging inside an existing marquee LIFTS it and moves it, with no
         // separate Cut step. Requiring Cut first is the classic reason people
         // conclude a selection "doesn't do anything".
+        // Instant Alpha defers the choice. Its marquee is usually a *background*
+        // and so covers most of the canvas, which is why this used to exclude it
+        // outright — if every press inside moved the selection there would be
+        // nowhere left to click to select something else. But excluding it means
+        // the region you just selected can never be moved, which is the more
+        // common complaint by far. So neither: a press waits, a drag past
+        // `dragSlop` lifts and moves, a click in place re-selects.
+
+        if settings.tool == .select, settings.selectionKind.isPointSelect,
+           let current = selection, current.contains(point)
+        {
+            gesture = .pointSelectPending(origin: point, operation: selectionOperation)
+            return .empty
+        }
+
         if settings.tool == .select, !settings.selectionKind.isPointSelect,
            let current = selection, current.contains(point)
         {
@@ -380,6 +403,18 @@ public final class PaintEngine {
             gesture = .bend(before: before, a: a, b: b, dirty: drawn, button: button)
             return previousDirty.union(drawn)
 
+        case let .pointSelectPending(origin, operation):
+            guard abs(point.x - origin.x) > Self.dragSlop
+                    || abs(point.y - origin.y) > Self.dragSlop
+            else { return .empty }
+            // Past the slop: this is a move. Lift the selection exactly as the
+            // marquee kinds do, then hand the rest of the drag to moveFloating.
+            _ = operation
+            let lifted = cutSelection()
+            guard let floating else { gesture = .idle; return lifted }
+            gesture = .moveFloating(grab: origin, startOrigin: floating.origin)
+            return lifted.union(continueStroke(to: point, constrained: constrained))
+
         case let .moveFloating(grab, startOrigin):
             guard var floating else { return .empty }
             let previous = floating.frame
@@ -466,6 +501,12 @@ public final class PaintEngine {
             lassoPath = selection == nil ? [] : points
             return refreshed.union(previous).union(selectionOverlayRect())
 
+        case let .pointSelectPending(origin, operation):
+            // The pointer never left the slop, so this was a click: select at
+            // the point pressed, which is what Instant Alpha has always done.
+            gesture = .idle
+            return refreshed.union(selectInstantAlpha(at: origin, operation: operation))
+
         case .moveFloating, .resizeFloating:
             gesture = .idle
             activeRegionSize = nil
@@ -488,6 +529,12 @@ public final class PaintEngine {
 
         switch gesture {
         case .idle:
+            // A pending point-select has not touched the canvas or the
+            // selection yet, so cancelling it is exactly going idle.
+            return .empty
+
+        case .pointSelectPending:
+            gesture = .idle
             return .empty
 
         case let .freehand(before, _, dirty, _),

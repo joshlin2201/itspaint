@@ -5,6 +5,26 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## Unreleased
+
+### Fixed
+- **An Instant Alpha selection can be moved.** Pressing inside the marquee made
+  a *new* selection instead of lifting the one you had just made, so the region
+  you selected could never be dragged anywhere. The exclusion was deliberate —
+  Instant Alpha usually selects a background covering most of the canvas, and if
+  every press inside moved it there would be nowhere left to click to select
+  something else — so neither behaviour wins outright now: a press waits, a drag
+  lifts and moves, a click in place still re-selects.
+- **The options panel said "Size" twice.** The tool's own size row and the
+  selection's dimensions carried the same label, with different units under each.
+  The second is now "Selection".
+- **Share stopped responding while a tool's options were open.** It is the one
+  control in the header that hosts a real `NSButton`, so its popover can anchor
+  to itself, and a hosted AppKit view can be occluded for hit-testing by SwiftUI
+  siblings drawn later in the stack even where they draw nothing — which is why
+  cut, copy and paste kept working beside it. The header band now sits above the
+  tool chrome.
+
 ## [0.13.0] — 2026-08-07
 
 ### Fixed
