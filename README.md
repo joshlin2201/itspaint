@@ -193,6 +193,12 @@ third-party code to audit behind that.
 None of this is a promise about future versions. It is three commands that run
 against the build you have.
 
+[**Making "no network" checkable**](docs/PROVING_NO_NETWORK.md) is why they are in
+that order — the entitlements check reports what the kernel will permit rather than
+what the developer wrote, so it holds even if the developer is lying. It includes a
+short `sandbox-exec` profile that reproduces the refusal, and what to do to make the
+same claim falsifiable in your own app.
+
 ## Design and implementation
 
 ItsPaint has two layers:
