@@ -209,13 +209,11 @@ swift test          # the whole engine suite, in a fresh clone
 **Five issues are open and labelled [`good first issue`](https://github.com/joshlin2201/itspaint/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)**,
 each naming the file and the line to start at:
 
-| | |
-|---|---|
-| [#3](https://github.com/joshlin2201/itspaint/issues/3) | Grow and shrink a selection by a pixel amount |
-| [#4](https://github.com/joshlin2201/itspaint/issues/4) | Make a selection from the alpha channel |
-| [#5](https://github.com/joshlin2201/itspaint/issues/5) | Arrowheads as a line style, not a separate shape |
-| [#6](https://github.com/joshlin2201/itspaint/issues/6) | Flip and rotate the selection, not the whole image |
-| [#7](https://github.com/joshlin2201/itspaint/issues/7) | Add to and subtract from a selection |
+- [#3](https://github.com/joshlin2201/itspaint/issues/3) — Grow and shrink a selection by a pixel amount
+- [#4](https://github.com/joshlin2201/itspaint/issues/4) — Make a selection from the alpha channel
+- [#5](https://github.com/joshlin2201/itspaint/issues/5) — Arrowheads as a line style, not a separate shape
+- [#6](https://github.com/joshlin2201/itspaint/issues/6) — Flip and rotate the selection, not the whole image
+- [#7](https://github.com/joshlin2201/itspaint/issues/7) — Add to and subtract from a selection
 
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the structure, the design constraints,
 and what a change has to prove before it lands.
