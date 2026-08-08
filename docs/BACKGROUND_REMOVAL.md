@@ -59,7 +59,8 @@ public func removeBackground(tolerance: Int = 24) -> Bool {
         return false
     }
     let covered = page.mask?.count { $0 > 0 } ?? page.bounds.area
-    guard Double(covered) / Double(canvas.count) < 0.92 else {
+    let remaining = canvas.count - covered
+    guard remaining >= max(64, canvas.count / 4000) else {
         selection = previous
         return false
     }
@@ -108,7 +109,8 @@ refusal costs you nothing, not even your selection.
 ### It declines rather than guessing
 
 ```swift
-guard Double(covered) / Double(canvas.count) < 0.92 else {
+let remaining = canvas.count - covered
+guard remaining >= max(64, canvas.count / 4000) else {
     selection = previous
     return false
 }
@@ -119,16 +121,42 @@ are all within tolerance of something at a corner, and it eats the frame. The
 useless answer is a blank canvas. The dangerous answer is a *nearly* blank
 canvas, because that one looks like the feature ran.
 
-So above 92% coverage it returns `false`, restores whatever selection you had,
-and the app says it could not separate the page. The menu item does nothing
-rather than something wrong.
+So when the flood leaves nothing behind it returns `false`, restores whatever
+selection you had, and the app says it could not separate the page. The menu
+item does nothing rather than something wrong.
 
-The same guard is why the small-subject case is a decline and not a bug report.
-A 40-pixel logo centred on a 4000-pixel page is a legitimate image with a
-legitimate flat background, and it crosses 92% — the feature says no to an
-image it could have handled. That is the corner the threshold buys, and it is
-the right side to be wrong on: a false decline costs one undo, a false removal
-costs the image.
+**This guard was wrong for its first three releases, and the way it was wrong is
+worth more than the fix.** It compared *coverage* against a ceiling:
+
+```swift
+guard Double(covered) / Double(canvas.count) < 0.92 else { ... }   // don't
+```
+
+That reads like the same test. It is not. A logo, an icon, or a product shot on
+a white sweep — the images this command exists for — is routinely 95% or more
+background. So the command refused precisely the pictures it was built to
+handle. A 60-pixel mark centred on a 400×400 page is 97.8% background and came
+back *"There's no background to remove."*
+
+Two things kept it hidden. The test fixture was a 40×20 canvas holding a 20×8
+subject, which sits at 80% page and sails under the threshold — **the constant
+was satisfied by the test and by nothing a person would open.** And this
+document argued the failure was a deliberate trade, in a paragraph that named
+the exact broken case and called it a corner worth buying. It was not a corner.
+It was the centre of the use case, described as an edge because the threshold
+that caused it had already been written down.
+
+The fix is not a better constant. Coverage was the wrong quantity. What the
+guard is protecting against is the image whose page and subject are *one region*,
+where keying out the page erases the picture — and that shows up as **nothing
+left over**, at any coverage at all. So measure the remainder instead. The floor
+stays small and grows slowly: a subject is never required to be a large fraction
+of the image, only to be more than the stray anti-aliased pixels a flood leaves
+along an edge where it stopped.
+
+The regression test now runs subjects of 8, 16, 40, 60, 120 and 200 pixels
+square on a 400×400 page — 99% down to 75% background — because a threshold
+tuned on one fixture is how the first one survived.
 
 ## The flood fill underneath
 

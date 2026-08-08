@@ -805,8 +805,31 @@ public final class PaintEngine {
             selection = previous
             return false
         }
+        // Decline when the flood left no subject behind — not when it found a
+        // lot of page.
+        //
+        // This used to compare *coverage* against 0.92, which sounds like the
+        // same test and is not. A logo or a product shot on a white sweep — the
+        // case this command exists for — is routinely 95%+ background, so the
+        // command refused precisely the images it is meant to handle. A 60px
+        // mark centred on a 400×400 page is 97.8% background and came back
+        // "There's no background to remove." The threshold was satisfied by the
+        // test fixture (a 40×20 canvas with a 20×8 subject, 80% page) and by
+        // nothing a user would actually open.
+        //
+        // What the guard is really for is the image whose page and subject are
+        // one region, where keying out the page erases the picture. That shows
+        // up as *nothing left over*, at any coverage. So measure the remainder.
+        //
+        // The floor is deliberately small and grows slowly. A subject is not
+        // required to be a large fraction of the image — that was the original
+        // mistake — only to be more than the stray anti-aliased pixels a flood
+        // leaves along an edge it stopped at. 64 pixels covers an 8×8 mark;
+        // the 1/4000 term keeps the same idea honest on a 24 MP photo, where
+        // 64 surviving pixels really would mean the picture was erased.
         let covered = page.mask?.count { $0 > 0 } ?? page.bounds.area
-        guard Double(covered) / Double(canvas.count) < 0.92 else {
+        let remaining = canvas.count - covered
+        guard remaining >= max(64, canvas.count / 4000) else {
             selection = previous
             return false
         }

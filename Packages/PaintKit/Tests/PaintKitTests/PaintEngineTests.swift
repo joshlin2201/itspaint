@@ -791,6 +791,35 @@ struct SelectionTests {
         #expect(engine.selection == nil, "a refusal left a selection behind")
     }
 
+    /// The case the command exists for, and the one it used to refuse.
+    ///
+    /// The guard compared coverage against 0.92, so anything more than 92%
+    /// background was declined — which is a logo, an icon, or a product shot on
+    /// a white sweep, i.e. the whole point. The old fixture (40×20 canvas, 20×8
+    /// subject) sat at 80% page and passed, so nothing caught it. These are
+    /// sized like images a person actually opens.
+    @Test(
+        "A small subject on a large page is still a background",
+        arguments: [8, 16, 40, 60, 120, 200]
+    )
+    func removeBackgroundKeepsSmallSubjects(subject: Int) {
+        var canvas = Bitmap(width: 400, height: 400, fill: .white)
+        let origin = (400 - subject) / 2
+        Raster.fillRect(
+            PixelRect(x: origin, y: origin, width: subject, height: subject),
+            colour: RGBA8(r: 200, g: 30, b: 30), into: &canvas
+        )
+        let engine = PaintEngine(canvas: canvas)
+        let page = 100 - Double(subject * subject) / 1600
+
+        #expect(engine.removeBackground(), "declined a subject on a \(Int(page))% page")
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 0, y: 0)) == .clear)
+        #expect(
+            engine.canvas.pixel(at: PixelPoint(x: 200, y: 200))?.a == 255,
+            "the subject did not survive"
+        )
+    }
+
     @Test("Selecting does not modify a single pixel")
     func selectingIsNonDestructive() {
         let engine = markedEngine()

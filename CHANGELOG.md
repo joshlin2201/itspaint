@@ -5,6 +5,28 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## [Unreleased]
+### Fixed
+- **Remove Background no longer refuses the images it is for.** The guard that
+  keeps it from erasing a picture compared *coverage* against 92%, so anything
+  more than 92% background was declined — which is a logo, an icon, or a product
+  shot on a white sweep, i.e. the whole use case. A 60px mark centred on a
+  400×400 page is 97.8% background and came back "There's no background to
+  remove."
+
+  Coverage was the wrong quantity. The guard exists for the image whose page and
+  subject are one region, where keying out the page erases the picture, and that
+  shows up as *nothing left over* — at any coverage. It now measures the
+  remainder against a small floor that grows slowly (`max(64, count / 4000)`),
+  so a subject is never required to be a large fraction of the image.
+
+  Two things hid it. The test fixture was a 40×20 canvas with a 20×8 subject,
+  which sits at 80% page and passes comfortably — the constant was satisfied by
+  the test and by nothing anyone would open. And `docs/BACKGROUND_REMOVAL.md`
+  argued the failure was a deliberate trade, naming the broken case and calling
+  it a corner worth buying. It was the centre of the use case. The regression
+  test now runs subjects from 8 to 200 pixels square, 99% down to 75% page.
+
 ## [0.13.0] — 2026-08-07
 ### Added
 - **Snap to grid** — `⇧⌘'`, with 8, 16, 32 and 64px spacings under View ▸ Grid
