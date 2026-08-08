@@ -7,6 +7,27 @@ version may still carry breaking changes to the document format.
 
 ## Unreleased
 
+### Added
+- **Snap to grid** — `⇧⌘'`, with 8, 16, 32 and 64px spacings under View ▸ Grid
+  Spacing, remembered across documents and launches.
+
+  Shapes, marquees and pasted content snap. Pencil, brush, highlighter and
+  eraser never do: a freehand stroke that jumped to a grid would not be
+  freehand.
+
+  It snaps the region's **edges**, not its corner pixels. `PixelRect(corners:)`
+  is inclusive, so rounding both corners to multiples of the grid gives sizes of
+  `n × grid + 1` — two boxes drawn one under the other would overlap by a row,
+  aligned-looking and quietly wrong. Dragging right or down, the last included
+  pixel now lands one short of the grid line, and the next box starting on that
+  line abuts it exactly.
+
+  The grid draws whenever snapping is on, at any zoom, with every fourth line
+  stronger so cells can be counted. Deliberately faint — the first version was
+  legible enough to compete with the artwork, which is the wrong job for a guide.
+  This is not the pixel grid: that one draws every pixel above 4× zoom, and
+  snapping to it would mean nothing, since a drag already lands on whole pixels.
+
 ### Fixed
 - **An Instant Alpha selection can be moved.** Pressing inside the marquee made
   a *new* selection instead of lifting the one you had just made, so the region

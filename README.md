@@ -119,6 +119,8 @@ session.
   that moves between the left and bottom of the window.
 - **Precise canvas control** with pointer-centred zoom, nearest-neighbour display
   above 100%, pixel grids, and live tool footprints.
+- **Snap to grid** (`⇧⌘'`) for shapes, selections and pasted content, at 8 to
+  64px — never for freehand tools.
 - **Rotate by any angle**, with the canvas growing to fit the corners.
 - **Universal and notarised** — one build for Apple silicon and Intel, signed
   with a Developer ID, with the notarisation ticket stapled so the check needs no

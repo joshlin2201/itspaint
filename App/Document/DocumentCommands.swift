@@ -73,6 +73,32 @@ extension DrawingDocument {
     }
     @IBAction func togglePixelGrid(_ sender: Any?) { model.showsGrid.toggle() }
 
+    /// Off, or the last spacing used. The menu carries the sizes; this is the
+    /// keystroke, and it should return you to the grid you were working on
+    /// rather than to a default you did not pick.
+    ///
+    /// Remembered across documents and launches, because a grid is a property of
+    /// the work someone is doing rather than of one file.
+    @IBAction func toggleSnapToGrid(_ sender: Any?) {
+        model.snapGrid = model.snapGrid == 0 ? Self.rememberedSnapGrid : 0
+    }
+
+    @IBAction func setSnapGrid(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem else { return }
+        model.snapGrid = item.tag
+        if item.tag > 0 { Self.rememberedSnapGrid = item.tag }
+    }
+
+    private static let snapGridDefaultsKey = "snapGrid"
+
+    static var rememberedSnapGrid: Int {
+        get {
+            let stored = UserDefaults.standard.integer(forKey: snapGridDefaultsKey)
+            return ToolSettings.snapGrids.contains(stored) ? stored : 16
+        }
+        set { UserDefaults.standard.set(newValue, forKey: snapGridDefaultsKey) }
+    }
+
     /// ⇧⌘C opens the swatch popover. In canvas-first there is no permanent
     /// colour surface, so the keystroke is the guaranteed way in.
     @IBAction func showColours(_ sender: Any?) { model.isColourPopoverRequested = true }
@@ -174,6 +200,17 @@ extension DrawingDocument {
             // The grid is meaningless until a pixel is comfortably bigger than
             // the line that would draw it.
             return model.zoom >= 4
+
+        case #selector(toggleSnapToGrid(_:)):
+            menuItem.state = model.snapGrid > 0 ? .on : .off
+            // Available at any zoom, unlike the pixel grid: an alignment grid is
+            // coarse enough to draw and to aim at when the whole picture is on
+            // screen, which is where most markup happens.
+            return true
+
+        case #selector(setSnapGrid(_:)):
+            menuItem.state = menuItem.tag == model.snapGrid ? .on : .off
+            return true
 
         case #selector(zoomIn(_:)):
             return model.zoom < (EditorModel.zoomSteps.last ?? 1)

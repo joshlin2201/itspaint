@@ -251,11 +251,11 @@ public final class PaintEngine {
             let previous = selectionOverlayRect()
             selection = nil
             if tool == .pixelate {
-                gesture = .shape(before: canvas, origin: point, dirty: .empty, button: button)
+                gesture = .shape(before: canvas, origin: snapped(point), dirty: .empty, button: button)
             } else if settings.selectionKind.isFreeform {
                 gesture = .lasso(points: [point])
             } else {
-                gesture = .region(origin: point, current: point)
+                gesture = .region(origin: snapped(point), current: snapped(point))
             }
             return dirty.union(previous)
         }
@@ -295,7 +295,7 @@ public final class PaintEngine {
             return dirty.union(stepDirty)
         }
 
-        gesture = .shape(before: before, origin: point, dirty: .empty, button: button)
+        gesture = .shape(before: before, origin: snapped(point), dirty: .empty, button: button)
         return dirty
     }
 
@@ -349,7 +349,7 @@ public final class PaintEngine {
                 let patch = before.extract(previousDirty)
                 canvas.restore(patch.pixels, to: patch.rect)
             }
-            let end = constrained ? constrain(origin, to: point) : point
+            let end = snappedEnd(constrained ? constrain(origin, to: point) : point, from: origin)
             let drawn = settings.tool == .pixelate
                 ? Raster.pixelate(
                     PixelRect(corners: origin, end),
@@ -362,7 +362,7 @@ public final class PaintEngine {
 
         case let .region(origin, _):
             let previous = selectionOverlayRect()
-            let end = constrained ? constrain(origin, to: point) : point
+            let end = snappedEnd(constrained ? constrain(origin, to: point) : point, from: origin)
             gesture = .region(origin: origin, current: end)
             let box = PixelRect(corners: origin, end)
             let region = box.intersection(canvas.bounds)
@@ -418,10 +418,10 @@ public final class PaintEngine {
         case let .moveFloating(grab, startOrigin):
             guard var floating else { return .empty }
             let previous = floating.frame
-            floating.move(to: PixelPoint(
+            floating.move(to: snapped(PixelPoint(
                 x: startOrigin.x + (point.x - grab.x),
                 y: startOrigin.y + (point.y - grab.y)
-            ))
+            )))
             self.floating = floating
             activeRegionSize = (floating.frame.width, floating.frame.height)
             return previous.union(floating.frame).insetBy(-handleTolerance)
@@ -1701,6 +1701,55 @@ public final class PaintEngine {
 
     /// Shift-constrain: lines snap to 45° increments, boxes and ellipses to
     /// squares and circles, marquees to squares.
+    /// Round to the nearest intersection of the alignment grid.
+    ///
+    /// **Only where alignment is the point.** A shape's corners, a marquee's
+    /// corners and floating content's origin snap; a brush, a pencil, a
+    /// highlighter and an eraser never do — a freehand stroke that jumped to a
+    /// grid would not be freehand, and there is no version of that anyone wants.
+    ///
+    /// Clamped to the canvas afterwards, so snapping near an edge cannot round a
+    /// point off the picture.
+    func snapped(_ point: PixelPoint) -> PixelPoint {
+        let grid = settings.snapGrid
+        guard grid > 1 else { return point }
+        func round(_ v: Int, _ limit: Int) -> Int {
+            let snapped = Int((Double(v) / Double(grid)).rounded()) * grid
+            return min(max(0, snapped), limit)
+        }
+        return PixelPoint(x: round(point.x, canvas.width), y: round(point.y, canvas.height))
+    }
+
+    /// Snap the far corner of a drag so the region's **edges** land on grid
+    /// lines, rather than its corner pixels.
+    ///
+    /// `PixelRect(corners:)` is inclusive — a box from 16 to 112 is 97 wide, not
+    /// 96 — so snapping both corners to multiples of the grid produces sizes of
+    /// `n x grid + 1`, and two boxes drawn one under the other overlap by a
+    /// row. Alignment would look right and tiling would be quietly off by one,
+    /// which is exactly the kind of nearly-correct that makes a snap feature
+    /// feel broken.
+    ///
+    /// So the *exclusive* edge is what snaps: dragging right or down, the last
+    /// included pixel is one short of the grid line, and the next box starting
+    /// on that line abuts it exactly.
+    func snappedEnd(_ point: PixelPoint, from origin: PixelPoint) -> PixelPoint {
+        let grid = settings.snapGrid
+        guard grid > 1 else { return point }
+        func edge(_ value: Int, _ start: Int, _ limit: Int) -> Int {
+            if value >= start {
+                let line = Int((Double(value + 1) / Double(grid)).rounded()) * grid
+                return min(max(start, line - 1), limit - 1)
+            }
+            let line = Int((Double(value) / Double(grid)).rounded()) * grid
+            return min(max(0, line), start)
+        }
+        return PixelPoint(
+            x: edge(point.x, origin.x, canvas.width),
+            y: edge(point.y, origin.y, canvas.height)
+        )
+    }
+
     private func constrain(_ origin: PixelPoint, to point: PixelPoint) -> PixelPoint {
         let dx = point.x - origin.x
         let dy = point.y - origin.y

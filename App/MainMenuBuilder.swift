@@ -146,6 +146,28 @@ enum MainMenuBuilder {
         add(to: menu, "Zoom to Fit", #selector(AppCommands.zoomToFit(_:)), "9")
         menu.addItem(.separator())
         add(to: menu, "Show Pixel Grid", #selector(AppCommands.togglePixelGrid(_:)), "'")
+
+        // Snapping is a drag modifier, not a tool, so it lives beside the other
+        // view-level switches rather than costing a rail cell — the rail lists
+        // things that make marks. The spacing hides in a submenu because the
+        // question "is snapping on" is asked constantly and "how big is the
+        // grid" almost never.
+        let snap = add(to: menu, "Snap to Grid", #selector(AppCommands.toggleSnapToGrid(_:)), "'")
+        snap.keyEquivalentModifierMask = [.command, .shift]
+
+        let spacing = NSMenu(title: "Grid Spacing")
+        for size in ToolSettings.snapGrids {
+            let item = NSMenuItem(
+                title: "\(size) px",
+                action: #selector(AppCommands.setSnapGrid(_:)),
+                keyEquivalent: ""
+            )
+            item.tag = size
+            spacing.addItem(item)
+        }
+        let spacingItem = NSMenuItem(title: "Grid Spacing", action: nil, keyEquivalent: "")
+        spacingItem.submenu = spacing
+        menu.addItem(spacingItem)
         add(to: menu, "Move Toolbar", #selector(AppCommands.toggleToolbarEdge(_:)), "t")
             .keyEquivalentModifierMask = [.command, .option]
         add(to: menu, "Colours…", #selector(AppCommands.showColours(_:)), "C")
@@ -368,6 +390,8 @@ enum MainMenuBuilder {
     func zoomOut(_ sender: Any?)
     func zoomActual(_ sender: Any?)
     func togglePixelGrid(_ sender: Any?)
+    func toggleSnapToGrid(_ sender: Any?)
+    func setSnapGrid(_ sender: Any?)
     func showColours(_ sender: Any?)
     func selectToolFromMenu(_ sender: Any?)
     func selectShapeFromMenu(_ sender: Any?)

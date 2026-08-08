@@ -11,6 +11,18 @@ public struct ToolSettings: Equatable, Sendable {
     public var fillTolerance: Int
     /// Corner radius for the rounded-rectangle shape, in pixels.
     public var cornerRadius: Int
+    /// Spacing of the alignment grid in pixels, or `0` for none.
+    ///
+    /// **Not the pixel grid.** That one draws every pixel above 4x zoom and
+    /// snapping to it would mean nothing — a drag already lands on whole pixels.
+    /// This is the coarse grid people mean by "snap": a shape or a marquee that
+    /// starts and ends on a multiple of it, so two rectangles drawn a minute
+    /// apart line up without anyone measuring.
+    ///
+    /// Off by default. It changes what a drag does, and a drag that quietly
+    /// disobeys is worse than one that needs a menu item first.
+    public var snapGrid: Int
+
     /// Highlighter opacity, 0...1.
     public var highlighterOpacity: Double
     /// The highlighter's own colour, remembered apart from the colour pair.
@@ -67,6 +79,7 @@ public struct ToolSettings: Equatable, Sendable {
         // clears the artifact floor with the cliff still three times away.
         fillTolerance: Int = 16,
         cornerRadius: Int = 12,
+        snapGrid: Int = 0,
         highlighterOpacity: Double = 0.38,
         highlighterColour: PaintColour? = PaintColour(hex: "FFE24D"),
         pixelateBlockSize: Int = 12,
@@ -83,6 +96,7 @@ public struct ToolSettings: Equatable, Sendable {
         self.shapeStyle = shapeStyle
         self.fillTolerance = min(255, max(0, fillTolerance))
         self.cornerRadius = max(0, cornerRadius)
+        self.snapGrid = max(0, snapGrid)
         self.highlighterOpacity = min(1, max(0.05, highlighterOpacity))
         self.highlighterColour = highlighterColour
         self.pixelateBlockSize = max(2, pixelateBlockSize)
@@ -92,6 +106,14 @@ public struct ToolSettings: Equatable, Sendable {
         self.sprayDensity = min(1, max(0.02, sprayDensity))
         self.textStyle = textStyle
     }
+
+    /// The grid spacings offered, in pixels.
+    ///
+    /// Powers of two because that is what the things people align to are —
+    /// icons, screenshots of UI, sprite cells — and four choices because a
+    /// spacing picker with a slider invites tuning a number nobody can see the
+    /// effect of until they drag.
+    public static let snapGrids = [8, 16, 32, 64]
 
     /// The inks a highlighter actually comes in.
     ///

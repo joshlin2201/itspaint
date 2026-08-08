@@ -195,6 +195,11 @@ final class CanvasNSView: NSView {
 
         drawFloatingContent(context: context, model: model)
 
+        // Under the marquee, over the artwork: it is a guide, not a mark.
+        if model.snapGrid > 1 {
+            drawSnapGrid(in: dirtyRect, context: context, spacing: model.snapGrid)
+        }
+
         if model.showsGrid && zoom >= 4 {
             drawPixelGrid(in: dirtyRect, context: context)
         }
@@ -657,6 +662,52 @@ final class CanvasNSView: NSView {
     }
 
     /// A hairline grid, only once a pixel is comfortably larger than the line.
+    /// The alignment grid, drawn wherever snapping is on.
+    ///
+    /// **At any zoom, unlike the pixel grid.** A 16px grid is still four points
+    /// apart at 25%, which is coarse enough to see and to aim at, and fitting the
+    /// whole picture on screen is where markup usually happens. The pixel grid
+    /// hides below 4x because at 1x it would be a solid wash.
+    ///
+    /// Every fourth line is stronger. An even field of identical lines is hard
+    /// to count across, and counting is the thing a grid is for — it is how you
+    /// see that two boxes are three cells apart without measuring.
+    private func drawSnapGrid(in dirtyRect: NSRect, context: CGContext, spacing: Int) {
+        guard let model, Double(spacing) * zoom >= 3 else { return }
+        context.saveGState()
+        context.setShouldAntialias(false)
+        context.setLineWidth(1 / (window?.backingScaleFactor ?? 2))
+
+        func strokeLines(every step: Int, alpha: Double) {
+            context.setStrokeColor(NSColor.separatorColor.withAlphaComponent(alpha).cgColor)
+            context.beginPath()
+            var column = max(0, Int(dirtyRect.minX / zoom) / step * step)
+            while column <= min(model.canvas.width, Int(dirtyRect.maxX / zoom) + step) {
+                let x = Double(column) * zoom
+                context.move(to: CGPoint(x: x, y: dirtyRect.minY))
+                context.addLine(to: CGPoint(x: x, y: dirtyRect.maxY))
+                column += step
+            }
+            var row = max(0, Int(dirtyRect.minY / zoom) / step * step)
+            while row <= min(model.canvas.height, Int(dirtyRect.maxY / zoom) + step) {
+                let y = Double(row) * zoom
+                context.move(to: CGPoint(x: dirtyRect.minX, y: y))
+                context.addLine(to: CGPoint(x: dirtyRect.maxX, y: y))
+                row += step
+            }
+            context.strokePath()
+        }
+
+        // Quiet on purpose. The first attempt used 0.5 and 0.9 and the grid read
+        // as the subject — bright rules across the artwork you are trying to
+        // look at. A guide has to be findable when you look for it and ignorable
+        // when you are not, so the minor lines sit near the edge of visibility
+        // and only the every-fourth line is meant to be countable at a glance.
+        strokeLines(every: spacing, alpha: 0.16)
+        strokeLines(every: spacing * 4, alpha: 0.38)
+        context.restoreGState()
+    }
+
     private func drawPixelGrid(in dirtyRect: NSRect, context: CGContext) {
         guard let model else { return }
         context.saveGState()

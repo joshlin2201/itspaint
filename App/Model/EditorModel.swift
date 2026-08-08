@@ -224,6 +224,11 @@ final class EditorModel {
     var isOptionsExpanded: Bool = true
 
     var showsGrid: Bool = false
+    /// Alignment-grid spacing in pixels, 0 for off. Mirrors `settings.snapGrid`.
+    ///
+    /// Turning it on draws the grid too. Snapping you cannot see is a drag that
+    /// disobeys you for reasons you have to guess.
+    var snapGrid: Int = 0 { didSet { engine.settings.snapGrid = snapGrid } }
     /// Set by ⇧⌘C; the cluster's colour well observes it and opens.
     var isColourPopoverRequested: Bool = false
     var isSizeSheetPresented: Bool = false

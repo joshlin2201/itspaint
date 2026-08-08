@@ -60,6 +60,9 @@ struct WindowCaptureTests {
            let tool = ToolKind(rawValue: toolName) {
             document.model.selectTool(tool)
         }
+        if let grid = environment["ITSPAINT_CAPTURE_SNAP"], let spacing = Int(grid) {
+            document.model.snapGrid = spacing
+        }
 
         // The traffic lights only take their colours once the app is active,
         // and activation is asynchronous.

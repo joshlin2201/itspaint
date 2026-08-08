@@ -1392,3 +1392,82 @@ struct InstantAlphaDragTests {
         #expect(engine.canvas.pixels == before.pixels, "a jitter lifted the selection")
     }
 }
+
+@Suite("Snap to grid")
+struct SnapGridTests {
+
+    @Test("A marquee starts and ends on the grid")
+    func marqueeSnaps() {
+        let engine = PaintEngine(width: 200, height: 200)
+        engine.settings.snapGrid = 16
+        engine.settings.tool = .select
+
+        engine.beginStroke(at: PixelPoint(x: 21, y: 27))   // -> 16, 32
+        _ = engine.endStroke(at: PixelPoint(x: 105, y: 89)) // -> 112, 96
+
+        let bounds = engine.selection?.bounds
+        #expect(bounds?.minX == 16 && bounds?.minY == 32, "origin did not snap: \(String(describing: bounds))")
+        #expect(bounds?.width == 96 && bounds?.height == 64, "size did not snap: \(String(describing: bounds))")
+    }
+
+    /// The whole reason snapping exists: two shapes drawn a minute apart line
+    /// up without anyone measuring.
+    @Test("Two rectangles drawn by hand share an edge")
+    func twoShapesAlign() {
+        let engine = PaintEngine(width: 300, height: 300)
+        engine.settings.snapGrid = 32
+        engine.settings.tool = .select
+
+        engine.beginStroke(at: PixelPoint(x: 30, y: 30))
+        _ = engine.endStroke(at: PixelPoint(x: 130, y: 130))
+        let first = engine.selection?.bounds
+
+        engine.beginStroke(at: PixelPoint(x: 35, y: 132))   // a hand-drag, off by a few
+        _ = engine.endStroke(at: PixelPoint(x: 126, y: 220))
+        let second = engine.selection?.bounds
+
+        #expect(first?.minX == second?.minX, "left edges drifted apart")
+        #expect(first?.maxY == second?.minY, "the second box did not start where the first ended")
+    }
+
+    /// Snapping a brush stroke would not be freehand. This is the guard that
+    /// says the grid never reaches the drawing tools.
+    @Test("Freehand ignores the grid entirely")
+    func freehandNeverSnaps() {
+        let engine = PaintEngine(width: 100, height: 100)
+        engine.settings.snapGrid = 32
+        engine.settings.tool = .pencil
+        engine.colours.foreground = .black
+
+        engine.beginStroke(at: PixelPoint(x: 5, y: 5))
+        _ = engine.endStroke(at: PixelPoint(x: 5, y: 5))
+
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 5, y: 5)) == .black,
+                "the pencil mark moved to the grid")
+    }
+
+    @Test("Off by default, and zero means off")
+    func offByDefault() {
+        let engine = PaintEngine(width: 100, height: 100)
+        #expect(engine.settings.snapGrid == 0)
+
+        engine.settings.tool = .select
+        engine.beginStroke(at: PixelPoint(x: 7, y: 9))
+        _ = engine.endStroke(at: PixelPoint(x: 53, y: 61))
+        #expect(engine.selection?.bounds.minX == 7, "a zero grid still moved the marquee")
+    }
+
+    @Test("Snapping near an edge stays on the canvas")
+    func clampsToCanvas() {
+        let engine = PaintEngine(width: 100, height: 100)
+        engine.settings.snapGrid = 64
+        engine.settings.tool = .select
+
+        engine.beginStroke(at: PixelPoint(x: 95, y: 95))    // nearest 64-multiple is 128
+        _ = engine.endStroke(at: PixelPoint(x: 99, y: 99))
+
+        let bounds = engine.selection?.bounds
+        #expect((bounds?.maxX ?? 0) <= 100 && (bounds?.maxY ?? 0) <= 100,
+                "snapped off the canvas: \(String(describing: bounds))")
+    }
+}
