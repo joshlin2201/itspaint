@@ -12,6 +12,45 @@ import Testing
 @MainActor
 struct EditorModelTests {
 
+    /// The drag handle and `⌘C` must never disagree about what "this image" is.
+    /// The handle is the only way out of the app that writes no file, so a
+    /// payload that is empty, or that quietly ships the whole canvas when a
+    /// selection is up, is a wrong file in someone's Slack message.
+    @Test("Dragging out carries the selection when there is one, the canvas otherwise")
+    func dragPayloadFollowsTheSelection() throws {
+        let model = EditorModel(canvas: Bitmap(width: 40, height: 24, fill: .white))
+
+        let whole = try #require(model.draggableImage())
+        #expect(whole.name == "Untitled.png")
+        // Decoded through the app's own codec — the bytes have to be a real PNG
+        // another app can open, not merely non-empty.
+        let wholeImage = try #require(ImageCodec.decode(data: whole.data))
+        #expect(wholeImage.width == 40 && wholeImage.height == 24)
+
+        // Drag a real marquee rather than assigning `selection`, which is
+        // deliberately not settable from outside the engine.
+        model.engine.settings.tool = .select
+        model.engine.beginStroke(at: PixelPoint(x: 4, y: 4))
+        model.engine.endStroke(at: PixelPoint(x: 14, y: 10))
+
+        let marquee = try #require(model.engine.selection?.bounds)
+        let cropped = try #require(model.draggableImage())
+        let croppedImage = try #require(ImageCodec.decode(data: cropped.data))
+
+        // Compared against the engine's own bounds rather than a literal, so the
+        // test asserts the invariant that matters — the drag is exactly what is
+        // selected — and does not encode whether a marquee is inclusive of its
+        // far edge.
+        #expect(croppedImage.width == marquee.width && croppedImage.height == marquee.height,
+                "dragged \(croppedImage.width)x\(croppedImage.height) for a \(marquee.width)x\(marquee.height) selection")
+        #expect(croppedImage.width < 40, "the drag shipped the whole canvas while a selection was up")
+
+        // The suggested filename is what Finder and Mail put on disk, so it
+        // follows the document rather than being a constant.
+        model.documentName = "Receipt"
+        #expect(try #require(model.draggableImage()).name == "Receipt.png")
+    }
+
     @Test("Changing a tool reaches the engine")
     func toolPropagates() {
         let model = EditorModel(canvas: Bitmap(width: 16, height: 16))

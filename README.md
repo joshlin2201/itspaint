@@ -46,6 +46,7 @@ threads, and what each one is in ItsPaint:
 | A colour picked off the image, as hex | Eyedropper, or `⌥` from any tool. Every swatch shows its hex |
 | Show up in right-click ▸ Open With | Registered as an editor for PNG, JPEG, TIFF, BMP, GIF and HEIC |
 | Mark up a screenshot properly | Auto-numbered step badges, arrows, highlighter, and pixelate for anything you'd rather not publish |
+| Get it into Slack without saving a file first | Drag the image out of the header, straight into the message |
 | Be free, and stay free | MIT, no account, no telemetry, no trial, no upsell |
 
 ## Install
@@ -107,6 +108,9 @@ session.
 
 - **Eleven visible tools** for drawing, markup, text, selection, colour, and
   pixelation — `ToolKind.allCases.count`, and the rail shows every one.
+- **Drag the image straight out** into Slack, Mail or the Finder — no save panel,
+  no file left on the Desktop. The selection if there is one, the whole canvas if
+  not.
 - **Fifteen shapes** with solid, dashed, or dotted outlines and optional fills.
 - **A one-cell tool rail** — 34pt, the width of the widest control it carries —
   that moves between the left and bottom of the window.

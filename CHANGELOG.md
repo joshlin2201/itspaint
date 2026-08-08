@@ -5,6 +5,25 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## Unreleased
+
+### Added
+- **Drag the image out of the window.** A handle sits with cut, copy and paste in
+  the header; dragging it carries the current selection, or the whole canvas when
+  there is none, into Slack, Mail, the Finder, or anything else that accepts a
+  PNG. No save panel and no file left behind.
+
+  Every other way out of the app writes a file first — Export asks where, Copy
+  needs somewhere to paste. This closes the shortest path, and it is the single
+  most-named thing people say they lost when Skitch stopped working.
+
+  Deliberately *in the header* rather than beside the canvas. Every app that has
+  this hides it: the demand in the wild is not for the capability, which several
+  tools already have, but for an affordance that can be found — people asked for
+  the feature in the same threads where they had missed the existing button. It
+  is also the one control in that group that is never disabled, since there is
+  always a canvas to drag, so it is the one your eye lands on.
+
 ## [0.12.1] — 2026-08-07
 
 A package release. **The app is unchanged from 0.12.0** — there is no new disk

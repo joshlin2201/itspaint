@@ -495,6 +495,22 @@ final class EditorModel {
     /// Copy the entire canvas, selection or not — the "send me that" case.
     func copyWholeImage() { writeToPasteboard(canvas) }
 
+    /// The current image as something another app can accept from a drag.
+    ///
+    /// The selection when there is one, the whole canvas otherwise — the same
+    /// rule Copy follows, so the drag handle and `⌘C` never disagree about what
+    /// "this image" means.
+    ///
+    /// Encoded eagerly rather than in the `Transferable` closure. A drag has to
+    /// hand the receiving app data the moment it is dropped, and doing the PNG
+    /// encode there put it on the main thread mid-gesture; the canvas is already
+    /// in memory, so paying for it up front costs a copy and removes the stall.
+    func draggableImage() -> DraggedImage? {
+        let bitmap = engine.selectedContent() ?? canvas
+        guard let data = try? ImageCodec.encode(bitmap, as: .png) else { return nil }
+        return DraggedImage(data: data, name: "\(documentName).png")
+    }
+
     func copySelection() {
         guard let content = engine.selectedContent() else { return }
         writeToPasteboard(content)

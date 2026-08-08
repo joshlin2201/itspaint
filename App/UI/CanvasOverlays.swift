@@ -93,6 +93,76 @@ struct HeaderButton: View {
     }
 }
 
+/// **Drag this into Slack, Mail or the Finder.** No save panel, no file left on
+/// the Desktop.
+///
+/// It sits with cut, copy and paste because it is the same job — getting the
+/// image out — and it is *in the header* rather than tucked beside the canvas
+/// deliberately. Every app that has this hides it: Shottr's is a bare file icon
+/// between two toolbar buttons and people who wanted the feature looked straight
+/// past it, then asked for it in the same thread. The demand is not for the
+/// capability, it is for an affordance you can find.
+///
+/// Not a `Button`. A draggable button reads as broken — press, nothing happens,
+/// because the gesture it wants is a drag. The grabber glyph and the cursor are
+/// the whole instruction.
+struct DragOutHandle: View {
+    @Bindable var model: EditorModel
+
+    @State private var isHovering = false
+
+    var body: some View {
+        // Resolved before the gesture rather than inside it. `draggable` takes
+        // the payload up front, and there is no version of this that can hand
+        // over an empty PNG and call it a drag — if the encode fails the handle
+        // goes dim and refuses instead.
+        let payload = model.draggableImage()
+
+        // `photo.on.rectangle.angled`, not an up-arrow. The first version used
+        // `square.and.arrow.up.on.square`, which is a share glyph with a box
+        // behind it — three cells from the real Share button and nearly
+        // indistinguishable from it at 12pt. This reads as *the image, as an
+        // object you can pick up*, which is what a drag proxy should look like.
+        // Not `hand.draw` either: a hand holding a pen means "draw" in a paint
+        // app.
+        Image(systemName: "photo.on.rectangle.angled")
+            .font(.system(size: 12, weight: .medium))
+            .frame(width: 26, height: 26)
+            .foregroundStyle(.primary.opacity(payload == nil ? Tokens.Ink.disabled : Tokens.Ink.regular))
+            .background {
+                RoundedRectangle(cornerRadius: Tokens.Radius.control, style: .continuous)
+                    .fill(.primary.opacity(isHovering && payload != nil ? Tokens.Fill.hover : 0))
+            }
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                isHovering = hovering
+                guard payload != nil else { return }
+                // A grab cursor is the only thing that says "drag me" before
+                // anyone has tried. `.help` only appears after a hover delay, by
+                // which point they have usually clicked and given up.
+                if hovering { NSCursor.openHand.push() } else { NSCursor.pop() }
+            }
+            .animation(Tokens.Motion.micro, value: isHovering)
+            .modifier(DraggableIfAvailable(payload: payload))
+            .help("Drag the image into another app — Slack, Mail, the Finder")
+            .accessibilityLabel("Drag image out")
+    }
+}
+
+/// `draggable` with nothing to drag still starts a drag, so it is applied
+/// conditionally rather than handed a placeholder.
+private struct DraggableIfAvailable: ViewModifier {
+    let payload: DraggedImage?
+
+    func body(content: Content) -> some View {
+        if let payload {
+            content.draggable(payload)
+        } else {
+            content
+        }
+    }
+}
+
 /// Share, routed through the responder chain to the document.
 ///
 /// An `NSViewRepresentable` rather than a SwiftUI `ShareLink` because the sheet
@@ -238,6 +308,7 @@ struct WorkingActions: View {
                     title: model.canPaste ? "Paste image" : "Nothing to paste",
                     shortcut: "⌘V", isEnabled: model.canPaste
                 ) { model.paste() }
+                DragOutHandle(model: model)
             }
 
             HeaderGroup {
