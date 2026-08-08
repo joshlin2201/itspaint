@@ -58,13 +58,28 @@ Or get it free on the [Mac App Store](https://apps.apple.com/us/app/itspaint/id6
 or download the disk image from [Releases](https://github.com/joshlin2201/itspaint/releases),
 open it, and drag **ItsPaint** to Applications.
 
-Releases are signed with a Developer ID and notarised by Apple, so Gatekeeper
-opens them with no extra steps — no Control-click, and nothing to clear from the
-Terminal.
+Releases are signed with a Developer ID, notarised by Apple, and the ticket is
+stapled to both the disk image and the app inside it, so nothing has to be
+cleared from the Terminal and there is no Control-click dance.
 
-Each release includes `checksums.txt` with SHA-256 hashes. The notarisation
-ticket is stapled to both the disk image and the app inside it, so a first
-launch works offline:
+**If macOS says it "could not verify ItsPaint is free of malware", the app is
+fine and so is your download — open System Settings ▸ Privacy & Security and
+click Open Anyway.** This was observed once on macOS 26.6 with a freshly
+downloaded 0.12.0, on the same disk image that `spctl --assess` accepts and whose
+stapled ticket validates. It appears to be a first-launch check that went to
+Apple and did not come back rather than anything about the build, and it is not
+reproducible on demand — but it is alarming enough when it happens that it
+belongs here rather than in an issue. You can confirm the download yourself
+before opening it:
+
+```bash
+shasum -a 256 -c checksums.txt
+codesign --verify --deep --strict --verbose=2 /Volumes/ItsPaint*/ItsPaint.app
+spctl -a -vvv -t exec /Volumes/ItsPaint*/ItsPaint.app   # expect: accepted
+```
+
+Each release includes `checksums.txt` with SHA-256 hashes, and the stapled ticket
+means the notarisation check itself needs no network:
 
 ```bash
 shasum -a 256 -c checksums.txt
@@ -99,7 +114,8 @@ session.
   above 100%, pixel grids, and live tool footprints.
 - **Rotate by any angle**, with the canvas growing to fit the corners.
 - **Universal and notarised** — one build for Apple silicon and Intel, signed
-  with a Developer ID, so it opens with no Gatekeeper detour.
+  with a Developer ID, with the notarisation ticket stapled so the check needs no
+  network.
 - **Native documents and common exports** with no third-party dependencies,
   accounts, telemetry, or cloud service — and [three commands](#no-network-and-how-to-check)
   that check it.
