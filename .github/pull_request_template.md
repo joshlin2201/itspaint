@@ -8,7 +8,7 @@
 
 ## Checks
 
-- [ ] `swift test --package-path Packages/PaintKit` passes
+- [ ] `swift test` passes
 - [ ] `xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint -destination 'platform=macOS' test` passes
 - [ ] New behaviour has a test that fails without the change
 - [ ] No new rail buttons, dependencies, or UI-layer code inside `PaintKit`

@@ -5,14 +5,30 @@ to get a change merged is to keep it in that spirit.
 
 ## Getting set up
 
+**Most changes need no Xcode.** The drawing engine is a plain Swift package
+declared at the repository root, so a clone plus a command-line Swift toolchain
+runs the whole engine suite:
+
 ```bash
 git clone https://github.com/joshlin2201/itspaint.git
 cd itspaint
-open ItsPaint.xcodeproj        # Xcode 16 or later
+swift test          # 275 tests, 40 suites, about six seconds
 ```
 
-The generated project is committed, so a clone needs nothing but Xcode. If you
-change `project.yml`, regenerate with [XcodeGen](https://github.com/yonaskolb/XcodeGen):
+That is the entire loop for anything in `Packages/PaintKit/` — drawing, raster
+operations, selections, undo, codecs. No project to open, no scheme to pick, no
+simulator, no signing, and no dependencies to fetch.
+
+Xcode 16 or later is needed for the **app shell** — the window, menus, document
+lifecycle and SwiftUI panels in `App/`:
+
+```bash
+open ItsPaint.xcodeproj   # build and run with ⌘R
+```
+
+The generated project is committed, so that needs nothing but Xcode itself. If
+you change `project.yml`, regenerate with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen):
 
 ```bash
 brew install xcodegen && xcodegen generate
@@ -21,15 +37,16 @@ brew install xcodegen && xcodegen generate
 ## Running the tests
 
 ```bash
-swift test --package-path Packages/PaintKit               # engine
-swift test -c release --package-path Packages/PaintKit    # + throughput guards
+swift test                    # engine
+swift test -c release         # engine + throughput guards
 xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
-           -destination 'platform=macOS' test             # app integration
+           -destination 'platform=macOS' test    # app integration, needs Xcode
 ```
 
-The engine suite is where most coverage lives and it runs in a fifth of a
-second — run it constantly. The app suite drives real AppKit views offscreen,
-so it needs a logged-in GUI session.
+The engine suite is where most coverage lives and it runs in seconds — run it
+constantly. The app suite drives real AppKit views offscreen, so it needs Xcode
+and a logged-in GUI session; if you cannot run it, say so in the pull request and
+CI will.
 
 ## Read first
 

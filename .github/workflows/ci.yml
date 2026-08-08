@@ -21,14 +21,19 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.4.app
-      # The engine is a plain Swift package with no UI and no dependencies, so
-      # it tests in about a second and is the fast signal on every push.
+      # The engine is a plain Swift package with no UI and no dependencies, so it is
+      # the fast signal on every push: about six seconds in debug, and a fifth of a
+      # second in the release step below, where the optimiser is actually on.
+      # Run from the ROOT, which is the command CONTRIBUTING and the README give a
+      # contributor. CI used to test only the nested manifest while the docs said
+      # `swift test` — so a root manifest whose test targets were misconfigured would
+      # have passed CI and failed the first person who followed the instructions.
       - name: Test PaintKit (debug)
-        run: swift test --package-path Packages/PaintKit
+        run: swift test
       # The throughput guards only assert in release: unoptimised timings
       # measure the compiler, not the algorithm.
       - name: Test PaintKit (release, includes performance budgets)
-        run: swift test -c release --package-path Packages/PaintKit
+        run: swift test -c release
       # A second manifest sits at the repository root so that a plain `swift build`,
       # a `.package(url:)` dependency and the Swift Package Index can all see the
       # engine. It vends the same targets from the same directories, so the two can

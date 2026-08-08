@@ -9,8 +9,8 @@ three failure modes that have already cost a day each.
 ## Running them
 
 ```bash
-swift test --package-path Packages/PaintKit             # engine — run constantly
-swift test -c release --package-path Packages/PaintKit  # + the throughput guards
+swift test             # engine — run constantly
+swift test -c release  # + the throughput guards
 xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
            -destination 'platform=macOS' test           # app integration
 ```
@@ -187,8 +187,8 @@ assert nothing near-white appears, and now it can.
 
 ## Before you open a pull request
 
-- [ ] `swift test --package-path Packages/PaintKit` passes
-- [ ] `swift test -c release --package-path Packages/PaintKit` passes if you
+- [ ] `swift test` passes
+- [ ] `swift test -c release` passes if you
       touched the drawing path
 - [ ] `xcodebuild … test` passes — and the count went *up*, not sideways
 - [ ] The new test fails when you revert the change. A test that passes both ways
