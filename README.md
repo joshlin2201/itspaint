@@ -2,7 +2,7 @@
 
 # ItsPaint
 
-### MS Paint for the Mac. Native, free, and under 3 MB.
+### MS Paint for the Mac. Native, free, and a 2.6 MB download.
 
 A blank canvas at the size you asked for, an image dropped on top of another
 one, a screenshot marked up and out the door. No workspace to set up, no
@@ -105,11 +105,11 @@ session.
 
 ## Highlights
 
-- **Twelve visible tools** for drawing, markup, text, selection, colour, and
-  pixelation.
+- **Eleven visible tools** for drawing, markup, text, selection, colour, and
+  pixelation — `ToolKind.allCases.count`, and the rail shows every one.
 - **Fifteen shapes** with solid, dashed, or dotted outlines and optional fills.
-- **A 48pt tool rail** — one cell thick on either edge — that moves between the
-  left and bottom of the window.
+- **A one-cell tool rail** — 34pt, the width of the widest control it carries —
+  that moves between the left and bottom of the window.
 - **Precise canvas control** with pointer-centred zoom, nearest-neighbour display
   above 100%, pixel grids, and live tool footprints.
 - **Rotate by any angle**, with the canvas growing to fit the corners.

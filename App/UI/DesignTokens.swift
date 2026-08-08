@@ -212,7 +212,9 @@ enum Tokens {
 
         /// The widest thing the rail carries across its short axis. The loaded
         /// colour pair, overlapped, is fractionally wider than a tool cell —
-        /// which is why the rail is 48pt and not 44.
+        /// which is why the rail is 34.08pt and not 34. `ToolbarGeometryTests`
+        /// pins that number, because the README quotes it and had gone on
+        /// claiming 48pt long after the cell shrank.
         static let cross: CGFloat = max(
             run,
             Size.colourWell * 1.42,

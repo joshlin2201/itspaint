@@ -93,6 +93,19 @@ struct ToolbarGeometryTests {
         #expect(Tokens.Rail.toolColumns == 1)
     }
 
+    /// The README quotes both of these, and both had rotted: it advertised a
+    /// 48pt rail long after the tool cell shrank to 34, and twelve tools when
+    /// there have been eleven. A number in prose cannot fail a build, so pin it
+    /// to one that can — change the design and this test names the sentence to
+    /// go and update.
+    @Test("The numbers the README quotes are still the numbers")
+    func documentedGeometryMatchesTheTokens() {
+        #expect(Tokens.Rail.cross == 34.08, "README says the rail is 34pt")
+        #expect(Tokens.Rail.toolColumns == 1, "README says one cell thick")
+        #expect(ToolKind.allCases.count == 11, "README says eleven visible tools")
+        #expect(ShapeKind.allCases.count == 15, "README says fifteen shapes")
+    }
+
     @Test("The rail fits the height of a small laptop window")
     func railFitsAShortWindow() {
         // The side rail runs the length of the window, so its content has to
