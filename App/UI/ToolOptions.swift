@@ -38,7 +38,17 @@ struct ToolOptions: View {
             // Not while something is floating: the action bar over the canvas is
             // the primary affordance then, and showing Crop in both places at
             // once is two answers to one question.
-            if model.hasSelection && !model.hasFloatingContent { selectionActions }
+            if model.hasSelection && !model.hasFloatingContent {
+                // **A rule, because these are two different subjects.** Above it
+                // is what the tool in your hand will do; below it is what can be
+                // done to the region already selected. They arrive together,
+                // they are unrelated, and run into each other they read as one
+                // list — which is how the panel came to show two rows labelled
+                // "Size", one the badge's and one the marquee's, with different
+                // units under each and nothing to say why.
+                OptionsDivider(isVertical: isVertical)
+                selectionActions
+            }
         }
         .environment(\.optionsAxisIsVertical, isVertical)
         .font(Tokens.Text.pillLabel)
@@ -360,7 +370,8 @@ struct ToolOptions: View {
                             .frame(height: Tokens.Size.segment)
                             .background {
                                 RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                                    .fill(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.clear))
+                                    .fill(.clear)
+                                    .overlay { if isSelected { SelectedSegmentFill(cornerRadius: Tokens.Radius.segmentInner) } }
                             }
                             .contentShape(Rectangle())
                     }
@@ -391,11 +402,14 @@ struct ToolOptions: View {
     @ViewBuilder
     private var selectionActions: some View {
         if isVertical {
-            // "Selection", not "Size". Every tool's own row is already labelled
-            // Size, so a badge with its size slider open showed the word twice,
-            // once for the badge and once for the marquee, with different units
-            // under each.
-            OptionRow("Selection") { sizeReadout }
+            // "Area", not "Size". Every tool's own row is already labelled Size,
+            // so a badge with its size slider open showed the word twice, once
+            // for the badge and once for the marquee, with different units under
+            // each. "Selection" was the obvious replacement and truncated to
+            // "Selec…" in the label column, which this file already knows is
+            // worse than no label at all — it looks broken rather than
+            // deliberate. Four letters fit.
+            OptionRow("Area") { sizeReadout }
             OptionRow(nil) {
                 SegmentTrack { selectionActionButtons }
             }
@@ -467,6 +481,38 @@ struct ToolOptions: View {
 ///
 /// The last cell is the colour pair. Before this the highlighter *only* had that
 /// behaviour, which made a fresh document's highlighter translucent black.
+/// The one rule in the panel, separating the tool's own options from what can be
+/// done to a selection.
+///
+/// Inset from both ends rather than running edge to edge: a full-bleed line cuts
+/// the surface into two panels, and this is one panel with two parts. It also
+/// fades rather than being a flat separator, so it does not compete with the
+/// hairline that describes the panel's own edge.
+private struct OptionsDivider: View {
+    let isVertical: Bool
+
+    var body: some View {
+        let gradient = LinearGradient(
+            colors: [
+                .primary.opacity(0),
+                .primary.opacity(Tokens.Ink.disabled),
+                .primary.opacity(0),
+            ],
+            startPoint: isVertical ? .leading : .top,
+            endPoint: isVertical ? .trailing : .bottom
+        )
+
+        Group {
+            if isVertical {
+                gradient.frame(height: 1).padding(.vertical, Tokens.Space.hair)
+            } else {
+                gradient.frame(width: 1).padding(.horizontal, Tokens.Space.hair)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 private struct HighlighterInks: View {
     @Bindable var model: EditorModel
 
@@ -538,7 +584,8 @@ private struct ShapeGallery: View {
                     .frame(height: 26)
                     .background {
                         RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                            .fill(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.clear))
+                            .fill(.clear)
+                            .overlay { if isSelected { SelectedSegmentFill(cornerRadius: Tokens.Radius.segmentInner) } }
                     }
                     .contentShape(Rectangle())
             }
@@ -788,7 +835,8 @@ struct OptionSegment<Value: Hashable>: View {
                     .frame(height: Tokens.Size.segment)
                     .background {
                         RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                            .fill(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.clear))
+                            .fill(.clear)
+                            .overlay { if isSelected { SelectedSegmentFill(cornerRadius: Tokens.Radius.segmentInner) } }
                     }
                     .contentShape(Rectangle())
                 }

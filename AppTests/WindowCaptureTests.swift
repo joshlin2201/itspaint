@@ -63,6 +63,17 @@ struct WindowCaptureTests {
         if let grid = environment["ITSPAINT_CAPTURE_SNAP"], let spacing = Int(grid) {
             document.model.snapGrid = spacing
         }
+        if environment["ITSPAINT_CAPTURE_SELECTION"] != nil {
+            // Make the marquee with the select tool, then restore whichever tool
+            // the capture asked for — otherwise this quietly overwrites it and
+            // the panel shows the wrong options.
+            let wanted = document.model.engine.settings.tool
+            document.model.engine.settings.tool = .select
+            document.model.engine.beginStroke(at: PixelPoint(x: 40, y: 40))
+            _ = document.model.engine.endStroke(at: PixelPoint(x: 354, y: 267))
+            document.model.engine.settings.tool = wanted
+            document.model.noteChange(.empty)
+        }
 
         // The traffic lights only take their colours once the app is active,
         // and activation is asynchronous.

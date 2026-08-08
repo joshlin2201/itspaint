@@ -38,7 +38,17 @@ version may still carry breaking changes to the document format.
   lifts and moves, a click in place still re-selects.
 - **The options panel said "Size" twice.** The tool's own size row and the
   selection's dimensions carried the same label, with different units under each.
-  The second is now "Selection".
+  The second is now "Area" — and a rule separates the two, because what the tool
+  in your hand will do and what can be done to the region already selected are
+  different subjects that happened to arrive in the same list.
+
+### Changed
+- **The chosen segment in a picker is no longer a flat rectangle of accent
+  colour.** Everything around it is a considered surface — a blurred material
+  under a tint floor, edged with a luminous hairline — and the selection
+  indicator was the one thing left that looked like stock SwiftUI. It now carries
+  a gentle fall and a rim of its own colour, so it reads as raised rather than
+  painted on, while staying unmistakably the accent.
 - **Share stopped responding while a tool's options were open.** It is the one
   control in the header that hosts a real `NSButton`, so its popover can anchor
   to itself, and a hosted AppKit view can be occluded for hit-testing by SwiftUI

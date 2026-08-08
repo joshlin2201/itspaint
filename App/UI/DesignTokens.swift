@@ -285,6 +285,40 @@ enum Tokens {
     }
 }
 
+/// The fill under a chosen segment.
+///
+/// **A flat `Color.accentColor` was the one default-looking thing left in the
+/// panel.** Everything around it is a considered surface — a blurred material
+/// under a tint floor, with a luminous hairline describing its edge — and then
+/// the selection indicator was a plain brand-blue rectangle sitting on top,
+/// which is what stock SwiftUI produces without being asked.
+///
+/// A gentle vertical fall gives it the same made quality as the surface it sits
+/// on: brighter at the top where a light would catch it, and rimmed with a
+/// brighter line of itself so it reads as raised rather than as painted on. It
+/// stays unmistakably the accent colour, because that is its job.
+struct SelectedSegmentFill: View {
+    var cornerRadius: CGFloat = Tokens.Radius.segmentInner
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        shape
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.accentColor.opacity(1),
+                        Color.accentColor.opacity(0.88),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .overlay {
+                shape.strokeBorder(.white.opacity(0.22), lineWidth: Tokens.Elevation.hairline)
+            }
+    }
+}
+
 // MARK: - The chrome material
 
 /// The one surface treatment shared by the cluster, the pill, the title chip
