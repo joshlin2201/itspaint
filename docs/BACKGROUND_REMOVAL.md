@@ -184,7 +184,7 @@ grep -rniE 'URLSession|NWConnection|import Network|CFSocket|getaddrinfo' App Pac
 ```
 
 Neither `com.apple.security.network.client` nor `.server` is requested, so the
-kernel refuses a socket regardless of what the code asks for.
+kernel refuses an outbound connection regardless of what the code asks for.
 
 The behaviour is covered by two tests in
 `Packages/PaintKit/Tests/PaintKitTests/PaintEngineTests.swift` — one that the

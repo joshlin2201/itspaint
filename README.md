@@ -161,7 +161,7 @@ ItsPaint never contacts anything. That is a claim, so here is how to falsify it.
 
 The sandbox is the part that does not require trusting the source. Neither
 `com.apple.security.network.client` nor `.server` is requested, so the kernel
-refuses a socket regardless of what the code asks for:
+refuses an outbound connection regardless of what the code asks for:
 
 ```bash
 codesign -d --entitlements - --xml /Applications/ItsPaint.app | plutil -p -
@@ -181,7 +181,7 @@ otool -L /Applications/ItsPaint.app/Contents/MacOS/ItsPaint
 No `CFNetwork`, no `Network.framework`, no bundled dylib — every entry on both
 architectures is an Apple framework or the Swift runtime.
 
-In the source, across 5,838 lines of engine and 8,251 lines of app:
+In the source, across every Swift file in the engine and the app:
 
 ```bash
 grep -rniE 'URLSession|NWConnection|import Network|CFSocket|getaddrinfo' App Packages
