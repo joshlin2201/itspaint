@@ -66,8 +66,22 @@ own screenshot workflow does that we would have to keep working, is in
 The staging matters more than the features:
 
 1. **Be the destination.** Watch the screenshot folder and open what lands.
-   Needs **no permissions at all** and breaks nothing about the existing
-   workflow, because it does not touch capture.
+   Breaks nothing about the existing workflow, because it does not touch capture.
+
+   **It is not free, though this list said it was.** The claim here used to be
+   "needs no permissions at all", and the entitlements say otherwise: the app
+   holds `files.user-selected.read-write` and app-scoped bookmarks, and
+   deliberately not `assets.pictures` or any blanket read. A sandboxed process
+   cannot watch `~/Desktop` — where `com.apple.screencapture location` puts
+   shots by default — without being given it.
+
+   What it actually costs is **one open panel, once**: the user picks their
+   screenshot folder, and the app-scoped bookmark keeps it across launches, which
+   is machinery recent documents already use. That is still the cheapest step on
+   this list and it still needs no TCC prompt, no Screen Recording, and no
+   Accessibility. But it is a folder grant, it has to be asked for, and a staging
+   order that assumed step 1 was invisible was resting on a claim nobody had
+   checked against `ItsPaint.entitlements`.
 2. **Own the clipboard variant.** `⌃⇧⌘4` already copies; a global hotkey that
    opens the clipboard into a new document closes the other half. Carbon
    `RegisterEventHotKey` works sandboxed without Accessibility.
