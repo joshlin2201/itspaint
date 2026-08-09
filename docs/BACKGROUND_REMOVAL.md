@@ -3,7 +3,7 @@
 **Image ▸ Remove Background** in ItsPaint takes a product shot off its page and
 leaves the checkerboard showing through. It ships no model, downloads no
 weights, touches no network, and does not ask the Neural Engine for anything.
-It is thirty-five lines on top of the flood fill that was already there for the
+It is thirty lines of code on top of the flood fill that was already there for the
 paint bucket.
 
 ![A product shot on a flat page, then the same window with the background gone](images/remove-background.gif)
@@ -193,7 +193,7 @@ coverage check, and one tolerance compare, and it is `@inline(__always)`.
 | Network | usually, at least once | never — the sandbox has no network entitlement |
 | Subject in a scene | works | declines |
 | Flat page, hard edge | soft fringe | exact |
-| Code | a framework | 35 lines over an existing fill |
+| Code | a framework | 30 lines over an existing fill |
 
 The gap in that table is real and it is not going to be closed by tuning a
 threshold. If you need a person cut out of a park, use a model.
@@ -221,7 +221,7 @@ there.
 
 The part worth taking from this page is not that a flood fill beats a model. It
 is that a *bounded* problem sometimes has an exact solution hiding inside code
-you already shipped, and 35 lines over the paint bucket is a cheaper thing to own
+you already shipped, and 30 lines over the paint bucket is a cheaper thing to own
 than a dependency on somebody's matting framework.
 
 ## Verifying the claims

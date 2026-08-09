@@ -58,7 +58,7 @@ One command. Four corner-seeded flood selections, unioned. If the page is not
 actually separable it says so and changes nothing, instead of handing you a
 nearly blank canvas.
 
-[How it works, in thirty-five lines →](docs/BACKGROUND_REMOVAL.md)
+[How it works, in thirty lines of code →](docs/BACKGROUND_REMOVAL.md)
 
 </td><td width="50%">
 
@@ -303,7 +303,7 @@ by memory rather than by a fixed number of steps.
 
 [**Background removal without a model**](docs/BACKGROUND_REMOVAL.md) is a worked
 example of both layers: four corner-seeded flood selections unioned through the
-same combiner `⇧`-click uses, and a coverage guard that declines rather than
+same combiner `⇧`-click uses, and a remainder guard that declines rather than
 returning a nearly blank canvas.
 
 **Using the engine on its own.** PaintKit is a product of the root package, so it
