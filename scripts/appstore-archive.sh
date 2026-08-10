@@ -23,7 +23,20 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-TEAM="${ITSPAINT_TEAM_ID:-H87MY889P5}"
+# No baked-in default.
+#
+# The team ID used to be hardcoded here as a fallback. It is also the value of
+# the NOTARY_TEAM_ID secret, and GitHub masks secret values in public logs — so
+# the repository's own script defeated that masking in plaintext. The ID is
+# recoverable from any signed release with `codesign -dv`, so the impact is
+# small, but a mitigation the project believes it has and does not is worth more
+# than the inconvenience of setting a variable.
+if [[ -z "${ITSPAINT_TEAM_ID:-}" ]]; then
+  echo "Set ITSPAINT_TEAM_ID to your Apple Developer team ID." >&2
+  echo "Find it with: security find-identity -v -p codesigning | grep 'Developer ID Application'" >&2
+  exit 2
+fi
+TEAM="$ITSPAINT_TEAM_ID"
 ARCHIVE=dist/appstore/ItsPaint.xcarchive
 EXPORT=dist/appstore/export
 

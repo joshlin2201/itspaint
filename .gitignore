@@ -35,7 +35,8 @@ TestResults*.xcresult
 .worktrees/
 
 # Promotion working files — local only, and this remote must never see them.
-# LAUNCH_KIT holds unsent outreach copy and press contacts; it was untracked rather
+# Local working notes. Deliberately not described here: an ignore file that
+# explains what it is hiding tells a reader exactly what to go looking for; it was untracked rather
 # than ignored, which is one `git add -A` away from being published.
 docs/LAUNCH_KIT.md
 docs/promo/

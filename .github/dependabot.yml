@@ -1,0 +1,21 @@
+# Keep the action pins current.
+#
+# Every `uses:` in this repository is pinned to a commit SHA with the tag in a
+# trailing comment, and the repository now requires that. Pinning is the right
+# call — a moved tag is how an action supply-chain compromise reaches you — but a
+# pin is frozen, so a fix upstream never arrives on its own. `dependabot_security_updates`
+# does not cover the `github-actions` ecosystem without this file, so without it
+# the pins are correct on the day they are written and silently rot after.
+#
+# Dependabot rewrites the SHA and the comment together, which keeps the pin
+# readable in a diff.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(actions)"
+    labels:
+      - "dependencies"

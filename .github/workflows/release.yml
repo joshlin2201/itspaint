@@ -8,6 +8,11 @@ on:
       tag:
         description: "Tag to build (e.g. v0.10.0)"
         required: true
+      allow_unnotarised:
+        description: "Ship even if notarisation does not complete (default: refuse)"
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: write
@@ -200,6 +205,9 @@ jobs:
           NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
           NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
           NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          # Only a manual dispatch can set this; a tag push never can, so a tag
+          # can never quietly produce an un-notarised release.
+          ALLOW_UNNOTARISED: ${{ github.event.inputs.allow_unnotarised }}
         run: |
           set -euo pipefail
           APP="$GITHUB_WORKSPACE/build/Build/Products/Release/ItsPaint.app"
@@ -329,8 +337,28 @@ jobs:
           fi
 
           if [[ "$NOTARISED" != "true" ]]; then
+            # A signed build that did not get its ticket is a refusal, not a
+            # warning.
+            #
+            # Apple's queue times out often enough that treating it as unfinished
+            # rather than rejected is right — 0.13.0 sat for 86 minutes and then
+            # succeeded on a re-run of the same tag. What was wrong was the
+            # default: the job went green, the release notes rewrote themselves to
+            # say "not notarised", and shipping un-notarised became something that
+            # happened rather than something anyone chose. Combined with a
+            # SECURITY.md that claimed releases were never notarised, an
+            # un-notarised artefact looked expected.
+            #
+            # Re-run the tag, or dispatch it with allow_unnotarised if you have a
+            # reason. An ad-hoc signed build (no certificate available at all) is
+            # a different case and still allowed through, because it never claimed
+            # a ticket.
+            if [[ "$SIGNED" == "true" && "${ALLOW_UNNOTARISED:-false}" != "true" ]]; then
+              echo "::error::Signed but not notarised (notarytool: ${NOTARY_RESULT:-none}). Re-run this tag, or dispatch with allow_unnotarised=true." >&2
+              exit 1
+            fi
             if [[ "$SIGNED" == "true" ]]; then
-              echo "::warning::Shipping without a stapled notarisation ticket."
+              echo "::warning::Shipping without a stapled notarisation ticket, because allow_unnotarised was set."
             fi
             # The image still has to exist.
             if [[ ! -f "$DMG" ]]; then
