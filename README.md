@@ -1,10 +1,14 @@
 <div align="center">
 
-<img src="docs/images/banner.png" alt="ItsPaint">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/banner.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/banner-light.png">
+  <img src="docs/images/banner.png" width="760" alt="ItsPaint — MS Paint for the Mac. Free and open source, 2.9 MB, no account and no telemetry.">
+</picture>
 
 ### MS Paint for the Mac.
 
-Open it, draw, close it. **2.9 MB**, free forever, MIT.<br>
+Open it, draw, close it. **2.9 MB**, free forever, MIT.
 No account, no subscription, no trial, no telemetry.
 
 [![Release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&style=flat-square&label=release&color=2563eb)](https://github.com/joshlin2201/itspaint/releases)
@@ -29,7 +33,7 @@ brew install --cask itspaint
 
 <img src="docs/images/markup-reel.gif" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
 
-**Paste a screenshot, number three steps, blur the token.**<br>
+**Paste a screenshot, number three steps, blur the token.**
 Nine seconds, no file saved.
 
 </div>

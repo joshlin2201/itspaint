@@ -276,11 +276,36 @@ The README hero is generated too, rather than made in a design tool:
 swift run paint-demo --banner docs/images/banner.png
 ```
 
-`ReadmeBanner` composes it out of PaintKit — the gradient is `Bitmap.fill` per
-row, the wordmark is `TextRenderer` on `.AppleSystemUIFont` with `isBold`. So the
+It writes a dark and a light file from one invocation, and the README picks
+between them with `<picture>` + `prefers-color-scheme`. A single near-black PNG
+is a full-width black slab above a white page for everyone in the light theme.
+
+`ReadmeBanner` composes it out of PaintKit — the light field is written per
+pixel, the wordmark is `TextRenderer`. So the
 page header is reproducible from a clean checkout, it moves when the icon moves,
 and it is itself a demonstration that the engine composes images. A hand-edited
 PNG sitting in `docs/images` would be none of those.
+
+**Name the weight, and know which names lie.** The wordmark is
+`.AppleSystemUIFontBlack` (`.SFNS-Black`, wght 1000), not Bold — 188pt in Bold is
+the weight a UI button uses and reads generic at display size. The dot-prefixed
+names are the only route to the system font and every wrong one fails silently:
+`"SF Pro Display"` and `"SFProDisplay-Bold"` return **Helvetica**, `".SFNS-Black"`
+returns **Times New Roman**, and `".AppleSystemUIFontSemibold"` returns Helvetica
+because the ladder has holes. Verified by comparing `CTFontCopyPostScriptName`
+against the request, which is the only way to notice.
+
+**A ramp nobody can see still bands.** The first backdrop went `11151D` to
+`070910` — a 13-level delta that reads as nothing, and produced 33 visible
+horizontal stripes, because red, green and blue each cross their rounding
+boundary on a different row. It is now a radial falloff written per pixel with a
+±0.5-level `(x ^ y) & 1` dither, which leaves no boundary coarse enough to read
+as a stripe.
+
+**A stacked-ellipse shadow is a dark ellipse.** Six of them under the icon, over
+a field the light had already lifted, read as a smudge behind the icon rather
+than as shadow. Removed — the light does the grounding, and one fewer object is
+the better composition.
 
 **It carries the lockup and nothing else, and that is the point.** The first
 version was 2400×1000 with the tagline, a metadata line and a screenshot of the

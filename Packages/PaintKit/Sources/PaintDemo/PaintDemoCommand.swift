@@ -60,9 +60,16 @@ struct PaintDemoCommand {
                 return 2
             }
             do {
-                try ReadmeBanner.run(
-                    output: url(for: arguments[index + 1], currentDirectory: currentDirectory)
-                )
+                // Both themes from one invocation: a hero that exists in only one
+                // of them is a black slab on a white page for half the readers.
+                let dark = url(for: arguments[index + 1], currentDirectory: currentDirectory)
+                let light = dark
+                    .deletingLastPathComponent()
+                    .appendingPathComponent(
+                        dark.deletingPathExtension().lastPathComponent + "-light.png"
+                    )
+                try ReadmeBanner.run(output: dark, palette: .dark)
+                try ReadmeBanner.run(output: light, palette: .light)
                 return 0
             } catch {
                 writeError("Banner failed: \(error)\n")
