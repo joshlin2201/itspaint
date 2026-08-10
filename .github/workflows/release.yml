@@ -46,6 +46,38 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ steps.release.outputs.tag }}
+          # Needed by the ancestry check below; a shallow clone has no history
+          # to compare against main.
+          fetch-depth: 0
+
+      # Refuse to build a tag that is not on main.
+      #
+      # `main` is protected — required checks, no force pushes, no deletions —
+      # but **branch protection does not protect tags**. A tag can point at any
+      # commit in the repository, including one on an unreviewed branch, and this
+      # workflow fires on `v*` regardless of where that commit came from. So
+      # without this, the path to a signed, notarised build carrying the Apple
+      # certificate is: push any branch, tag it, done.
+      #
+      # **This step is not the security control**, and it must not be mistaken
+      # for one: anyone who can modify this file can delete it in the same commit
+      # they tag. The controls are a tag ruleset restricting who may create `v*`
+      # and a protected `release` environment that pauses for a second person
+      # before any secret-bearing step. Both are repository settings and neither
+      # lives here.
+      #
+      # What this does buy is the accident: releasing from a branch that was
+      # never reviewed, which is a mistake a maintainer can make on any evening.
+      - name: Refuse a tag that is not on main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=0 origin main
+          TAG_SHA="$(git rev-parse HEAD)"
+          if ! git merge-base --is-ancestor "$TAG_SHA" origin/main; then
+            echo "::error::${{ steps.release.outputs.tag }} points at $TAG_SHA, which is not an ancestor of origin/main. Releases are cut from reviewed commits on main." >&2
+            exit 1
+          fi
+          echo "$TAG_SHA is on main."
 
       # The same check the Package step makes, made here instead of forty
       # minutes later. A tag whose version does not match the committed

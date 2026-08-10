@@ -45,3 +45,16 @@ docs/appstore/
 
 # Release artifacts (CI builds into dist/ too; nothing in it belongs in git)
 dist/
+
+# Credentials and signing material. None of this has ever been committed; the
+# patterns exist so a stray file cannot be, and because the release path holds
+# Apple signing secrets in Actions rather than on disk.
+.env
+.env.*
+!.env.example
+AuthKey_*.p8
+*.p8
+*.pem
+*.key
+*.cer
+*.certSigningRequest

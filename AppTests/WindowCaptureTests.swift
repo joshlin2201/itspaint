@@ -275,7 +275,7 @@ struct WindowCaptureTests {
 
         chip(PixelRect(x: 48, y: 366, width: 744, height: 60))
         text("API token", x: 72, y: 382, size: 21, colour: colour("33404F"))
-        text("sk_live_9f3KJq8vX2mR7pTd41Nw", x: 300, y: 384, size: 19, colour: colour("B3261E"), font: "Menlo")
+        text("demo_EXAMPLE_NOT_A_REAL_KEY", x: 300, y: 384, size: 19, colour: colour("B3261E"), font: "Menlo")
 
         return engine.canvas
     }

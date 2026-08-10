@@ -1,0 +1,22 @@
+# Ownership for the paths that decide what gets signed, what gets shipped, and
+# what the app is allowed to do.
+#
+# The point is not bureaucracy. `main` is protected and the release workflow
+# holds the Apple Developer ID certificate and the notarisation credentials, so
+# a change to the workflow, to a release script, or to the entitlements is a
+# change to the trust story of every published build — and those are exactly the
+# files that look boring in a diff.
+#
+# With a single maintainer this file documents intent and does nothing to
+# enforce it. Once there is a second, add them below and turn on "Require review
+# from Code Owners" in the ruleset for `main`, which is the point at which it
+# starts being a control rather than a note.
+
+*                                   @joshlin2201
+
+/.github/                           @joshlin2201
+/.github/workflows/                 @joshlin2201
+/scripts/                           @joshlin2201
+/App/Resources/ItsPaint.entitlements  @joshlin2201
+/App/Resources/PrivacyInfo.xcprivacy  @joshlin2201
+/SECURITY.md                        @joshlin2201
