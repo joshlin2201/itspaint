@@ -1,57 +1,48 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/banner.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/banner-light.png">
-  <img src="docs/images/banner.png" width="760" alt="ItsPaint — MS Paint for the Mac. Free and open source, 2.9 MB, no account and no telemetry.">
-</picture>
+<img src="docs/images/icon.png" width="116" alt="">
 
-### MS Paint for the Mac.
+# ItsPaint
 
-Open it, draw, close it. **2.9 MB**, free forever, MIT.
-No account, no subscription, no trial, no telemetry.
+### MS Paint for the Mac. Open it, draw, close it.
+
+**2.9 MB** · free on the App Store, no trial · MIT ·
+**no network entitlement, so the kernel refuses a socket**
 
 [![Release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&style=flat-square&label=release&color=2563eb)](https://github.com/joshlin2201/itspaint/releases)
 [![Mac App Store](https://img.shields.io/badge/Mac_App_Store-free-2563eb?style=flat-square)](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)
-[![macOS 14+](https://img.shields.io/badge/macOS-14+-1f2937?style=flat-square)](https://github.com/joshlin2201/itspaint/releases)
-[![Swift 6](https://img.shields.io/badge/Swift-6-1f2937?style=flat-square)](https://swift.org)
 [![MIT](https://img.shields.io/badge/licence-MIT-1f2937?style=flat-square)](LICENSE)
 [![tests](https://img.shields.io/github/actions/workflow/status/joshlin2201/itspaint/ci.yml?branch=main&style=flat-square&label=tests)](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml)
 
-```
+```sh
 brew tap joshlin2201/itspaint
 brew install --cask itspaint
 ```
 
-**[Download the disk image](https://github.com/joshlin2201/itspaint/releases/latest)** · **[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)**
-
-</div>
-
----
-
-<div align="center">
+**[Download the disk image](https://github.com/joshlin2201/itspaint/releases/latest)** · **[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)** · macOS 14+, universal
 
 <img src="docs/images/editor-window.png" alt="ItsPaint editing a chameleon painting on a transparent canvas, with the brush options open">
 
 </div>
 
-<br>
+## What makes it different
 
-## Why this exists
-
-Every few weeks someone asks the internet for MS Paint on a Mac, and the answers
-are always the same three. **Preview** cannot make a blank canvas. **Paintbrush**
-stopped keeping up with macOS. Everything capable is a gigabyte with a
-subscription attached, and half the free ones turn out to be a trial.
-
-ItsPaint is the fourth answer. `⌘N` gives you a blank canvas at the size you
-asked for, eleven tools sit on a rail one cell thick, and the whole thing is a
-2.9 MB download that puts a window on screen in about half a second.
+- **2.9 MB, and a window on screen in about half a second.** Everything else
+  capable is a gigabyte with a subscription attached, and half the free ones turn
+  out to be a trial.
+- **No network entitlement.** `com.apple.security.network.client` is not
+  requested, so the kernel refuses an outbound socket whatever the code asks for —
+  [three commands to check it yourself](#no-network-three-commands-to-prove-it).
+- **Background removal with no ML model** and nothing to download: four
+  corner-seeded flood selections, unioned, and it declines rather than handing you
+  a blank canvas — [thirty lines of code](docs/BACKGROUND_REMOVAL.md).
+- **The drawing engine has no UI.** `Packages/PaintKit` imports Foundation,
+  CoreGraphics and ImageIO and nothing else, so `swift test` verifies most changes
+  with no Xcode and no GUI session.
+- **Free, not free-for-now.** No account, no subscription, no trial, no telemetry.
 
 It is the app you reach for *between* the real tools — mark up the screenshot,
 crop the thing, drag it into Slack, close the window without saving.
-
-<br>
 
 ## What it does
 
@@ -95,8 +86,6 @@ Nine seconds, no file saved.
 
 </div>
 
-<br>
-
 ## Install
 
 ```bash
@@ -120,32 +109,9 @@ shasum -a 256 -c checksums.txt
 xcrun stapler validate ItsPaint-*.dmg
 ```
 
-<details>
-<summary><b>If macOS says it "could not verify ItsPaint is free of malware"</b></summary>
+If macOS asks you to confirm the first launch, open **System Settings ▸ Privacy &
+Security** and click **Open Anyway** — [why that happens](#first-launch).
 
-<br>
-
-**The app is fine and so is your download.** Open **System Settings ▸ Privacy &
-Security** and click **Open Anyway**.
-
-This was observed once, on macOS 26.6, with a freshly downloaded 0.12.0 — on the
-same disk image that `spctl --assess` accepts and whose stapled ticket validates.
-It reads like a first-launch check that went to Apple and did not come back
-rather than anything about the build, and it is not reproducible on demand. It is
-alarming enough when it happens that it belongs here rather than buried in an
-issue.
-
-You can check the download yourself:
-
-```bash
-shasum -a 256 -c checksums.txt
-codesign --verify --deep --strict --verbose=2 /Volumes/ItsPaint*/ItsPaint.app
-spctl -a -vvv -t exec /Volumes/ItsPaint*/ItsPaint.app   # expect: accepted
-```
-
-</details>
-
-<br>
 
 ## No network. Three commands to prove it
 
@@ -210,14 +176,9 @@ and what a change has to prove before it lands.
 | **Select** | Rectangle, Ellipse, Lasso, Instant Alpha |
 | **Effects** | Pixelate |
 
-Eleven rail buttons — `ToolKind.allCases.count`, and the rail shows every one.
-Variations stay inside the tool that owns them rather than becoming another
-button: fifteen shapes share the Shape button, four selection modes share Select,
-four nibs share Brush.
-
-The Shape tool covers line, curve, arrow, rectangle, rounded rectangle, ellipse,
-triangle, right triangle, diamond, pentagon, hexagon, five- and six-point stars,
-speech bubble, and polygon.
+Eleven rail buttons. Variations live inside the tool that owns them — fifteen
+shapes behind Shape, four nibs behind Brush, four modes behind Select — so the
+whole set stays available without a button each.
 
 | Shortcut | Action | Shortcut | Action |
 |---|---|---|---|
@@ -289,7 +250,7 @@ can be a dependency of anything that wants a raster canvas without an editor
 around it:
 
 ```swift
-.package(url: "https://github.com/joshlin2201/itspaint.git", from: "0.12.1")
+.package(url: "https://github.com/joshlin2201/itspaint.git", from: "0.13.1")
 ```
 
 ```swift
@@ -299,22 +260,38 @@ let engine = PaintEngine(width: 800, height: 600)
 engine.removeBackground()            // false when the page is not separable
 ```
 
-`0.12.1` is a package tag, not an app release — the app is unchanged from
-`0.12.0`, and only tags from `0.12.1` onward carry the root manifest.
-
-```bash
-swift test                    # engine, from the repository root
-swift test -c release         # engine, including the throughput budgets
-xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
-  -destination 'platform=macOS' test
-```
-
-Xcode 16 or later is needed only for the app shell — the `ItsPaint` scheme and
-the AppKit tests that need a GUI session.
-
 [docs/README.md](docs/README.md) has the design notes, architecture, feature
 reference, testing guide, and roadmap. [CHANGELOG.md](CHANGELOG.md) has the
 version history.
+
+</details>
+
+<br>
+
+<a id="first-launch"></a>
+
+<details>
+<summary>First launch, and the Gatekeeper message</summary>
+
+<br>
+
+**The app is fine and so is your download.** Open **System Settings ▸ Privacy &
+Security** and click **Open Anyway**.
+
+This was observed once, on macOS 26.6, with a freshly downloaded 0.12.0 — on the
+same disk image that `spctl --assess` accepts and whose stapled ticket validates.
+It reads like a first-launch check that went to Apple and did not come back
+rather than anything about the build, and it is not reproducible on demand. It is
+alarming enough when it happens that it belongs here rather than buried in an
+issue.
+
+You can check the download yourself:
+
+```bash
+shasum -a 256 -c checksums.txt
+codesign --verify --deep --strict --verbose=2 /Volumes/ItsPaint*/ItsPaint.app
+spctl -a -vvv -t exec /Volumes/ItsPaint*/ItsPaint.app   # expect: accepted
+```
 
 </details>
 

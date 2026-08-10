@@ -113,14 +113,23 @@ struct ToolbarGeometryTests {
             .deletingLastPathComponent()      // AppTests/
             .deletingLastPathComponent()      // repository root
             .appendingPathComponent("README.md")
+        // Whitespace-collapsed, so a phrase that happens to straddle a line wrap
+        // still matches. Pinning the wrap as well as the words makes the test fail
+        // on reflowing a paragraph, which teaches people to delete it.
         let prose = try String(contentsOf: readme, encoding: .utf8)
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
 
         // Every place the README spends one of these numbers as a word.
+        // The exact words, because the point is to catch the *prose* moving. When
+        // the page is rewritten these have to be updated deliberately, which is
+        // the moment someone re-checks that the number is still right — and that
+        // is the whole mechanism. This test failing during a rewrite is it
+        // working, not it being in the way.
         for phrase in [
-            "eleven tools sit on a rail one cell thick",
             "Eleven rail buttons",
             "**Fifteen shapes**",
-            "fifteen shapes share the Shape button",
+            "fifteen shapes behind Shape",
         ] {
             #expect(prose.contains(phrase), "README no longer says \"\(phrase)\"")
         }
