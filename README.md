@@ -31,10 +31,7 @@ brew install --cask itspaint
 
 <div align="center">
 
-<img src="docs/images/markup-reel.gif" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
-
-**Paste a screenshot, number three steps, blur the token.**
-Nine seconds, no file saved.
+<img src="docs/images/editor-window.png" alt="ItsPaint editing a chameleon painting on a transparent canvas, with the brush options open">
 
 </div>
 
@@ -83,6 +80,16 @@ nearly blank canvas.
 - **Mark up a screenshot properly.** Auto-numbered step badges, arrows, a
   highlighter with its own ink, and pixelate for whatever you would rather not
   publish.
+
+<div align="center">
+
+<img src="docs/images/markup-reel.gif" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
+
+**Paste a screenshot, number three steps, blur the token.**
+Nine seconds, no file saved.
+
+</div>
+
 - **Annotation text that stays readable** on any screenshot, because it carries a
   contrasting rim. One text colour cannot work across a light panel and a dark
   one, so it does not try.
@@ -94,12 +101,6 @@ nearly blank canvas.
 - **Real pixel control** — pointer-centred zoom, nearest-neighbour above 100%, a
   pixel grid, live tool footprints, rotate by any angle with the canvas growing
   to fit the corners.
-
-<div align="center">
-<img src="docs/images/editor-window.png" alt="ItsPaint editing a chameleon painting on a transparent canvas">
-</div>
-
-<br>
 
 ## Install
 
