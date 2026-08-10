@@ -185,6 +185,8 @@ struct SettingsView: View {
 
             Section("Screenshots") {
                 ScreenshotWatcherRow()
+                Divider()
+                ClipboardHotKeyRow()
             }
 
             Section {
@@ -245,6 +247,36 @@ private struct ScreenshotWatcherRow: View {
         }
 
         if let problem = watcher.problem, watcher.isEnabled || watcher.folder != nil {
+            Text(problem)
+                .font(.caption)
+                .foregroundStyle(.orange)
+        }
+    }
+}
+
+/// The other half of the screenshot workflow: `⌃⇧⌘4` copies instead of saving,
+/// and this gives that clipboard somewhere to land from any app.
+private struct ClipboardHotKeyRow: View {
+    @Bindable private var hotKey = ClipboardHotKey.shared
+
+    var body: some View {
+        Toggle(isOn: $hotKey.isEnabled) {
+            HStack(spacing: Tokens.Space.tight) {
+                Text("Open the clipboard as a new image with")
+                Text(ClipboardHotKey.displayName)
+                    .monospaced()
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+            }
+        }
+
+        Text("Works from any app, without ItsPaint being open. "
+             + "It always makes a new image, so it never pastes into what you were editing.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+        if let problem = hotKey.problem {
             Text(problem)
                 .font(.caption)
                 .foregroundStyle(.orange)
