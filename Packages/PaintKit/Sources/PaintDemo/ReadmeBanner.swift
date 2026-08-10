@@ -59,12 +59,12 @@ enum ReadmeBanner {
         }
         canvas.composite(iconScaled, at: PixelPoint(x: (size.width - 208) / 2, y: 96))
 
-        centred("ItsPaint", y: 330, pointSize: 116, weight: "Helvetica-Bold",
+        centred("ItsPaint", y: 330, pointSize: 116, bold: true,
                 hex: "FFFFFF", into: &canvas)
-        centred("MS Paint for the Mac.", y: 476, pointSize: 46, weight: "Helvetica",
+        centred("MS Paint for the Mac.", y: 476, pointSize: 46, bold: false,
                 hex: "AFBBCB", into: &canvas)
         centred("Free  ·  MIT  ·  2.9 MB  ·  no account, no telemetry",
-                y: 552, pointSize: 27, weight: "Helvetica", hex: "6B7A8E", into: &canvas)
+                y: 552, pointSize: 27, bold: false, hex: "6B7A8E", into: &canvas)
 
         try placeWindow(from: windowCapture, into: &canvas)
 
@@ -132,15 +132,26 @@ enum ReadmeBanner {
         )
     }
 
+    /// The system font, which on a Mac means SF.
+    ///
+    /// `"SF Pro Display"` and `"SFProDisplay-Bold"` are **not** resolvable names:
+    /// `CTFontCreateWithName` silently returns Helvetica for both, so asking for
+    /// them looks like it worked and quietly ships the generic face. The one name
+    /// that resolves is `.AppleSystemUIFont`, which comes back as `.SFNS-Regular`,
+    /// and bold has to arrive as a symbolic trait rather than in the name —
+    /// `".SFNS-Bold"` resolves to *Times*.
+    private static let systemFont = ".AppleSystemUIFont"
+
     private static func centred(
-        _ text: String, y: Int, pointSize: Double, weight: String, hex: String,
+        _ text: String, y: Int, pointSize: Double, bold: Bool, hex: String,
         into canvas: inout Bitmap
     ) {
         var style = TextRenderer.Style(
-            fontName: weight,
+            fontName: systemFont,
             pointSize: pointSize,
             colour: PaintColour(hex: hex) ?? .white
         )
+        style.isBold = bold
         style.alignment = .centre
         // No rim: the backdrop is a known dark gradient, and a halo here would
         // be the legibility fix for a problem this image does not have.
