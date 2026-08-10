@@ -54,6 +54,23 @@ struct PaintDemoCommand {
             }
         }
 
+        if let index = arguments.firstIndex(of: "--banner") {
+            guard arguments.count > index + 2 else {
+                writeError("Usage: paint-demo --banner <window-capture> <output.png>\n")
+                return 2
+            }
+            do {
+                try ReadmeBanner.run(
+                    windowCapture: url(for: arguments[index + 1], currentDirectory: currentDirectory),
+                    output: url(for: arguments[index + 2], currentDirectory: currentDirectory)
+                )
+                return 0
+            } catch {
+                writeError("Banner failed: \(error)\n")
+                return 1
+            }
+        }
+
         if let index = arguments.firstIndex(of: "--appstore") {
             guard arguments.count > index + 2 else {
                 writeError("Usage: paint-demo --appstore <reel-final-frame.png> <output-dir>\n")
@@ -120,6 +137,7 @@ struct PaintDemoCommand {
           paint-demo --bench
           paint-demo --icon [output-directory]
           paint-demo --social <window-capture> <output.png>
+          paint-demo --banner <window-capture> <output.png>
           paint-demo --appstore <reel-final-frame.png> <output-dir>
         """)
     }

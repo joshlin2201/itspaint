@@ -1,31 +1,29 @@
 <div align="center">
 
-<img src="docs/images/icon.png" width="120" alt="">
+<img src="docs/images/banner.png" alt="ItsPaint — MS Paint for the Mac. Free, MIT, 2.9 MB, no account and no telemetry.">
 
-# ItsPaint
+[![Release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&style=flat-square&label=release&color=2563eb)](https://github.com/joshlin2201/itspaint/releases)
+[![Mac App Store](https://img.shields.io/badge/Mac_App_Store-free-2563eb?style=flat-square)](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)
+[![macOS 14+](https://img.shields.io/badge/macOS-14+-1f2937?style=flat-square)](https://github.com/joshlin2201/itspaint/releases)
+[![Swift 6](https://img.shields.io/badge/Swift-6-1f2937?style=flat-square)](https://swift.org)
+[![MIT](https://img.shields.io/badge/licence-MIT-1f2937?style=flat-square)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/joshlin2201/itspaint/ci.yml?branch=main&style=flat-square&label=tests)](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml)
 
-### MS Paint for the Mac.
-
-Open it, draw, close it. **2.9 MB**, free forever, MIT.
-No account, no subscription, no trial, no telemetry — and [three commands](#no-network-and-how-to-check) that prove the last one.
-
-[![CI](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml/badge.svg)](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&label=release&color=success)](https://github.com/joshlin2201/itspaint/releases)
-[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white)](https://github.com/joshlin2201/itspaint/releases)
-[![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](https://swift.org)
-[![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
-
-```bash
+```
 brew install --cask joshlin2201/itspaint/itspaint
 ```
 
-<sub>or [download the disk image](https://github.com/joshlin2201/itspaint/releases/latest) · or get it on the [Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)</sub>
+**[Download the disk image](https://github.com/joshlin2201/itspaint/releases/latest)** · **[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)** · free either way
 
-<br>
+</div>
 
-<img src="docs/images/markup-reel.gif" width="830" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
+---
 
-<sub>Paste a screenshot, number three steps, blur the token. Nine seconds, no file saved.</sub>
+<div align="center">
+
+<img src="docs/images/markup-reel.gif" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
+
+**Paste a screenshot, number three steps, blur the token.** Nine seconds, no file saved.
 
 </div>
 
@@ -49,23 +47,21 @@ crop the thing, drag it into Slack, close the window without saving.
 
 ## What it does
 
-<table>
-<tr><td width="50%">
+### Remove a background with no model and no network
 
-**Remove a background with no model and no network**
+<div align="center">
+
+<img src="docs/images/remove-background.gif" alt="A product shot on a flat page, then the same window with the background gone and the checkerboard showing through">
+
+</div>
 
 One command. Four corner-seeded flood selections, unioned. If the page is not
 actually separable it says so and changes nothing, instead of handing you a
 nearly blank canvas.
 
-[How it works, in thirty lines of code →](docs/BACKGROUND_REMOVAL.md)
+**[How it works, in thirty lines of code →](docs/BACKGROUND_REMOVAL.md)**
 
-</td><td width="50%">
-
-<img src="docs/images/remove-background.gif" alt="A product shot on a flat page, then the same window with the background gone and the checkerboard showing through">
-
-</td></tr>
-</table>
+### And the rest
 
 - **Drag the image straight out** of the window into Slack, Mail or the Finder.
   No save panel, no `Screenshot 2026-08-07 at 11.42.13.png` left on the Desktop.
@@ -89,7 +85,7 @@ nearly blank canvas.
   to fit the corners.
 
 <div align="center">
-<img src="docs/images/editor-window.png" width="830" alt="ItsPaint editing a chameleon painting on a transparent canvas">
+<img src="docs/images/editor-window.png" alt="ItsPaint editing a chameleon painting on a transparent canvas">
 </div>
 
 <br>
