@@ -70,6 +70,13 @@ struct PaintDemoCommand {
                     )
                 try ReadmeBanner.run(output: dark, palette: .dark)
                 try ReadmeBanner.run(output: light, palette: .light)
+                // The README leads with the icon rather than the banner, and the
+                // icon needs a light-theme twin for the same reason the banner does.
+                let dir = dark.deletingLastPathComponent()
+                try ReadmeBanner.icons(
+                    darkOutput: dir.appendingPathComponent("icon.png"),
+                    lightOutput: dir.appendingPathComponent("icon-light.png")
+                )
                 return 0
             } catch {
                 writeError("Banner failed: \(error)\n")

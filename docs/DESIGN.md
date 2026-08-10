@@ -276,8 +276,18 @@ The README hero is generated too, rather than made in a design tool:
 swift run paint-demo --banner docs/images/banner.png
 ```
 
-It writes a dark and a light file from one invocation, and the README picks
-between them with `<picture>` + `prefers-color-scheme`. A single near-black PNG
+It writes four files from one invocation — a dark and light banner, and a dark and
+light icon — and the README picks between them with `<picture>` +
+`prefers-color-scheme`.
+
+**The icon needs a light twin for a non-obvious reason.** The app icon is a *white*
+squircle. On a dark page the white is the edge; on GitHub's light theme it is white
+on white, the container disappears, and what is left is a blue stroke, a yellow band
+and a red arrow floating loose in the text. Found by forcing
+`prefers-color-scheme: light` and looking at it — nothing in the markup says so. The
+light variant sits on a faint plate with a hairline, built from `fill` plus four
+`fillEllipse` corners because PaintKit has no rounded-rect fill and does not need
+one for a paint app. A single near-black PNG
 is a full-width black slab above a white page for everyone in the light theme.
 
 `ReadmeBanner` composes it out of PaintKit — the light field is written per

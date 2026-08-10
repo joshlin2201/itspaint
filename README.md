@@ -1,6 +1,10 @@
 <div align="center">
 
-<img src="docs/images/icon.png" width="116" alt="">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/icon.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/icon-light.png">
+  <img src="docs/images/icon.png" width="116" alt="">
+</picture>
 
 # ItsPaint
 

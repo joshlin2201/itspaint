@@ -112,6 +112,72 @@ enum ReadmeBanner {
         print("Wrote \(size.width)×\(size.height) banner to \(output.path)")
     }
 
+    /// The README's icon, on a plate when the page behind it is light.
+    ///
+    /// The app icon is a white squircle with a blue stroke, a yellow band and a red
+    /// arrow inside it. On a dark page that reads as an icon. On GitHub's light
+    /// theme the squircle is white on white, so its edge disappears and what is left
+    /// is three loose marks floating in the text — verified by forcing
+    /// `prefers-color-scheme: light` and looking, which is the only way to see it.
+    ///
+    /// So the light variant sits on a faint plate with a hairline, drawn a little
+    /// larger than the icon and behind it. The dark variant is the icon unchanged,
+    /// because there the white *is* the edge.
+    static func icons(darkOutput: URL, lightOutput: URL) throws {
+        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let iconURL = root.appendingPathComponent(
+            "App/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png"
+        )
+        guard FileManager.default.fileExists(atPath: iconURL.path) else {
+            throw BannerError.missingIcon
+        }
+        let icon = try ImageCodec.decode(contentsOf: iconURL)
+
+        // Dark: the icon as it is.
+        try ImageCodec.write(icon, to: darkOutput, as: .png)
+        print("Wrote \(icon.width)×\(icon.height) icon to \(darkOutput.path)")
+
+        // Light: a plate with 6% padding, so the edge is outside the artwork.
+        let pad = icon.width / 16
+        let side = icon.width + pad * 2
+        var plated = Bitmap(width: side, height: side, fill: RGBA8(r: 0, g: 0, b: 0, a: 0))
+        roundedPlate(
+            in: PixelRect(x: 0, y: 0, width: side, height: side),
+            radius: side / 5,
+            fill: RGBA8(r: 236, g: 239, b: 243, a: 255),
+            edge: RGBA8(r: 0, g: 0, b: 0, a: 28),
+            into: &plated
+        )
+        plated.composite(icon, at: PixelPoint(x: pad, y: pad))
+        try ImageCodec.write(plated, to: lightOutput, as: .png)
+        print("Wrote \(side)×\(side) plated icon to \(lightOutput.path)")
+    }
+
+    /// A rounded rectangle out of the primitives there are: a cross of two rects for
+    /// the body, four ellipses for the corners. PaintKit has no rounded-rect fill,
+    /// and adding one to the engine for a docs asset would be the wrong place.
+    private static func roundedPlate(
+        in rect: PixelRect, radius r: Int, fill: RGBA8, edge: RGBA8, into canvas: inout Bitmap
+    ) {
+        func plate(_ inset: Int, _ colour: RGBA8) {
+            let x = rect.minX + inset, y = rect.minY + inset
+            let w = rect.width - inset * 2, h = rect.height - inset * 2
+            let rr = max(1, r - inset)
+            canvas.fill(PixelRect(x: x + rr, y: y, width: w - rr * 2, height: h), with: colour)
+            canvas.fill(PixelRect(x: x, y: y + rr, width: w, height: h - rr * 2), with: colour)
+            for (cx, cy) in [(x, y), (x + w - rr * 2, y),
+                             (x, y + h - rr * 2), (x + w - rr * 2, y + h - rr * 2)] {
+                Raster.fillEllipse(
+                    in: PixelRect(x: cx, y: cy, width: rr * 2, height: rr * 2),
+                    colour: colour, into: &canvas
+                )
+            }
+        }
+        // Edge first, then the fill one pixel in, which leaves a hairline showing.
+        plate(0, edge)
+        plate(2, fill)
+    }
+
     // MARK: - Pieces
 
     /// One light source, written per pixel.
