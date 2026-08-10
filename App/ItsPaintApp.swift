@@ -52,6 +52,11 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.activate()
+        // Touching the singleton is what starts the watch, when it is switched
+        // on and its bookmark still resolves. Nothing here asks for anything: it
+        // is off until someone turns it on, and it stays off if the folder it was
+        // given has since moved.
+        _ = ScreenshotWatcher.shared
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { true }

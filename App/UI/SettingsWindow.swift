@@ -183,6 +183,10 @@ struct SettingsView: View {
                 Toggle("Warn before very large canvases", isOn: $settings.confirmLargeCanvas)
             }
 
+            Section("Screenshots") {
+                ScreenshotWatcherRow()
+            }
+
             Section {
                 HStack {
                     Spacer()
@@ -193,5 +197,57 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// The screenshot-folder switch, and the folder it needs before it can mean
+/// anything.
+///
+/// The toggle is deliberately not the first thing that happens: turning it on
+/// without a folder chosen opens the panel, because a switch that goes on and
+/// then reports a problem is worse than one that asks the question first.
+private struct ScreenshotWatcherRow: View {
+    @Bindable private var watcher = ScreenshotWatcher.shared
+
+    var body: some View {
+        Toggle("Open new screenshots automatically", isOn: Binding(
+            get: { watcher.isEnabled },
+            set: { wanted in
+                guard wanted else {
+                    watcher.isEnabled = false
+                    return
+                }
+                if watcher.folder == nil {
+                    watcher.chooseFolder { picked in
+                        if picked { watcher.isEnabled = true }
+                    }
+                } else {
+                    watcher.isEnabled = true
+                }
+            }
+        ))
+
+        Text("ItsPaint watches one folder and opens images that appear in it. "
+             + "It never takes the screenshot and never changes where macOS saves them.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+        LabeledContent("Folder") {
+            HStack(spacing: Tokens.Space.tight) {
+                Text(watcher.folder?.lastPathComponent ?? "None chosen")
+                    .foregroundStyle(watcher.folder == nil ? .secondary : .primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Button(watcher.folder == nil ? "Choose…" : "Change…") {
+                    watcher.chooseFolder { _ in }
+                }
+            }
+        }
+
+        if let problem = watcher.problem, watcher.isEnabled || watcher.folder != nil {
+            Text(problem)
+                .font(.caption)
+                .foregroundStyle(.orange)
+        }
     }
 }
