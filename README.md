@@ -71,15 +71,20 @@ nearly blank canvas.
 
 ### And the rest
 
-- **Drag the image straight out** of the window into Slack, Mail or the Finder.
-  No save panel, no `Screenshot 2026-08-07 at 11.42.13.png` left on the Desktop.
-  The selection if there is one, the whole canvas if not.
-- **Paste anything on top of anything.** It arrives floating — drag it, scale it
-  from the corners, and if it is bigger than the canvas the canvas grows to hold
-  it rather than cropping it.
+- **Drag the image straight out** into Slack, Mail or the Finder. No save panel, no
+  `Screenshot 2026-08-07 at 11.42.13.png` left on your Desktop.
+- **Paste anything on top of anything.** It arrives floating, and if it is bigger
+  than the canvas the canvas grows rather than cropping it.
 - **Mark up a screenshot properly.** Auto-numbered step badges, arrows, a
-  highlighter with its own ink, and pixelate for whatever you would rather not
-  publish.
+  highlighter with its own ink, pixelate for what you would rather not publish.
+- **Annotation text stays readable** on any screenshot — it carries a contrasting
+  rim, because one colour cannot work across a light panel and a dark one.
+- **Snap to grid** (`⇧⌘'`) at 8–64px for shapes, selections and pasted content.
+  Never for freehand: a stroke that jumped to a grid would not be freehand.
+- **Fifteen shapes**, four brush nibs, four ways to select — each folded behind one
+  rail button rather than sprawling across the window.
+- **Real pixel control** — pointer-centred zoom, nearest-neighbour above 100%, a
+  pixel grid, live tool footprints, rotate by any angle.
 
 <div align="center">
 
@@ -90,17 +95,7 @@ Nine seconds, no file saved.
 
 </div>
 
-- **Annotation text that stays readable** on any screenshot, because it carries a
-  contrasting rim. One text colour cannot work across a light panel and a dark
-  one, so it does not try.
-- **Snap to grid** (`⇧⌘'`) at 8 to 64px for shapes, selections and pasted
-  content — and never for freehand tools, because a brush stroke that jumped to a
-  grid would not be freehand.
-- **Fifteen shapes**, four brush nibs, four ways to select, all folded behind one
-  rail button each rather than sprawling across the window.
-- **Real pixel control** — pointer-centred zoom, nearest-neighbour above 100%, a
-  pixel grid, live tool footprints, rotate by any angle with the canvas growing
-  to fit the corners.
+<br>
 
 ## Install
 
@@ -109,17 +104,16 @@ brew tap joshlin2201/itspaint
 brew install --cask itspaint
 ```
 
-Or grab the disk image from [Releases](https://github.com/joshlin2201/itspaint/releases),
-open it, drag **ItsPaint** to Applications. Or install it free from the
-[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12).
+Or the [disk image](https://github.com/joshlin2201/itspaint/releases) — open it,
+drag **ItsPaint** to Applications. Or the
+[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12), free.
 
-Requires macOS 14 Sonoma or later. Universal — one build for Apple silicon and
-Intel. Signed with a Developer ID and notarised by Apple, with the ticket stapled
-to both the disk image and the app inside it, so the check needs no network and
-there is nothing to clear from the Terminal.
-
-Every release ships `checksums.txt`, and you can verify a download before you
-open it:
+| | |
+|---|---|
+| **Requires** | macOS 14 Sonoma or later |
+| **Architecture** | universal — one build for Apple silicon and Intel |
+| **Signing** | Developer ID, notarised, ticket stapled to the image *and* the app, so the check needs no network and there is nothing to clear from the Terminal |
+| **Download** | 2.9 MB, with a SHA-256 in `checksums.txt` |
 
 ```bash
 shasum -a 256 -c checksums.txt
@@ -153,52 +147,27 @@ spctl -a -vvv -t exec /Volumes/ItsPaint*/ItsPaint.app   # expect: accepted
 
 <br>
 
-## No network, and how to check
+## No network. Three commands to prove it
 
-ItsPaint never contacts anything. That is a claim, so here is how to falsify it.
-
-Start with the sandbox, because it is the only part that does not require
-trusting me. Neither `com.apple.security.network.client` nor `.server` is
-requested, so the kernel refuses an outbound connection regardless of what the
-code asks for:
+Not a promise — a property the kernel enforces. Run these against the copy you
+installed:
 
 ```bash
 codesign -d --entitlements - --xml /Applications/ItsPaint.app | plutil -p -
-```
-
-Three entitlements come back — the sandbox itself, read-write access to files
-chosen in an open or save panel, and app-scoped bookmarks so recent documents
-reopen without re-prompting. Nothing else.
-
-Then check that nothing links against a networking framework, or outside the
-system at all:
-
-```bash
 otool -L /Applications/ItsPaint.app/Contents/MacOS/ItsPaint
+grep -rniE 'URLSession|NWConnection|import Network|CFSocket' App Packages
 ```
 
-No `CFNetwork`, no `Network.framework`, no bundled dylib — every entry on both
-architectures is an Apple framework or the Swift runtime.
+| What you ran | What comes back |
+|---|---|
+| **entitlements** | three — sandbox, files you pick in a panel, app-scoped bookmarks. No `network.client`, no `.server`, so the kernel refuses a socket whatever the code asks for |
+| **`otool -L`** | Apple frameworks and the Swift runtime, on both architectures. No `CFNetwork`, no `Network.framework`, no bundled dylib |
+| **`grep`** | nothing. And `Package.swift` declares no dependency, so there is no third-party code behind it |
 
-Then the source, across every Swift file in the engine and the app:
+The entitlements check is first on purpose: it reports what the kernel will
+*permit*, not what the developer wrote, so it holds even if the developer is lying.
 
-```bash
-grep -rniE 'URLSession|NWConnection|import Network|CFSocket|getaddrinfo' App Packages
-```
-
-Zero matches, and `Package.swift` declares no external dependency, so there is no
-third-party code hiding behind that.
-
-None of this is a promise about future versions. It is three commands that run
-against the build you already have.
-
-> [**Making "no network" checkable**](docs/PROVING_NO_NETWORK.md) explains why
-> they are in that order — the entitlements check reports what the kernel will
-> permit rather than what the developer wrote, so it holds even if the developer
-> is lying. It includes a `sandbox-exec` profile that reproduces the refusal, and
-> how to make the same claim falsifiable in your own app.
-
-<br>
+**[Why that order, and how to make the same claim falsifiable in your own app →](docs/PROVING_NO_NETWORK.md)**
 
 ## Contributing — the engine needs no Xcode
 
