@@ -1,19 +1,24 @@
 <div align="center">
 
-<img src="docs/images/banner.png" alt="ItsPaint — MS Paint for the Mac. Free, MIT, 2.9 MB, no account and no telemetry.">
+<img src="docs/images/banner.png" alt="ItsPaint">
+
+### MS Paint for the Mac.
+
+Open it, draw, close it. **2.9 MB**, free forever, MIT.<br>
+No account, no subscription, no trial, no telemetry.
 
 [![Release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&style=flat-square&label=release&color=2563eb)](https://github.com/joshlin2201/itspaint/releases)
 [![Mac App Store](https://img.shields.io/badge/Mac_App_Store-free-2563eb?style=flat-square)](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)
 [![macOS 14+](https://img.shields.io/badge/macOS-14+-1f2937?style=flat-square)](https://github.com/joshlin2201/itspaint/releases)
 [![Swift 6](https://img.shields.io/badge/Swift-6-1f2937?style=flat-square)](https://swift.org)
 [![MIT](https://img.shields.io/badge/licence-MIT-1f2937?style=flat-square)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/joshlin2201/itspaint/ci.yml?branch=main&style=flat-square&label=tests)](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/github/actions/workflow/status/joshlin2201/itspaint/ci.yml?branch=main&style=flat-square&label=tests)](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml)
 
 ```
 brew install --cask joshlin2201/itspaint/itspaint
 ```
 
-**[Download the disk image](https://github.com/joshlin2201/itspaint/releases/latest)** · **[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)** · free either way
+**[Download the disk image](https://github.com/joshlin2201/itspaint/releases/latest)** · **[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)**
 
 </div>
 
@@ -23,7 +28,8 @@ brew install --cask joshlin2201/itspaint/itspaint
 
 <img src="docs/images/markup-reel.gif" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
 
-**Paste a screenshot, number three steps, blur the token.** Nine seconds, no file saved.
+**Paste a screenshot, number three steps, blur the token.**<br>
+Nine seconds, no file saved.
 
 </div>
 
