@@ -15,7 +15,8 @@ No account, no subscription, no trial, no telemetry.
 [![tests](https://img.shields.io/github/actions/workflow/status/joshlin2201/itspaint/ci.yml?branch=main&style=flat-square&label=tests)](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml)
 
 ```
-brew install --cask joshlin2201/itspaint/itspaint
+brew tap joshlin2201/itspaint
+brew install --cask itspaint
 ```
 
 **[Download the disk image](https://github.com/joshlin2201/itspaint/releases/latest)** · **[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)**
