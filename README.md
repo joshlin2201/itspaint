@@ -104,7 +104,8 @@ nearly blank canvas.
 ## Install
 
 ```bash
-brew install --cask joshlin2201/itspaint/itspaint
+brew tap joshlin2201/itspaint
+brew install --cask itspaint
 ```
 
 Or grab the disk image from [Releases](https://github.com/joshlin2201/itspaint/releases),
