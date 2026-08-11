@@ -106,6 +106,9 @@ Or the [disk image](https://github.com/joshlin2201/itspaint/releases) — open i
 drag **ItsPaint** to Applications. Or the
 [Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12), free.
 
+It ships often while it is in beta, so **Watch ▸ Custom ▸ Releases** is the quietest
+way to hear about a new build.
+
 | | |
 |---|---|
 | **Requires** | macOS 14 Sonoma or later |
