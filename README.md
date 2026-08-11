@@ -162,12 +162,20 @@ cd itspaint
 swift test          # the whole engine suite, in a fresh clone
 ```
 
-**Five issues are open and labelled [`good first issue`](https://github.com/joshlin2201/itspaint/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)**,
-each naming the file and the line to start at:
+**Seven issues are open and labelled [`good first issue`](https://github.com/joshlin2201/itspaint/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)**,
+each naming the file and the line to start at, in three different parts of the app so
+you can pick the one that suits you:
 
+*View layer, AppKit drawing, no engine knowledge needed*
+- [#11](https://github.com/joshlin2201/itspaint/issues/11) — A loupe that follows the pointer
+
+*Engine, pure functions over pixels, no Xcode needed*
+- [#12](https://github.com/joshlin2201/itspaint/issues/12) — Brightness, contrast and saturation
+- [#5](https://github.com/joshlin2201/itspaint/issues/5) — Arrowheads as a line style, not a separate shape
+
+*Selection arithmetic, also engine-only*
 - [#3](https://github.com/joshlin2201/itspaint/issues/3) — Grow and shrink a selection by a pixel amount
 - [#4](https://github.com/joshlin2201/itspaint/issues/4) — Make a selection from the alpha channel
-- [#5](https://github.com/joshlin2201/itspaint/issues/5) — Arrowheads as a line style, not a separate shape
 - [#6](https://github.com/joshlin2201/itspaint/issues/6) — Flip and rotate the selection, not the whole image
 - [#7](https://github.com/joshlin2201/itspaint/issues/7) — Add to and subtract from a selection
 
