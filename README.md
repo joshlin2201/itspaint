@@ -280,19 +280,15 @@ same combiner `⇧`-click uses, and a remainder guard that declines rather than
 returning a nearly blank canvas.
 
 **Using the engine on its own.** PaintKit is a product of the root package, so it
-can be a dependency of anything that wants a raster canvas without an editor
-around it:
+can be a dependency of anything that wants a raster canvas without an editor around
+it. The four-line example is in the **Contributing** section above, where it is
+compiled against the published tag and checked by counting pixels.
 
-```swift
-.package(url: "https://github.com/joshlin2201/itspaint.git", from: "0.13.1")
-```
-
-```swift
-import PaintKit
-
-let engine = PaintEngine(width: 800, height: 600)
-engine.removeBackground()            // false when the page is not separable
-```
+This block used to carry its own snippet, and the snippet ended
+`PaintEngine(width: 800, height: 600)` followed by `engine.removeBackground()` — a
+blank white canvas, which the command correctly declines. A README example whose
+last line returns `false` is worse than no example, and having two of them in one
+file is how that goes unnoticed.
 
 [docs/README.md](docs/README.md) has the design notes, architecture, feature
 reference, testing guide, and roadmap. [CHANGELOG.md](CHANGELOG.md) has the
