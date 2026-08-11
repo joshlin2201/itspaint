@@ -6,8 +6,9 @@ so the command cannot hand you a blank canvas: if keying out the page would eras
 picture, it changes nothing and says so.
 
 The check was inverted in effect for three releases. Not subtly wrong at the
-margins — it refused the *entire* class of image the feature was built for, while
-its test passed, its documentation defended it, and every release shipped it.
+margins — it refused the images that fit the feature *best*, and refused them more
+certainly the better they fit, while its test passed, its documentation defended it,
+and every release shipped it.
 
 Here is the line.
 

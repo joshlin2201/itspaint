@@ -26,9 +26,9 @@ Standalone pieces about one mechanism each, written to be read by someone who do
 not use this app.
 
 - **[A_GUARD_TUNED_TO_ITS_TEST.md](A_GUARD_TUNED_TO_ITS_TEST.md)** — a safety check
-  that refused every image its feature existed for, for three releases. A threshold
-  satisfied by its own test fixture and by nothing a person would open, kept
-  invisible by a paragraph arguing the failure was deliberate.
+  that rejected an image more certainly the better it fitted the feature, for three
+  releases. A threshold satisfied by its own test fixture and crossed by ordinary
+  input, kept invisible by a paragraph arguing the failure was deliberate.
 - **[BACKGROUND_REMOVAL.md](BACKGROUND_REMOVAL.md)** — taking a product shot off its
   page with no model, no weights and no network: four corner-seeded flood fills
   unioned, in about thirty lines on top of the paint bucket.
