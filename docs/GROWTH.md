@@ -15,8 +15,17 @@ Both are conversion killers and neither is a marketing problem.
 
 **Shipped in 0.11.0.** Releases are signed with a Developer ID and notarised,
 and the ticket is stapled to both the disk image and the app inside it, so a
-first launch works with no network. Gatekeeper opens them with no Control-click
-and nothing to clear from a terminal.
+first launch works with no network. There is no Control-click step and nothing to
+clear from a terminal.
+
+**That is not the same as "Gatekeeper never says anything", and this document
+claimed it was.** A freshly downloaded 0.12.0 was once refused on macOS 26.6 with
+*"Apple could not verify 'ItsPaint' is free of malware"* — on the same image
+`spctl --assess` accepts and whose stapled ticket validates. Observed 2026-08-07,
+not reproducible on demand, and documented in the README under
+[First launch](../README.md#first-launch) with the System Settings route. Notarisation
+removes the routine detour; it does not make a first-launch check that fails to
+answer impossible.
 
 This was the item every other line on this page multiplied against, and the
 diagnosis in the original version of this section was wrong in an instructive

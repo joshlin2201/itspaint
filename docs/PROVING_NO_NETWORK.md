@@ -92,9 +92,10 @@ For this app that last gap is closable by looking:
 find /Applications/ItsPaint.app -type f -perm -u+x -exec file {} \; | grep Mach-O
 ```
 
-One result — `Contents/MacOS/ItsPaint`. There is no `Frameworks/`, no `XPCServices/` and
-no `PlugIns/` directory in the bundle, so "the main executable" and "everything that ships"
-are the same set, and one `otool -L` covers it.
+One file — `Contents/MacOS/ItsPaint`. It prints as three lines, because `file` reports a
+universal binary and then each of its two slices; count paths, not lines. There is no
+`Frameworks/`, no `XPCServices/` and no `PlugIns/` directory in the bundle, so "the main
+executable" and "everything that ships" are the same set, and one `otool -L` covers it.
 
 The static-linking and `dlopen` gaps are not closed by this command in any app, and that
 is the honest reason command 1 comes first: the sandbox refuses the connection whether the

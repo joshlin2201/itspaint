@@ -122,9 +122,12 @@ Saying no is most of the design. These are settled, not open questions:
   stroke start — the fix is tiled incremental capture.
 - **The lasso mask rebuilds from the whole path** on every pointer move.
   *Reopens if:* a very long trace stutters; the fix is incremental extension.
-- **Ad-hoc signing, not notarised.** Downloads require a one-time Gatekeeper
-  override. *Reopens if:* the project adds Developer ID signing and notarisation
-  through CI.
+- ~~**Ad-hoc signing, not notarised.**~~ **Closed in 0.11.0** — the reopen
+  condition below fired and this entry outlived it. Releases are signed with a
+  Developer ID and notarised in CI, and the ticket is stapled to both the disk
+  image and the app inside it. *Was: downloads require a one-time Gatekeeper
+  override. Reopens if: the project adds Developer ID signing and notarisation
+  through CI.*
 
 ---
 
