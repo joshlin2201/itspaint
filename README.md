@@ -171,6 +171,28 @@ each naming the file and the line to start at:
 - [#6](https://github.com/joshlin2201/itspaint/issues/6) — Flip and rotate the selection, not the whole image
 - [#7](https://github.com/joshlin2201/itspaint/issues/7) — Add to and subtract from a selection
 
+It is also a dependency you can use without the app. Add it:
+
+```swift
+.package(url: "https://github.com/joshlin2201/itspaint", from: "0.13.1")
+```
+
+and take a product shot off its page in four lines, on device, with no model and no
+network:
+
+```swift
+import PaintKit
+
+let engine = PaintEngine(canvas: try ImageCodec.decode(contentsOf: input))
+guard engine.removeBackground() else { fatalError("no background to remove") }
+try ImageCodec.encode(engine.canvas, as: .png).write(to: output)
+```
+
+That snippet is compiled and run against the published tag rather than written out
+here, and the check is the transparent-pixel count before and after, not that it
+exited without complaining. On a 60px mark centred on a 400×400 page it takes the
+count from 0 to 156,400 — which is 160,000 minus the 3,600 pixels of subject.
+
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the structure, the design constraints,
 and what a change has to prove before it lands.
 

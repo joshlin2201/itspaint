@@ -774,9 +774,11 @@ public final class PaintEngine {
     /// into regions, and a corner in a different region from the other three is
     /// the normal case, not the exotic one.
     ///
-    /// Returns `false` and changes nothing when there is no background to speak
-    /// of — a flat image is one region from any seed, and a Remove Background
-    /// that erases the picture is far worse than one that declines.
+    /// Returns `false` and changes nothing in the two cases where there is no
+    /// background to remove: when the flood leaves no subject behind, because a
+    /// flat image is one region from any seed and erasing the picture is far worse
+    /// than declining; and when the page it found is already transparent, because
+    /// succeeding at doing nothing is still a lie about what happened.
     @discardableResult
     public func removeBackground(tolerance: Int = 24) -> Bool {
         _ = commitFloating()
@@ -830,6 +832,37 @@ public final class PaintEngine {
         let covered = page.mask?.count { $0 > 0 } ?? page.bounds.area
         let remaining = canvas.count - covered
         guard remaining >= max(64, canvas.count / 4000) else {
+            selection = previous
+            return false
+        }
+
+        // And decline when the page it found is already transparent.
+        //
+        // The remainder test above asks "would this erase the picture". It does not
+        // ask "would this change anything", and those come apart on an image that
+        // has already been keyed: open a PNG with a transparent page, and the flood
+        // happily selects that page, the subject is still there so the remainder is
+        // healthy, and clearing already-clear pixels succeeds at doing nothing. The
+        // command then reported success, pushed an undo step and dirtied the
+        // document, for no visible change and with no explanation offered.
+        //
+        // Found by running the four-line snippet from the README against real files
+        // and counting transparent pixels before and after, rather than checking
+        // that it exited zero and wrote a file. Two of four images came back
+        // byte-identical with `true` returned. The same shape as the guard this
+        // block sits under: the test measured something adjacent to the claim.
+        var clearsSomething = false
+        scan: for y in page.bounds.minY...max(page.bounds.minY, page.bounds.maxY - 1) {
+            for x in page.bounds.minX...max(page.bounds.minX, page.bounds.maxX - 1) {
+                let point = PixelPoint(x: x, y: y)
+                guard page.contains(point) else { continue }
+                if (canvas.pixel(at: point)?.a ?? 0) > 0 {
+                    clearsSomething = true
+                    break scan
+                }
+            }
+        }
+        guard clearsSomething else {
             selection = previous
             return false
         }

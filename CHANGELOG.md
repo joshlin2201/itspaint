@@ -5,6 +5,31 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## [Unreleased]
+### Fixed
+- **Remove Background declines a page that is already transparent, instead of
+  reporting success and changing nothing.** Open a PNG that has already been keyed,
+  run the command, and the flood happily selected the transparent page; the subject
+  was still there so the remainder guard was satisfied; and clearing already-clear
+  pixels succeeded at doing nothing. The command returned success, pushed an undo
+  step and marked the document dirty, with no visible change and no message
+  explaining why.
+
+  The remainder guard added in 0.13.1 asks *would this erase the picture*. It does
+  not ask *would this change anything*, and on an already-keyed image those two come
+  apart. There is now a second decline for that case, and it says the same thing the
+  other one says, because it is the same fact: there is no background to remove.
+
+  Found by running the four-line snippet from the README against real files and
+  counting transparent pixels before and after, rather than checking that the
+  program exited zero and wrote a file. Two of four images came back byte-identical
+  with success reported. That is the same shape as the bug 0.13.1 fixed and as the
+  write-up about it: the check measured something next to the claim.
+
+### Added
+- The README shows PaintKit used as a dependency, in four lines that are compiled
+  and run against the published tag rather than written out by hand.
+
 ## [0.13.1] — 2026-08-08
 ### Fixed
 - **Remove Background no longer refuses the images it is for.** The guard that

@@ -820,6 +820,53 @@ struct SelectionTests {
         )
     }
 
+    /// A page that is already transparent is not a background to remove.
+    ///
+    /// The remainder guard asks whether this would erase the picture. It does not
+    /// ask whether it would change anything, and on an already-keyed PNG those come
+    /// apart: the flood selects the transparent page, the subject survives so the
+    /// remainder is healthy, and clearing already-clear pixels succeeds at doing
+    /// nothing. The command returned `true`, pushed an undo step and dirtied the
+    /// document with no visible change and no explanation.
+    ///
+    /// Found by running the four-line README snippet over real files and counting
+    /// transparent pixels, instead of checking that it exited zero and wrote a file.
+    @Test("Remove Background declines a page that is already transparent")
+    func removeBackgroundDeclinesAnAlreadyKeyedPage() {
+        var canvas = Bitmap(width: 200, height: 200, fill: .clear)
+        Raster.fillRect(
+            PixelRect(x: 70, y: 70, width: 60, height: 60),
+            colour: RGBA8(r: 200, g: 30, b: 30), into: &canvas
+        )
+        let engine = PaintEngine(canvas: canvas)
+        let before = engine.canvas
+
+        #expect(!engine.removeBackground(), "claimed to remove a background that was already gone")
+        #expect(engine.canvas == before, "a decline still changed pixels")
+        #expect(engine.selection == nil, "a refusal left a selection behind")
+        #expect(!engine.canUndo, "a no-op became an undo step")
+    }
+
+    /// The partially-keyed case still works, so the new guard is not "refuse
+    /// anything with transparency in it".
+    @Test("A page with some transparency in it is still removable")
+    func removeBackgroundStillWorksWithSomeTransparency() {
+        var canvas = Bitmap(width: 200, height: 200, fill: .white)
+        Raster.fillRect(
+            PixelRect(x: 0, y: 0, width: 200, height: 40),
+            colour: .clear, into: &canvas
+        )
+        Raster.fillRect(
+            PixelRect(x: 70, y: 90, width: 60, height: 60),
+            colour: RGBA8(r: 200, g: 30, b: 30), into: &canvas
+        )
+        let engine = PaintEngine(canvas: canvas)
+
+        #expect(engine.removeBackground(), "declined a page that was mostly opaque white")
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 100, y: 199)) == .clear)
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 100, y: 120))?.a == 255)
+    }
+
     @Test("Selecting does not modify a single pixel")
     func selectingIsNonDestructive() {
         let engine = markedEngine()
