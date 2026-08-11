@@ -116,7 +116,6 @@ xcrun stapler validate ItsPaint-*.dmg
 If macOS asks you to confirm the first launch, open **System Settings ▸ Privacy &
 Security** and click **Open Anyway** — [why that happens](#first-launch).
 
-
 ## No network. Three commands to prove it
 
 Not a promise — a property the kernel enforces. Run these against the copy you
@@ -128,11 +127,11 @@ otool -L /Applications/ItsPaint.app/Contents/MacOS/ItsPaint
 grep -rniE 'URLSession|NWConnection|import Network|CFSocket' App Packages
 ```
 
-| What you ran | What comes back |
+| Command | What comes back |
 |---|---|
-| **entitlements** | three — sandbox, files you pick in a panel, app-scoped bookmarks. No `network.client`, no `.server`, so the kernel refuses a socket whatever the code asks for |
-| **`otool -L`** | Apple frameworks and the Swift runtime, on both architectures. No `CFNetwork`, no `Network.framework`, no bundled dylib |
-| **`grep`** | nothing. And `Package.swift` declares no dependency, so there is no third-party code behind it |
+| `codesign` | three — sandbox, files you pick in a panel, app-scoped bookmarks. No `network.client`, no `.server`, so the kernel refuses a socket whatever the code asks for |
+| `otool` | Apple frameworks and the Swift runtime, on both architectures. No `CFNetwork`, no `Network.framework`, no bundled dylib |
+| `grep` | nothing. And `Package.swift` declares no dependency, so there is no third-party code behind it |
 
 The entitlements check is first on purpose: it reports what the kernel will
 *permit*, not what the developer wrote, so it holds even if the developer is lying.
@@ -270,12 +269,10 @@ version history.
 
 </details>
 
-<br>
-
 <a id="first-launch"></a>
 
 <details>
-<summary>First launch, and the Gatekeeper message</summary>
+<summary><b>First launch, and the Gatekeeper message</b></summary>
 
 <br>
 
@@ -298,8 +295,6 @@ spctl -a -vvv -t exec /Volumes/ItsPaint*/ItsPaint.app   # expect: accepted
 ```
 
 </details>
-
-<br>
 
 <div align="center">
 
