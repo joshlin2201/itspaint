@@ -1,7 +1,8 @@
-# A guard that refused every image it existed for
+# The case of the background remover that found no background
 
-**Image ▸ Remove Background** in ItsPaint has a safety check. It is there so the
-command cannot hand you a blank canvas: if keying out the page would erase the
+**Image ▸ Remove Background** in [ItsPaint](https://github.com/joshlin2201/itspaint),
+a free open-source paint and markup app for the Mac, has a safety check. It is there
+so the command cannot hand you a blank canvas: if keying out the page would erase the
 picture, it changes nothing and says so.
 
 The check was inverted in effect for three releases. Not subtly wrong at the
