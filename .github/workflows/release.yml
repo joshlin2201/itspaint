@@ -76,7 +76,13 @@ jobs:
       - name: Refuse a tag that is not on main
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=0 origin main
+          # No --depth here. The checkout above already sets `fetch-depth: 0`, so the
+          # clone is complete and this only needs the `main` ref. `--depth=0` was
+          # accepted by the runner's git on 2026-08-08 and is rejected by git 2.55.0
+          # with `fatal: depth 0 is not a positive number`, which failed the 0.14.0
+          # release at the first step. A pinned action does not pin the tools the
+          # runner image ships.
+          git fetch --no-tags origin main
           TAG_SHA="$(git rev-parse HEAD)"
           if ! git merge-base --is-ancestor "$TAG_SHA" origin/main; then
             echo "::error::${{ steps.release.outputs.tag }} points at $TAG_SHA, which is not an ancestor of origin/main. Releases are cut from reviewed commits on main." >&2
