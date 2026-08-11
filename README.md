@@ -64,6 +64,11 @@ nearly blank canvas.
 
 **[How it works, in thirty lines of code →](docs/BACKGROUND_REMOVAL.md)**
 
+Its safety check was also wrong for three releases, in a way worth reading about:
+it measured how much of the canvas was background, so it refused every image the
+feature existed for while its test stayed green and its documentation defended it —
+**[a guard tuned to its test →](docs/A_GUARD_TUNED_TO_ITS_TEST.md)**
+
 ### And the rest
 
 - **Drag the image straight out** into Slack, Mail or the Finder. No save panel, no

@@ -20,6 +20,22 @@ Three about where it goes and who else is in the space:
 | **[GROWTH.md](GROWTH.md)** | Distribution, where to post and what to say, the utility worth building to attract contributors, and which money models survive the constraints in PHILOSOPHY. |
 | **[APP_STORE.md](APP_STORE.md)** | The Mac App Store submission kit: every App Store Connect field pre-written, the archive/export script, the screenshot pipeline, and the steps only the account holder can do. |
 
+## Write-ups
+
+Standalone pieces about one mechanism each, written to be read by someone who does
+not use this app.
+
+- **[A_GUARD_TUNED_TO_ITS_TEST.md](A_GUARD_TUNED_TO_ITS_TEST.md)** — a safety check
+  that refused every image its feature existed for, for three releases. A threshold
+  satisfied by its own test fixture and by nothing a person would open, kept
+  invisible by a paragraph arguing the failure was deliberate.
+- **[BACKGROUND_REMOVAL.md](BACKGROUND_REMOVAL.md)** — taking a product shot off its
+  page with no model, no weights and no network: four corner-seeded flood fills
+  unioned, in about thirty lines on top of the paint bucket.
+- **[PROVING_NO_NETWORK.md](PROVING_NO_NETWORK.md)** — making "it never contacts
+  anything" falsifiable rather than asserted, and why the entitlements check goes
+  first: it reports what the kernel will permit, not what the developer wrote.
+
 Two more, kept for the reasoning rather than as current reference:
 
 - **[PLAN.md](PLAN.md)** — the plan of record. A first design, an honest critique
