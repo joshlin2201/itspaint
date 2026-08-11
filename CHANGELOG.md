@@ -5,7 +5,15 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
-## [0.14.0] — 2026-08-11
+## [0.14.1] — 2026-08-11
+
+**0.14.0 was tagged and never built.** Its release run died at the first step on
+`fatal: depth 0 is not a positive number`, from a `git fetch --depth=0` that the
+runner's git accepted three days earlier and version 2.55.0 rejects. Release tags
+here are immutable by repository ruleset, which is the correct setting and means a
+tag pointing at a broken commit gets superseded rather than moved. There is no
+v0.14.0 download, and there never will be.
+
 ### Fixed
 - **Remove Background declines a page that is already transparent, instead of
   reporting success and changing nothing.** Open a PNG that has already been keyed,
@@ -476,8 +484,8 @@ First public beta.
   one would be a dependency this app does not have. AVIF covers the same need.
 - Text is pixels once committed; re-editing means undo and retype.
 
-[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.14.0...HEAD
-[0.14.0]: https://github.com/joshlin2201/itspaint/compare/v0.13.1...v0.14.0
+[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/joshlin2201/itspaint/compare/v0.13.1...v0.14.1
 [0.13.1]: https://github.com/joshlin2201/itspaint/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/joshlin2201/itspaint/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/joshlin2201/itspaint/compare/v0.11.0...v0.12.0
