@@ -1,10 +1,16 @@
 # Every check that failed here verified something next to the claim
 
 This is a list of checks that passed while the thing they were checking was broken.
-All of them are from [ItsPaint](https://github.com/joshlin2201/itspaint), a free
-open-source paint and markup app for the Mac. All of them are recent. Most of them
-were found in a single day, which is the part that made them worth writing down: they
-are not seven different mistakes, they are one mistake with seven costumes.
+
+They come from [ItsPaint](https://github.com/joshlin2201/itspaint), a free open-source
+paint and markup app for the Mac, and from the tooling around it — three are in the
+app and its tests, four are in the release and publishing machinery. That split is
+worth stating rather than blurring, because the machinery is where the sloppier checks
+live: nobody reviews a health check.
+
+All were found between 2026-08-08 and 2026-08-11, most of them in one day, which is
+what made them worth writing down. They are not seven different mistakes. They are one
+mistake with seven costumes.
 
 The shape is always the same. There is a claim. Checking the claim directly is
 awkward, slow, or requires a thing you do not have. So you check something adjacent
