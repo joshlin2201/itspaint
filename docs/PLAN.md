@@ -129,7 +129,7 @@ because debug timings measure the compiler rather than the algorithm.
 
 Done: engine, all twelve tools and fifteen shapes, selection/clipboard/crop,
 Pixelate, undo, document + codecs, the rail-and-options UI, export with
-format and scale, 293 tests, app builds and runs.
+format and scale, 293 tests at the time, app builds and runs.
 
 Next, in order:
 1. Icon (Icon Composer), accessibility pass, Reduce Transparency verification.

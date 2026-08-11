@@ -1,8 +1,13 @@
 # Testing protocol
 
-293 tests cover the engine and the Mac app. This document explains what each
+408 tests cover the engine and the Mac app. This document explains what each
 suite is for, how to write a test that will still be useful in a year, and the
 three failure modes that have already cost a day each.
+
+The counts here are the ones the suites print. They were 293 / 211 / 82 for
+several releases while the suites reported 408 / 290 / 118, which is the wrong
+number to get wrong in the file called *Testing protocol* — a reader checking
+whether this project counts carefully starts here.
 
 ---
 
@@ -28,9 +33,9 @@ again before it will build a tag.
 
 | Suite | Where | Covers |
 |---|---|---|
-| **Engine** (211) | `Packages/PaintKit/Tests/PaintKitTests/` | pixels, tools, selection, undo, codecs, transforms |
+| **Engine** (290) | `Packages/PaintKit/Tests/PaintKitTests/` | pixels, tools, selection, undo, codecs, transforms |
 | **Throughput** (6 of the engine tests; budgets in release) | `PerformanceTests.swift` | stamp / stroke / fill / preview / encode budgets |
-| **App** (82) | `AppTests/` | the model, the document, the menus, and what the canvas actually *draws* |
+| **App** (118) | `AppTests/` | the model, the document, the menus, and what the canvas actually *draws* |
 
 Most coverage belongs in the **engine** suite: it needs no window, no app host
 and no main actor, and it runs in milliseconds. Only reach for the app suite when

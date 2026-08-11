@@ -17,7 +17,7 @@ with no UI framework and nothing third-party. The arrow never points the other
 way.
 
 This is what makes the whole tool matrix testable in milliseconds without
-launching an app — 211 engine tests cover it directly — and it means a UI
+launching an app — 290 engine tests cover it directly — and it means a UI
 redesign is a view-layer change rather than a rewrite. It has already survived
 one: the chrome was rebuilt from a floating cluster to a rail without the engine
 changing.
