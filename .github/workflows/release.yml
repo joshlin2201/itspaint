@@ -470,3 +470,6 @@ jobs:
 
             Verify your download against `checksums.txt`. Full notes are in
             [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.release.outputs.tag }}/CHANGELOG.md).
+
+            It ships often while it is in beta, so **Watch ▸ Custom ▸ Releases** is the
+            quietest way to hear about the next build.
