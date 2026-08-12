@@ -10,7 +10,7 @@
 
 ### MS Paint for the Mac. Open it, draw, close it.
 
-**2.9 MB** · free on the App Store, no trial · MIT ·
+**2.96 MB** · free on the App Store, no trial · MIT ·
 **no network entitlement, so the kernel refuses a socket**
 
 [![Release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&style=flat-square&label=release&color=2563eb)](https://github.com/joshlin2201/itspaint/releases)
@@ -31,7 +31,7 @@ brew install --cask itspaint
 
 ## What makes it different
 
-- **2.9 MB, and a window on screen in about half a second.** Everything else
+- **2.96 MB, and a window on screen in about half a second.** Everything else
   capable is a gigabyte with a subscription attached, and half the free ones turn
   out to be a trial.
 - **No network entitlement.** `com.apple.security.network.client` is not
@@ -115,7 +115,7 @@ way to hear about a new build.
 | **Requires** | macOS 14 Sonoma or later |
 | **Architecture** | universal — one build for Apple silicon and Intel |
 | **Signing** | Developer ID, notarised, ticket stapled to the image *and* the app, so the check needs no network and there is nothing to clear from the Terminal |
-| **Download** | 2.9 MB, with a SHA-256 in `checksums.txt` |
+| **Download** | 2.96 MB for the disk image, with a SHA-256 in `checksums.txt` |
 
 ```bash
 shasum -a 256 -c checksums.txt
