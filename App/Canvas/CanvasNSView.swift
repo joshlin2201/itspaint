@@ -1262,6 +1262,15 @@ final class CanvasNSView: NSView {
         }
 
         switch key {
+        case "a":
+            // Arrow is the annotation primitive people reach for, and reaching it
+            // meant arming Shape and finding one cell in a gallery of fifteen. Bound
+            // here as well as on the menu item, because the canvas resolves its own
+            // keys: a menu-only equivalent would work from the menu bar and do
+            // nothing under the pointer, which is where the drag starts.
+            model.selectShape(.arrow)
+            needsDisplay = true
+            return
         case "x":
             // Older than every paint app we are competing with.
             model.swapColours()

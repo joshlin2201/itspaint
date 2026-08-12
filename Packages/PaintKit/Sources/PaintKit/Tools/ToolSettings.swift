@@ -40,7 +40,9 @@ public struct ToolSettings: Equatable, Sendable {
     public var highlighterColour: PaintColour?
     /// Mosaic cell size for the pixelate tool.
     public var pixelateBlockSize: Int
-    /// How far the area outside a spotlight is darkened, 0 to 1.
+    /// How far the area outside a spotlight is darkened. Clamped to 0.1...0.9: a
+    /// spotlight that dims by nothing is a no-op, and one that dims to black hides
+    /// the context that makes it a spotlight rather than a crop.
     public var spotlightDim: Double
     /// Whether shape outlines are solid, dashed or dotted.
     public var strokeDash: Raster.Dash
@@ -151,16 +153,19 @@ public struct ToolSettings: Equatable, Sendable {
 
     /// As far as a tolerance slider is worth travelling.
     ///
-    /// The sweep recorded against `fillTolerance` above found coverage stable from
-    /// 8 through 32 and then a cliff: at 48 a probe in dark window chrome goes from
-    /// 4% to 91%, because adjacent near-blacks in a dark UI sit within 48 of each
-    /// other. The sliders offered 0 to 128 anyway, so most of the track did not
-    /// match more, it flooded the screenshot, and a bucket that floods reads as a
-    /// broken bucket rather than as a setting turned up too far.
+    /// The sweep recorded against `fillTolerance` above measured coverage as stable
+    /// from 8 through 32, and at 48 a probe in dark window chrome goes from 4% to
+    /// 91% because adjacent near-blacks in a dark UI sit within 48 of each other.
+    /// The sliders offered 0 to 128 anyway, so most of the track did not match more,
+    /// it flooded the screenshot.
     ///
-    /// The stored properties still clamp to 0...255. A document saved with a wider
-    /// tolerance keeps it; this only bounds what the slider can dial in.
-    public static let usefulTolerance = 40
+    /// 32 rather than 40, because 32 is the last value the sweep actually covered.
+    /// Picking the middle of the untested gap would be the same guess this file
+    /// spends a paragraph talking someone out of.
+    ///
+    /// The stored properties still clamp to 0...255, so an engine driven directly
+    /// can go higher. This only bounds what the slider can dial in.
+    public static let usefulTolerance = 32
 
     /// The sizes a given tool can actually paint at.
     ///

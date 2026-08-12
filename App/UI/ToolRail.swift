@@ -500,6 +500,11 @@ private struct PaletteGrid: View {
             .accessibilityAddTraits(
                 colour == model.foreground || colour == model.background ? [.isButton, .isSelected] : .isButton
             )
+            // `MouseButtons` takes the click, so the tap gesture VoiceOver used to
+            // activate is gone. Both slots need naming here, because a keyboard user
+            // has no second mouse button to press.
+            .accessibilityAction { model.applySwatch(colour, to: .foreground) }
+            .accessibilityAction(named: "Set as Colour 2") { model.applySwatch(colour, to: .background) }
     }
 }
 
@@ -524,8 +529,11 @@ struct MouseButtons: NSViewRepresentable {
         var secondary: () -> Void = {}
         override func mouseDown(with event: NSEvent) { primary() }
         override func rightMouseDown(with event: NSEvent) { secondary() }
-        // Without this, a control-click arrives as `rightMouseDown` on some
-        // trackpad configurations and as a modified `mouseDown` on others.
+        // The middle button, which no palette gesture is documented for. Sent to
+        // Colour 2 because that is the only other thing a swatch does, and because
+        // a button that silently does nothing is the failure this whole type exists
+        // to fix. Control-click is not this method: macOS delivers that as
+        // `rightMouseDown`, which is already handled above.
         override func otherMouseDown(with event: NSEvent) { secondary() }
     }
 

@@ -34,9 +34,34 @@ final class EditorModel {
             if !tool.isRegionDrag {
                 noteChange(engine.commitFloating())
             }
-            // Arming a tool with a size floor moves the size up to it, so the
-            // panel never shows a number the next stroke will not honour.
-            brushSize = max(brushSize, ToolSettings.sizeRange(for: tool).lowerBound)
+            applySizeFloor(leaving: oldValue)
+        }
+    }
+
+    /// The size chosen before a tool's floor raised it, or nil if none did.
+    @ObservationIgnored private var sizeBeforeFloor: Int?
+
+    /// Keep the size control honest without letting one tool's floor be permanent.
+    ///
+    /// Arming a tool has to move the size up to that tool's floor, or the panel goes
+    /// back to showing a number the stroke will not honour. Doing only that, with a
+    /// one-way `max`, meant a single visit to the highlighter took 1–3px away from
+    /// the brush, the badge and every shape outline for the rest of the session, and
+    /// nothing on screen explained why the small sizes had stopped existing.
+    ///
+    /// So the chosen size is kept and handed back the moment a tool can honour it.
+    /// If it was changed while the floor was in force it is not handed back, because
+    /// then the number on screen is one somebody picked on purpose.
+    private func applySizeFloor(leaving previous: ToolKind) {
+        let floor = ToolSettings.sizeRange(for: tool).lowerBound
+        if brushSize < floor {
+            if sizeBeforeFloor == nil { sizeBeforeFloor = brushSize }
+            brushSize = floor
+        } else if let remembered = sizeBeforeFloor {
+            if brushSize == ToolSettings.sizeRange(for: previous).lowerBound {
+                brushSize = remembered
+            }
+            sizeBeforeFloor = nil
         }
     }
 

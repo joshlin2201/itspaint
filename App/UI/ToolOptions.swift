@@ -204,15 +204,13 @@ struct ToolOptions: View {
 
         case .shape:
             ShapeGallery(model: model, columns: isVertical ? 5 : 8)
-            // A filled closed shape draws no outline, so `PaintEngine` ignores both
-            // the stroke weight and the dash. Leaving the rows armed meant dragging
-            // Stroke from 2 to 28 on a filled box and getting the identical box, the
-            // same class of dead control that Corner already avoids by appearing
-            // only for the two shapes that have one.
+            // Stroke stays. A filled shape draws no outline, but `PaintEngine` still
+            // insets the fill by `brush.size` (`fillRect(rect.insetBy(brush.size))`
+            // and the same for ellipse, rounded rect and callout), so the weight is
+            // the difference between a box and a smaller box. Only the dash is
+            // genuinely dead, and only that row goes.
+            sizeControl(title: "Stroke")
             let strokes = model.shapeStyle.drawsOutline || !model.shapeKind.isClosed
-            if strokes {
-                sizeControl(title: "Stroke")
-            }
             if model.shapeKind.isClosed {
                 OptionRow("Fill") {
                     OptionSegment(selection: $model.shapeStyle, options: [
@@ -941,7 +939,6 @@ struct OptionToggle: View {
     }
 }
 
-/// A small labelled action inside the panel.
 /// A number you nudge, in the panel's own idiom.
 ///
 /// A native `Stepper` brings its own label layout and its own control height, both
@@ -992,6 +989,7 @@ struct OptionStepper: View {
     }
 }
 
+/// A small labelled action inside the panel.
 struct OptionButton: View {
     let title: String
     let symbol: String

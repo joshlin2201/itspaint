@@ -5,6 +5,27 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## [0.15.1] — 2026-08-12
+### Fixed
+- **`A` worked from the menu and did nothing on the canvas.** The canvas resolves
+  its own keys, so a menu equivalent alone was bound in one of the two places the
+  twelve tool letters are bound in.
+- **Stroke weight vanished on a filled shape, and it was not dead.** `PaintEngine`
+  insets a filled rectangle, ellipse, rounded rectangle and callout by the stroke
+  size, so the weight is the difference between a box and a smaller box. Only the
+  dash row is genuinely ignored, and only that one hides now.
+- **One visit to the highlighter took the 1–3px sizes away for the session.**
+  Arming it raises the size to its 4px floor, which is what keeps the panel honest,
+  but the raise was one-way. The chosen size comes back when a tool can honour it,
+  unless it was changed while the floor was in force.
+- **VoiceOver could not activate a palette swatch.** The new mouse handling took the
+  click, and the SwiftUI tap it replaced was what VoiceOver had been firing.
+- Match tops out at 32 rather than 40. 32 is the last value the coverage sweep
+  actually covered; 40 sat in the untested gap between the stable band and the cliff.
+
+### Changed
+- `A` is bound on the canvas as well as the menu.
+
 ## [0.15.0] — 2026-08-12
 ### Fixed
 - **The highlighter said 2px and painted 4px.** Its chisel nib clamps to a 4px

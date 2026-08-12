@@ -17,17 +17,17 @@ hover and in the Tools menu.
 |---|---|---|
 | `P` | **Pencil** | Always a hard 1px nib. Not size-aware on purpose — that is the promise of the tool; making it size-aware would make it a small brush. |
 | `B` | **Brush** | Four tips at 1–96px. Round and square are hard-edged; soft antialiases over the outer ring; **spray is the airbrush** — it scatters coverage weighted to the centre and **keeps spraying while you hold still**, which is the whole feel of it. Flow sets density, and appears only for the spray tip. Seeded randomness, so a given engine sprays reproducibly. Spray used to be its own rail button; it is a nib, not a job. |
-| `H` | **Highlighter** | A 4px floor, because the chisel nib clamps there: the size control shows what the stroke will be rather than a number the engine would round up. Coverage buffer, so overlapping passes within one stroke **never darken**. Drag back over your own line and it stays one flat tone, the way a real highlighter does. |
+| `H` | **Highlighter** | A 4px floor, because the chisel nib clamps there: the size control shows what the stroke will be rather than a number the engine would round up. Arming it raises a smaller size to 4 and hands the old one back when you leave, so one highlighter stroke does not cost you the 1–3px sizes everywhere else. Coverage buffer, so overlapping passes within one stroke **never darken**. Drag back over your own line and it stays one flat tone, the way a real highlighter does. |
 | `E` | **Eraser** | Lays down the *background* colour — which is what makes it read as removing paint. Right-drag inverts that pairing. |
 
 ### Insert
 
 | | Tool | Behaviour |
 |---|---|---|
-| `U` | **Shape** | Fifteen kinds, below. Stroke weight, dash, fill/outline, corner radius. |
+| `U` | **Shape** | Fifteen kinds, below. Stroke weight, dash, fill/outline, corner radius. `A` arms Shape with Arrow in one key. |
 | `T` | **Text** | Drag a box and type in place, at the size and font it will land at. `⌘-drag` moves the box while you type. `⌘↩` places it, `⎋` discards. Rasterises on commit. A click instead of a drag gets a one-line box pulled back inside the canvas, so clicking near an edge still gives you something usable. |
 | `N` | **Step badge** | Click to drop `1`, `2`, `3`… in the current colour, numeral auto-contrasted. Size follows the brush size. The options set the next number, so a run continued on a second screenshot can start at 4, and "Restart at 1" puts it back. |
-| `K` | **Fill** | Scanline flood fill with a tolerance slider (0–40, per channel). A sweep on a real screenshot found coverage stable from 8 through 32, then a cliff at 48 where a probe in dark window chrome went from 4% to 91%, so the slider stops before it. The stored value still allows 0–255 for a document that already had one. Explicitly iterative — a recursive fill overflows the stack on any realistic canvas. Filling with the colour already there is a no-op rather than an infinite loop. |
+| `K` | **Fill** | Scanline flood fill with a tolerance slider (0–32, per channel). A sweep on a real screenshot found coverage stable from 8 through 32, then a cliff at 48 where a probe in dark window chrome went from 4% to 91%. The slider stops at 32 because that is the last value the sweep covered. The engine still accepts 0–255. Explicitly iterative — a recursive fill overflows the stack on any realistic canvas. Filling with the colour already there is a no-op rather than an infinite loop. |
 | `I` | **Eyedropper** | Samples into Colour 1. **Hold `⌥` with any tool** to do the same without switching — right-button samples into Colour 2. Never enters undo: a colour pick on the undo stack is a classic way to make ⌘Z feel broken. |
 
 ### Select and effects
