@@ -8,7 +8,7 @@ bug in one of the two.
 
 ## Tools
 
-Twelve rail buttons in three runs. Every one has a single-key shortcut, shown on
+Eleven rail buttons in three runs. Every one has a single-key shortcut, shown on
 hover and in the Tools menu.
 
 ### Draw

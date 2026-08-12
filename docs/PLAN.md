@@ -90,7 +90,7 @@ is the wrong unit. Bridged to `NSUndoManager` by registering the inverse from
 inside each replay, so the engine's history and the Edit menu stay in lockstep
 instead of drifting into two stacks.
 
-**Tools — twelve rail buttons, and everything else inside them.**
+**Tools — twelve rail buttons at the time, and everything else inside them.**
 
 | Group | Tools |
 |---|---|
@@ -127,7 +127,7 @@ because debug timings measure the compiler rather than the algorithm.
 > [ROADMAP.md](ROADMAP.md); this one is kept as the record of what the original
 > plan committed to and what actually landed.
 
-Done: engine, all twelve tools and fifteen shapes, selection/clipboard/crop,
+Done: engine, all twelve tools at the time and fifteen shapes, selection/clipboard/crop,
 Pixelate, undo, document + codecs, the rail-and-options UI, export with
 format and scale, 293 tests at the time, app builds and runs.
 
