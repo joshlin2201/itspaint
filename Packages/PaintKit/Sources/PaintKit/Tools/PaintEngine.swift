@@ -99,6 +99,16 @@ public final class PaintEngine {
 
     public func resetBadgeNumbering() { nextBadgeNumber = 1 }
 
+    /// Set the number the next badge will carry.
+    ///
+    /// A sequence often spans several screenshots, and the second image starts at
+    /// 4, not at 1. Reset was the only control, so continuing a run meant dropping
+    /// three throwaway badges and undoing them, or restarting and shipping a figure
+    /// with a second `1` in it.
+    public func setNextBadgeNumber(_ number: Int) {
+        nextBadgeNumber = min(99, max(1, number))
+    }
+
     /// Size of the region currently being dragged out — marquee, shape or
     /// floating content — for the status bar. `nil` when nothing is in flight.
     public private(set) var activeRegionSize: (width: Int, height: Int)?
@@ -250,7 +260,7 @@ public final class PaintEngine {
         if tool.isRegionDrag {
             let previous = selectionOverlayRect()
             selection = nil
-            if tool == .pixelate {
+            if tool == .pixelate || tool == .spotlight {
                 gesture = .shape(before: canvas, origin: snapped(point), dirty: .empty, button: button)
             } else if settings.selectionKind.isFreeform {
                 gesture = .lasso(points: [point])
@@ -350,13 +360,23 @@ public final class PaintEngine {
                 canvas.restore(patch.pixels, to: patch.rect)
             }
             let end = snappedEnd(constrained ? constrain(origin, to: point) : point, from: origin)
-            let drawn = settings.tool == .pixelate
-                ? Raster.pixelate(
+            let drawn: PixelRect
+            switch settings.tool {
+            case .pixelate:
+                drawn = Raster.pixelate(
                     PixelRect(corners: origin, end),
                     blockSize: settings.pixelateBlockSize,
                     into: &canvas
-                  )
-                : drawShape(from: origin, to: end, button: button)
+                )
+            case .spotlight:
+                drawn = Raster.spotlight(
+                    PixelRect(corners: origin, end),
+                    dim: settings.spotlightDim,
+                    into: &canvas
+                )
+            default:
+                drawn = drawShape(from: origin, to: end, button: button)
+            }
             gesture = .shape(before: before, origin: origin, dirty: drawn, button: button)
             return previousDirty.union(drawn)
 
@@ -469,7 +489,9 @@ public final class PaintEngine {
                 pendingCurve = (before: before, a: origin, b: point ?? origin)
                 return refreshed.union(dirty)
             }
-            let name = settings.tool == .pixelate ? "Pixelate" : settings.shapeKind.displayName
+            let name = settings.tool.isRegionEffect
+                ? settings.tool.displayName
+                : settings.shapeKind.displayName
             recordEdit(name: name, before: before, dirty: dirty)
             return refreshed.union(dirty)
 

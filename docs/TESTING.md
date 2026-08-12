@@ -1,6 +1,6 @@
 # Testing protocol
 
-408 tests cover the engine and the Mac app. This document explains what each
+422 tests cover the engine and the Mac app. This document explains what each
 suite is for, how to write a test that will still be useful in a year, and the
 three failure modes that have already cost a day each.
 
@@ -106,7 +106,7 @@ breaks. They are cheap and they have all fired at least once:
   stays swap-colours.
 - `railCoversEveryTool` — every tool appears in exactly one rail run.
 - `everyToolsItemIsLive`, `canvasContextMenuIsLive` — every menu item is wired to
-  a selector something answers. These exist because eleven Tools items once
+  a selector something answers. These exist because twelve Tools items once
   shipped wired to nothing.
 - `liveMenuBarIsInstalled` — the running host really has File, Edit and Tools.
   The tests run inside the app host, so this is the actual launch path.

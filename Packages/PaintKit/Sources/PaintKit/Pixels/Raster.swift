@@ -502,7 +502,92 @@ public enum Raster {
         return dirty
     }
 
-    // MARK: - Pixelate
+    // MARK: - Region effects
+
+    /// Dim everything *outside* `rect`, so the eye lands where you dragged.
+    ///
+    /// The opposite shape to `pixelate`: that one changes the region you drew, this
+    /// one changes everything else. It is the "look here" mark on a busy screenshot,
+    /// where another rectangle or arrow is just more ink on a page that already has
+    /// plenty of both.
+    ///
+    /// **Darkens rather than veiling.** Compositing black at `dim` over the outside
+    /// would also fill transparent pixels, so a spotlight on a logo whose background
+    /// had been removed would paint black across the checkerboard. Scaling the colour
+    /// channels and leaving alpha alone darkens what is there and leaves what is not
+    /// there alone. The premultiplied invariant survives because every channel only
+    /// gets smaller while alpha holds.
+    ///
+    /// **Dragging a second one darkens the first.** There is no light here, only a
+    /// multiply, so a second spotlight dims everything outside it again including the
+    /// region the first one lit. That is inherent to an app that flattens every edit
+    /// and has no layers. Undo is the way back, and the tool's own copy says so
+    /// rather than letting someone discover it on a screenshot they are about to send.
+    ///
+    /// The default dim is 0.45, chosen by rendering 0.35, 0.45 and 0.55 over both a
+    /// dark and a light screenshot and looking at them. At 0.55 a dark interface goes
+    /// almost black, and the context around the point of a bug report is still
+    /// evidence even when it is not the point.
+    @discardableResult
+    public static func spotlight(
+        _ rect: PixelRect,
+        dim: Double = 0.45,
+        radius: Int = 10,
+        into bitmap: inout Bitmap
+    ) -> PixelRect {
+        let lit = rect.intersection(bitmap.bounds)
+        let canvas = bitmap.bounds
+        guard !canvas.isEmpty else { return .empty }
+
+        // A stray click must not dim the whole image.
+        //
+        // `PixelRect(corners:)` is inclusive, so clicking without dragging produces a
+        // 1x1 rect rather than an empty one. An `isEmpty` guard therefore never fired,
+        // and a click left exactly one pixel lit and darkened everything else. The
+        // first version of this had a test for the empty case that passed `width: 0`,
+        // which is an input the engine cannot produce, so the guard was checking a
+        // shape no user could make while the shape they *could* make went through.
+        let minimumSide = 8
+        guard lit.width >= minimumSide, lit.height >= minimumSide else { return .empty }
+
+        let keep = min(max(dim, 0), 1)
+        let scale = 1.0 - keep
+
+        // Clamped so the straight part of each edge is at least one pixel long. At
+        // exactly half the shorter side the two corner zones meet, every pixel counts
+        // as a corner, and the midpoint of each edge falls outside the arc and goes
+        // dark — a rounded rectangle pinched into a lens.
+        let r = min(max(radius, 0), (min(lit.width, lit.height) - 1) / 2)
+
+        // Distance to the nearest point of the inner rectangle, which is zero along
+        // the straight edges and grows only inside a corner. Symmetric by
+        // construction, unlike hand-rolled per-edge arithmetic.
+        let innerMinX = lit.minX + r, innerMaxX = lit.maxX - 1 - r
+        let innerMinY = lit.minY + r, innerMaxY = lit.maxY - 1 - r
+        let rr = r * r
+
+        var scaled = [UInt8](repeating: 0, count: 256)
+        for i in 0..<256 { scaled[i] = UInt8((Double(i) * scale).rounded()) }
+
+        let width = canvas.width
+        bitmap.pixels.withUnsafeMutableBufferPointer { buffer in
+            for y in canvas.minY..<canvas.maxY {
+                let row = (y - canvas.minY) * width
+                let insideRows = y >= lit.minY && y < lit.maxY
+                let dy = y < innerMinY ? innerMinY - y : y > innerMaxY ? y - innerMaxY : 0
+                for x in canvas.minX..<canvas.maxX {
+                    if insideRows && x >= lit.minX && x < lit.maxX {
+                        let dx = x < innerMinX ? innerMinX - x : x > innerMaxX ? x - innerMaxX : 0
+                        if dx * dx + dy * dy <= rr { continue }
+                    }
+                    let i = row + (x - canvas.minX)
+                    let c = buffer[i]
+                    buffer[i] = RGBA8(r: scaled[Int(c.r)], g: scaled[Int(c.g)], b: scaled[Int(c.b)], a: c.a)
+                }
+            }
+        }
+        return canvas
+    }
 
     /// Mosaic `rect` by averaging each `blockSize` cell.
     ///

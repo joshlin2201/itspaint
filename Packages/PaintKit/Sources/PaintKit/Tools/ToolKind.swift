@@ -31,6 +31,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
     // Select
     case select
     case pixelate
+    case spotlight
 
     public var id: String { rawValue }
 
@@ -47,6 +48,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .eyedropper: "Eyedropper"
         case .select: "Select"
         case .pixelate: "Pixelate"
+        case .spotlight: "Spotlight"
         }
     }
 
@@ -70,6 +72,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .eyedropper: "eyedropper"
         case .select: "rectangle.dashed"
         case .pixelate: "mosaic"
+        case .spotlight: "rectangle.center.inset.filled"
         }
     }
 
@@ -88,6 +91,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .eyedropper: "i"
         case .select: "m"
         case .pixelate: "r"
+        case .spotlight: "s"
         }
     }
 
@@ -99,9 +103,18 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
     }
 
     /// Drags out a rectangle that is a *region*, not a mark.
+    /// Drags a rectangle and applies an effect to it, rather than selecting it or
+    /// drawing a shape. Both name their own undo step after the tool.
+    public var isRegionEffect: Bool {
+        switch self {
+        case .pixelate, .spotlight: true
+        default: false
+        }
+    }
+
     public var isRegionDrag: Bool {
         switch self {
-        case .select, .pixelate: true
+        case .select, .pixelate, .spotlight: true
         default: false
         }
     }
@@ -136,7 +149,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
     public static let groups: [[ToolKind]] = [
         [.pencil, .brush, .highlighter, .eraser],
         [.shape, .text, .badge, .fill, .eyedropper],
-        [.select, .pixelate],
+        [.select, .pixelate, .spotlight],
     ]
 }
 

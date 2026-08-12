@@ -34,6 +34,9 @@ final class EditorModel {
             if !tool.isRegionDrag {
                 noteChange(engine.commitFloating())
             }
+            // Arming a tool with a size floor moves the size up to it, so the
+            // panel never shows a number the next stroke will not honour.
+            brushSize = max(brushSize, ToolSettings.sizeRange(for: tool).lowerBound)
         }
     }
 
@@ -92,6 +95,7 @@ final class EditorModel {
     var highlighterOpacity: Double { didSet { engine.settings.highlighterOpacity = highlighterOpacity } }
     var highlighterColour: PaintColour? { didSet { engine.settings.highlighterColour = highlighterColour } }
     var pixelateBlockSize: Int { didSet { engine.settings.pixelateBlockSize = pixelateBlockSize } }
+    var spotlightDim: Double { didSet { engine.settings.spotlightDim = spotlightDim } }
 
     var foreground: PaintColour {
         didSet {
@@ -211,6 +215,13 @@ final class EditorModel {
         syncBadgeNumber()
     }
 
+    /// Set the number the next badge carries, for a sequence continued across
+    /// more than one screenshot.
+    func setNextBadgeNumber(_ number: Int) {
+        engine.setNextBadgeNumber(number)
+        syncBadgeNumber()
+    }
+
     /// True while a curve or polygon is half-built, so the chrome can say how
     /// to finish it.
     var hasPendingShape: Bool { engine.hasPendingShape }
@@ -257,6 +268,7 @@ final class EditorModel {
         self.highlighterOpacity = engine.settings.highlighterOpacity
         self.highlighterColour = engine.settings.highlighterColour
         self.pixelateBlockSize = engine.settings.pixelateBlockSize
+        self.spotlightDim = engine.settings.spotlightDim
         self.selectionKind = engine.settings.selectionKind
         self.strokeDash = engine.settings.strokeDash
         self.sprayDensity = engine.settings.sprayDensity
@@ -410,7 +422,8 @@ final class EditorModel {
         case ..<48: 4
         default: 8
         }
-        brushSize = min(ToolSettings.sizeRange.upperBound, max(ToolSettings.sizeRange.lowerBound, brushSize + (up ? step : -step)))
+        let allowed = ToolSettings.sizeRange(for: tool)
+        brushSize = min(allowed.upperBound, max(allowed.lowerBound, brushSize + (up ? step : -step)))
     }
 
     /// Flip a text trait, arming the text tool with it.

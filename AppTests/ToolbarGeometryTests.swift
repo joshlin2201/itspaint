@@ -106,7 +106,7 @@ struct ToolbarGeometryTests {
     @Test("The numbers the README quotes are still the numbers")
     func documentedGeometryMatchesTheTokens() throws {
         #expect(Tokens.Rail.toolColumns == 1)
-        #expect(ToolKind.allCases.count == 11)
+        #expect(ToolKind.allCases.count == 12)
         #expect(ShapeKind.allCases.count == 15)
 
         let readme = URL(fileURLWithPath: #filePath)
@@ -127,7 +127,7 @@ struct ToolbarGeometryTests {
         // is the whole mechanism. This test failing during a rewrite is it
         // working, not it being in the way.
         for phrase in [
-            "Eleven rail buttons",
+            "Twelve rail buttons",
             "**Fifteen shapes**",
             "fifteen shapes behind Shape",
         ] {

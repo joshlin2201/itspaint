@@ -15,6 +15,7 @@ These are the gaps a Preview user notices in the first five minutes.
 
 | | Why it matters | Shape of the work |
 |---|---|---|
+| ~~**Spotlight**~~ | **Shipped.** Drag a box, everything outside dims. The "look here" mark for a busy screenshot, where another arrow is just more ink. Suggested by an outside model asked what the daily markup user actually misses, which was a better answer than anything on this list. | Done |
 | **Loupe** | Preview's magnifier; genuinely useful at 100% on a dense screenshot. | A view-layer overlay reading the existing cached `CGImage`. No engine change. |
 | **Adjust colour** | Brightness / contrast / saturation over the whole image or the selection. | `Bitmap.map(_:_:)` already applies a per-pixel transform inside a selection; this is a sheet plus three transforms and a live preview from a snapshot. |
 | **Separate border and fill wells** | Today Colour 1 strokes and Colour 2 fills, which is the classic mapping but not what a Preview user expects when they set a shape's fill. | UI only — the engine already takes both colours per shape. |
@@ -95,7 +96,7 @@ The staging matters more than the features:
    only one that could ever justify charging.
 
 The four markup features that make this worth doing — step badges, pixelate,
-Instant Alpha, and eight export formats — are already shipped. macOS Markup has
+Instant Alpha, and nine export formats — are already shipped. macOS Markup has
 none of them. The capture layer is a distribution mechanism for work that
 already exists.
 

@@ -117,10 +117,10 @@ paint,markup,screenshot,annotate,pixelate,redact,draw,image,editor,sketch,badge,
 > screenshot leaves your Mac, and knock a background out with Instant Alpha.
 >
 > TOOLS
-> • Eleven tools: pencil, brush (round, square, soft, and spray tips),
-> highlighter, eraser, shape, text, step badge, fill, eyedropper, selection, and
-> pixelate. Instant Alpha is one of four ways to select, alongside rectangle,
-> ellipse and lasso
+> • Twelve tools: pencil, brush (round, square, soft, and spray tips),
+> highlighter, eraser, shape, text, step badge, fill, eyedropper, selection,
+> pixelate, and spotlight. Instant Alpha is one of four ways to select, alongside
+> rectangle, ellipse and lasso
 > • Fifteen shapes — lines, curves, arrows, rectangles, ellipses, triangles,
 > polygons, stars, and a speech bubble — with solid, dashed, or dotted
 > outlines and optional fills
@@ -194,7 +194,7 @@ for someone using the app, not how it was done. 4,000 characters.
 
 **0.11.0 (first release)**
 
-> First Mac App Store release. Eleven tools, fifteen shapes, automatic step
+> First Mac App Store release. Twelve tools, fifteen shapes, automatic step
 > badges, pixelation, Instant Alpha, and export to nine formats.
 
 ### Screenshots

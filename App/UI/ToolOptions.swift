@@ -204,7 +204,15 @@ struct ToolOptions: View {
 
         case .shape:
             ShapeGallery(model: model, columns: isVertical ? 5 : 8)
-            sizeControl(title: "Stroke")
+            // A filled closed shape draws no outline, so `PaintEngine` ignores both
+            // the stroke weight and the dash. Leaving the rows armed meant dragging
+            // Stroke from 2 to 28 on a filled box and getting the identical box, the
+            // same class of dead control that Corner already avoids by appearing
+            // only for the two shapes that have one.
+            let strokes = model.shapeStyle.drawsOutline || !model.shapeKind.isClosed
+            if strokes {
+                sizeControl(title: "Stroke")
+            }
             if model.shapeKind.isClosed {
                 OptionRow("Fill") {
                     OptionSegment(selection: $model.shapeStyle, options: [
@@ -214,10 +222,12 @@ struct ToolOptions: View {
                     ])
                 }
             }
-            OptionRow("Line") {
-                OptionSegment(selection: $model.strokeDash, options: Raster.Dash.allCases.map {
-                    .init(value: $0, symbol: $0.symbolName, help: $0.displayName)
-                })
+            if strokes {
+                OptionRow("Line") {
+                    OptionSegment(selection: $model.strokeDash, options: Raster.Dash.allCases.map {
+                        .init(value: $0, symbol: $0.symbolName, help: $0.displayName)
+                    })
+                }
             }
             if model.shapeKind == .roundedRectangle || model.shapeKind == .callout {
                 OptionRow("Corner") {
@@ -269,6 +279,18 @@ struct ToolOptions: View {
 
         case .badge:
             sizeControl
+            // A run of badges often spans two screenshots, and the second one
+            // starts at 4. Reset alone meant either three throwaway badges and
+            // three undos, or a figure with a second `1` in it.
+            OptionRow("Next") {
+                OptionStepper(
+                    value: Binding(
+                        get: { model.nextBadgeNumber },
+                        set: { model.setNextBadgeNumber($0) }
+                    ),
+                    range: 1...99
+                )
+            }
             OptionRow(nil) {
                 OptionButton("Restart at 1", symbol: "arrow.counterclockwise") {
                     model.resetBadgeNumbering()
@@ -282,8 +304,23 @@ struct ToolOptions: View {
                         get: { Double(model.fillTolerance) },
                         set: { model.fillTolerance = Int($0.rounded()) }
                     ),
-                    range: 0...128,
+                    range: 0...Double(ToolSettings.usefulTolerance),
                     readout: "\(model.fillTolerance)"
+                )
+            }
+
+        case .spotlight:
+            // One control, and it is the one CleanShot exposes too: how dark the
+            // outside goes. Percent rather than 0-to-1, because the slider is read
+            // at a glance and nobody thinks in fractions of a veil.
+            OptionRow("Dim") {
+                OptionSlider(
+                    value: Binding(
+                        get: { model.spotlightDim * 100 },
+                        set: { model.spotlightDim = $0 / 100 }
+                    ),
+                    range: 10...90,
+                    readout: "\(Int((model.spotlightDim * 100).rounded()))%"
                 )
             }
 
@@ -312,7 +349,7 @@ struct ToolOptions: View {
                             get: { Double(model.selectionTolerance) },
                             set: { model.selectionTolerance = Int($0.rounded()) }
                         ),
-                        range: 0...128,
+                        range: 0...Double(ToolSettings.usefulTolerance),
                         readout: "\(model.selectionTolerance)"
                     )
                 }
@@ -344,20 +381,24 @@ struct ToolOptions: View {
     /// indication they were clickable at all.
     @ViewBuilder
     private func sizeControl(title: String) -> some View {
+        // Asked of the armed tool, never assumed: the highlighter's chisel floor
+        // is 4, so offering it 1 and lighting up 2 described a stroke the engine
+        // would not draw.
+        let allowed = ToolSettings.sizeRange(for: model.tool)
         OptionRow(title) {
             OptionSlider(
                 value: Binding(
                     get: { Double(model.brushSize) },
                     set: { model.brushSize = Int($0.rounded()) }
                 ),
-                range: Double(ToolSettings.sizeRange.lowerBound)...Double(ToolSettings.sizeRange.upperBound),
+                range: Double(allowed.lowerBound)...Double(allowed.upperBound),
                 readout: "\(model.brushSize)",
                 gamma: 2
             )
         }
         OptionRow(nil) {
             SegmentTrack {
-                ForEach(ToolSettings.sizeStops, id: \.self) { stop in
+                ForEach(ToolSettings.sizeStops(for: model.tool), id: \.self) { stop in
                     let isSelected = model.brushSize == stop
                     Button {
                         model.brushSize = stop
@@ -901,6 +942,56 @@ struct OptionToggle: View {
 }
 
 /// A small labelled action inside the panel.
+/// A number you nudge, in the panel's own idiom.
+///
+/// A native `Stepper` brings its own label layout and its own control height, both
+/// of which fight `OptionRow`; this is the same pill the rest of the panel uses,
+/// with the readout between the two ends so the value sits where the eye already
+/// looks for it.
+struct OptionStepper: View {
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+
+    var body: some View {
+        HStack(spacing: 2) {
+            end("minus", enabled: value > range.lowerBound) { value = max(range.lowerBound, value - 1) }
+            Text("\(value)")
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .frame(minWidth: 22)
+                .accessibilityHidden(true)
+            end("plus", enabled: value < range.upperBound) { value = min(range.upperBound, value + 1) }
+        }
+        .padding(.horizontal, 4)
+        .frame(height: Tokens.Size.pillAction)
+        .background {
+            RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
+                .fill(.primary.opacity(0.10))
+        }
+        .accessibilityElement()
+        .accessibilityValue("\(value)")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: value = min(range.upperBound, value + 1)
+            case .decrement: value = max(range.lowerBound, value - 1)
+            @unknown default: break
+            }
+        }
+    }
+
+    private func end(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .semibold))
+                .frame(width: 16, height: Tokens.Size.pillAction)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : Tokens.Ink.muted)
+        .accessibilityLabel(symbol == "plus" ? "Increase" : "Decrease")
+    }
+}
+
 struct OptionButton: View {
     let title: String
     let symbol: String

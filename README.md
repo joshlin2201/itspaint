@@ -8,7 +8,9 @@
 
 # ItsPaint
 
-### MS Paint for the Mac. Open it, draw, close it.
+### MS Paint for the Mac. Paste a screenshot, number the steps, drag it into Slack.
+
+Preview markup has no step badges, no pixelate and no drag-out.
 
 **2.96 MB** · free on the App Store · MIT ·
 **no network entitlement, so the kernel refuses a socket**
@@ -19,20 +21,20 @@
 [![tests](https://img.shields.io/github/actions/workflow/status/joshlin2201/itspaint/ci.yml?branch=main&style=flat-square&label=tests)](https://github.com/joshlin2201/itspaint/actions/workflows/ci.yml)
 
 ```sh
-brew tap joshlin2201/itspaint
-brew install --cask itspaint
+brew install --cask joshlin2201/itspaint/itspaint
 ```
 
 **[Download the disk image](https://github.com/joshlin2201/itspaint/releases/latest)** · **[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)** · macOS 14+, universal
 
-<img src="docs/images/editor-window.png" alt="ItsPaint editing a chameleon painting on a transparent canvas, with the brush options open">
+<img src="docs/images/markup-reel.gif" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
 
 </div>
 
 ## What makes it different
 
-- **2.96 MB, and a window on screen in about half a second.** Everything else that
-  can do this is a gigabyte with a subscription attached.
+- **2.96 MB, and a window on screen in half a second.** Krita is a gigabyte and
+  built for painters. CleanShot X is $29 plus a cloud subscription. Preview is
+  already on your Mac and will not number a step or pixelate a token.
 - **No network entitlement.** `com.apple.security.network.client` is not requested,
   so the kernel will not open a socket for it.
   [Three commands to check that yourself](#no-network-three-commands-to-prove-it).
@@ -40,14 +42,27 @@ brew install --cask itspaint
   corner-seeded flood selections, unioned.
   [Thirty lines of code](docs/BACKGROUND_REMOVAL.md).
 - **The drawing engine has no UI.** `Packages/PaintKit` imports Foundation,
-  CoreGraphics and ImageIO and nothing else, so `swift test` verifies most changes
-  with no Xcode.
-- **Free, and it stays free.** No account, no trial, no telemetry.
+  CoreGraphics, ImageIO, CoreText and UniformTypeIdentifiers, and nothing else, so
+  `swift test` verifies most changes with no Xcode.
+- **Free, MIT, and it stays that way.** There is no account and no telemetry.
 
-You open it between the real tools. Mark up the screenshot, crop the thing, drag it
-into Slack, close the window without saving.
+Paste the screenshot, number the steps, crop it, drag it into Slack, close the
+window. Nothing lands on your Desktop.
 
 ## What it does
+
+### Mark up a screenshot and drag it out
+
+- **Auto-numbered step badges, arrows, a highlighter with its own ink, and
+  pixelate** for what you would rather not publish. Preview markup does none of it.
+- **Drag the image straight out** into Slack, Mail or the Finder. No save panel, and
+  no `Screenshot 2026-08-07 at 11.42.13.png` on your Desktop.
+- **Spotlight the part that matters.** Drag a box and everything outside it dims, so
+  the eye lands where you meant it to on a busy screenshot.
+- **Paste anything on top of anything.** It arrives floating, and if it is bigger
+  than the canvas the canvas grows instead of cropping it.
+- **Annotation text stays readable** on any screenshot. It carries a contrasting
+  rim, because one colour cannot work across a light panel and a dark one.
 
 ### Remove a background with no model and no network
 
@@ -65,37 +80,28 @@ and scanned diagrams. It is useless on hair.
 
 **[How it works, in thirty lines of code →](docs/BACKGROUND_REMOVAL.md)**
 
-### And the rest
+### And it is still a paint app
 
-- **Drag the image straight out** into Slack, Mail or the Finder. No save panel, and
-  no `Screenshot 2026-08-07 at 11.42.13.png` on your Desktop.
-- **Paste anything on top of anything.** It arrives floating, and if it is bigger
-  than the canvas the canvas grows instead of cropping it.
-- **Mark up a screenshot properly.** Auto-numbered step badges, arrows, a
-  highlighter with its own ink, and pixelate for what you would rather not publish.
-- **Annotation text stays readable** on any screenshot. It carries a contrasting
-  rim, because one colour cannot work across a light panel and a dark one.
 - **Snap to grid** (`⇧⌘'`) at 8–64px for shapes, selections and pasted content.
-  Never for freehand, since a stroke that jumped to a grid would not be freehand.
+  Freehand ignores it.
 - **Fifteen shapes**, four brush nibs and four ways to select, each folded behind
-  one rail button rather than sprawling across the window.
-- **Real pixel control.** Pointer-centred zoom, nearest-neighbour above 100%, a
+  one rail button rather than sprawling across the window. `A` draws an arrow.
+- **Pixel control.** Pointer-centred zoom, nearest-neighbour above 100%, a
   pixel grid, live tool footprints, and rotate by any angle.
 
 <div align="center">
 
-<img src="docs/images/markup-reel.gif" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
+<img src="docs/images/editor-window.png" alt="ItsPaint editing a chameleon painting on a transparent canvas, with the brush options open">
 
-**Paste a screenshot, number three steps, blur the token.**
-Nine seconds, no file saved.
+**Twelve tools, fifteen shapes, and a transparent canvas.**
+The window above is ItsPaint painting, not marking up.
 
 </div>
 
 ## Install
 
 ```bash
-brew tap joshlin2201/itspaint
-brew install --cask itspaint
+brew install --cask joshlin2201/itspaint/itspaint
 ```
 
 Or take the [disk image](https://github.com/joshlin2201/itspaint/releases), open it
@@ -122,8 +128,9 @@ Security** and click **Open Anyway**. [Why that happens](#first-launch).
 
 ## No network. Three commands to prove it
 
-This is a property the kernel enforces rather than a promise. Run these against the
-copy you installed:
+This is a property the kernel enforces, not a promise anyone is making. The first
+two commands run against the copy in `/Applications`, the third greps this
+repository:
 
 ```bash
 codesign -d --entitlements - --xml /Applications/ItsPaint.app | plutil -p -
@@ -137,9 +144,8 @@ grep -rniE 'URLSession|NWConnection|import Network|CFSocket' App Packages
 | `otool` | Apple frameworks and the Swift runtime, on both architectures. No `CFNetwork`, no `Network.framework`, no bundled dylib |
 | `grep` | Nothing. `Package.swift` also declares no dependency, so there is no third-party code behind it |
 
-The entitlements check goes first on purpose. It reports what the kernel will
-*permit* rather than what the developer wrote, so it holds even if the developer is
-lying to you.
+The entitlements check goes first because it is the one that holds even if the
+developer is lying to you. It reports what the kernel will permit.
 
 **[Why that order, and how to make the same claim falsifiable in your own app →](docs/PROVING_NO_NETWORK.md)**
 
@@ -212,9 +218,9 @@ what a change has to prove before it lands.
 | **Draw** | Pencil, Brush (round / square / soft / spray), Highlighter (own ink, four colours), Eraser |
 | **Insert** | Shape, Text, Step Badge, Fill, Eyedropper |
 | **Select** | Rectangle, Ellipse, Lasso, Instant Alpha |
-| **Effects** | Pixelate |
+| **Effects** | Pixelate, Spotlight |
 
-Eleven rail buttons. Variations live inside the tool that owns them, so there are fifteen
+Twelve rail buttons. Variations live inside the tool that owns them, so there are fifteen
 shapes behind Shape, four nibs behind Brush and four modes behind Select. The whole
 set stays available without a button each.
 
@@ -225,8 +231,9 @@ set stays available without a button each.
 | `U` | Shape | `T` | Text |
 | `N` | Step Badge | `K` | Fill |
 | `I` | Eyedropper | `M` | Select |
-| `R` | Pixelate | `X` | Swap colours |
-| `[` / `]` | Change tool size | `Space` | Pan |
+| `R` | Pixelate | `S` | Spotlight |
+| `X` | Swap colours | `[` / `]` | Change tool size |
+| `Space` | Pan | `Esc` | Cancel what you are doing |
 | `⌥1`–`⌥9` | Choose a shape | `⇧⌘'` | Snap to grid |
 | `⌘K` | Crop to selection | `⌘9` | Fit to window |
 | `⇧⌘E` | Export | `⌘V` | Paste as a floating image |
@@ -303,8 +310,7 @@ history.
 
 <br>
 
-**The app is fine and so is your download.** Open **System Settings ▸ Privacy &
-Security** and click **Open Anyway**.
+Open **System Settings ▸ Privacy & Security** and click **Open Anyway**.
 
 This happened once, on macOS 26.6, with a freshly downloaded 0.12.0, on a disk image
 that `spctl --assess` accepts and whose stapled ticket validates. It looks like a
@@ -323,7 +329,7 @@ spctl -a -vvv -t exec /Volumes/ItsPaint*/ItsPaint.app   # expect: accepted
 
 <div align="center">
 
-**If ItsPaint saved you a trip to the App Store, a ⭐ helps the next person find it.**
+**If you installed it, a star is how the next person finds it from search.**
 
 [MIT License](LICENSE) · Built by [Josh Lin](https://github.com/joshlin2201)
 

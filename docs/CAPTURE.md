@@ -147,7 +147,7 @@ Apple in v1; we win because of what happens after the capture:
   nothing. We already ship it.
 - **Instant Alpha.** Knock a background out deterministically, with a tolerance
   you control and no model deciding for you. We already ship it.
-- **Crop, canvas resize, scale, and eight export formats.** Markup has one path
+- **Crop, canvas resize, scale, and nine export formats.** Markup has one path
   out.
 - **It does not end.** Markup is modal — click Done and the session is over.
   An `.itspaint` document stays editable, and it is a PNG with a JSON sidecar,

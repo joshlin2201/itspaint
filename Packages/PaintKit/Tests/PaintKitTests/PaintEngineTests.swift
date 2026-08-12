@@ -1547,3 +1547,118 @@ struct SnapGridTests {
                 "snapped off the canvas: \(String(describing: bounds))")
     }
 }
+
+@Suite("Spotlight")
+struct SpotlightTests {
+    /// A flat canvas so any change is the spotlight and nothing else.
+    private func canvas(_ size: Int = 200) -> Bitmap {
+        Bitmap(width: size, height: size, fill: RGBA8(r: 200, g: 200, b: 200))
+    }
+
+    @Test("The lit region keeps its colour and everything else darkens")
+    func spotlightDimsOnlyTheOutside() {
+        var image = canvas()
+        let before = image.pixel(at: PixelPoint(x: 100, y: 100))
+        Raster.spotlight(PixelRect(x: 60, y: 60, width: 80, height: 80), into: &image)
+
+        #expect(image.pixel(at: PixelPoint(x: 100, y: 100)) == before, "the middle of the lit region changed")
+        let outside = image.pixel(at: PixelPoint(x: 10, y: 10))!
+        #expect(outside.r < before!.r, "the outside did not darken")
+        #expect(outside.r > 0, "the outside went black rather than dim")
+    }
+
+    @Test("Dimming leaves transparency alone")
+    func spotlightKeepsTransparency() {
+        // Compositing black over the outside would fill the checkerboard on anything
+        // whose background had already been removed.
+        var image = Bitmap(width: 100, height: 100, fill: .clear)
+        Raster.fillRect(PixelRect(x: 40, y: 40, width: 20, height: 20),
+                        colour: RGBA8(r: 200, g: 30, b: 30), into: &image)
+        Raster.spotlight(PixelRect(x: 45, y: 45, width: 10, height: 10), into: &image)
+
+        #expect(image.pixel(at: PixelPoint(x: 5, y: 5))?.a == 0, "a transparent pixel gained alpha")
+        let dimmed = image.pixel(at: PixelPoint(x: 41, y: 41))!
+        #expect(dimmed.a == 255, "an opaque pixel lost alpha")
+        #expect(dimmed.r < 200, "the opaque outside did not darken")
+    }
+
+    @Test("A click, which is what the engine actually produces, changes nothing")
+    func spotlightDeclinesAClick() {
+        // `PixelRect(corners:)` is inclusive, so a click without a drag is 1x1 and not
+        // empty. The first version of this test passed `width: 0`, an input the engine
+        // cannot make, so it passed while a real click dimmed the whole image and left
+        // one pixel lit.
+        var image = canvas()
+        let before = image
+        let click = PixelRect(corners: PixelPoint(x: 10, y: 10), PixelPoint(x: 10, y: 10))
+        #expect(click.width == 1 && click.height == 1, "a click is 1x1, not empty")
+
+        let dirty = Raster.spotlight(click, into: &image)
+        #expect(dirty.isEmpty)
+        #expect(image == before, "a click dimmed the image")
+
+        // A drag too small to be a spotlight is the same case.
+        var tiny = canvas()
+        _ = Raster.spotlight(PixelRect(x: 10, y: 10, width: 5, height: 40), into: &tiny)
+        #expect(tiny == canvas(), "a 5px-wide drag dimmed the image")
+    }
+
+    @Test("The middle of every edge stays lit, even at the largest radius")
+    func spotlightKeepsItsEdgesLit() {
+        // With the radius at exactly half the shorter side the two corner zones meet,
+        // every pixel counts as a corner, and each edge midpoint falls outside the arc.
+        // The rounded rectangle becomes a lens. Only the centre pixel survived, which
+        // is the one pixel the original clamp test happened to sample.
+        var image = canvas()
+        let lit = PixelRect(x: 90, y: 90, width: 20, height: 20)
+        Raster.spotlight(lit, radius: 500, into: &image)
+
+        #expect(image.pixel(at: PixelPoint(x: 99, y: 90))!.r == 200, "the top edge midpoint went dark")
+        #expect(image.pixel(at: PixelPoint(x: 99, y: 109))!.r == 200, "the bottom edge midpoint went dark")
+        #expect(image.pixel(at: PixelPoint(x: 90, y: 99))!.r == 200, "the left edge midpoint went dark")
+        #expect(image.pixel(at: PixelPoint(x: 109, y: 99))!.r == 200, "the right edge midpoint went dark")
+    }
+
+    @Test("Rounding is symmetric, so opposite corners are cut the same")
+    func spotlightRoundsSymmetrically() {
+        var image = canvas()
+        let lit = PixelRect(x: 50, y: 50, width: 100, height: 100)
+        Raster.spotlight(lit, radius: 20, into: &image)
+        let topLeft = image.pixel(at: PixelPoint(x: 50, y: 50))!.r
+        let topRight = image.pixel(at: PixelPoint(x: 149, y: 50))!.r
+        let bottomLeft = image.pixel(at: PixelPoint(x: 50, y: 149))!.r
+        let bottomRight = image.pixel(at: PixelPoint(x: 149, y: 149))!.r
+        #expect(topLeft == topRight, "left and right corners differ")
+        #expect(topLeft == bottomLeft, "top and bottom corners differ")
+        #expect(topLeft == bottomRight, "opposite corners differ")
+        #expect(topLeft < 200, "the corners were not cut at all")
+    }
+
+    @Test("Corners are rounded, so it reads as a spotlight and not a cut-out")
+    func spotlightRoundsItsCorners() {
+        var image = canvas()
+        let lit = PixelRect(x: 50, y: 50, width: 100, height: 100)
+        Raster.spotlight(lit, radius: 20, into: &image)
+        // The very corner of the lit rectangle falls outside a 20px radius.
+        #expect(image.pixel(at: PixelPoint(x: 51, y: 51))!.r < 200, "the corner was left lit")
+        // A point the same distance in along one edge is inside it.
+        #expect(image.pixel(at: PixelPoint(x: 100, y: 51))!.r == 200, "the top edge was dimmed")
+    }
+
+    @Test("Dragging it is one undoable step named after the tool")
+    func spotlightIsOneUndoableStep() {
+        var settings = ToolSettings()
+        settings.tool = .spotlight
+        let engine = PaintEngine(canvas: canvas(), settings: settings)
+        let before = engine.canvas
+
+        engine.beginStroke(at: PixelPoint(x: 40, y: 40), button: .primary)
+        _ = engine.continueStroke(to: PixelPoint(x: 160, y: 160))
+        _ = engine.endStroke(at: PixelPoint(x: 160, y: 160))
+
+        #expect(engine.canvas != before, "the drag did nothing")
+        #expect(engine.canUndo)
+        _ = engine.undo()
+        #expect(engine.canvas == before, "undo did not restore the image")
+    }
+}

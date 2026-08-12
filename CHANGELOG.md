@@ -5,6 +5,42 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## [Unreleased]
+### Fixed
+- **The highlighter said 2px and painted 4px.** Its chisel nib clamps to a 4px
+  floor, and nothing told the options panel, so the readout, the slider and the lit
+  size stop all described a stroke the engine would never draw. `[` walked 4 → 3 →
+  2 → 1 without changing a pixel, which reads as a dead key rather than a clamp.
+  The panel now asks the armed tool what sizes it can paint at.
+- **Right-clicking a palette swatch opens a menu instead of loading Colour 2**,
+  which is what the swatch's own tooltip promised and what the canvas has done
+  since the first build. It now loads Colour 2.
+- **Stroke weight and dash stayed live on a filled shape**, where the engine draws
+  no outline and ignores both. Dragging Stroke from 2 to 28 on a filled box gave
+  back the identical box. They now appear only when the shape has an outline.
+
+### Changed
+- **`A` draws an arrow.** It is the annotation primitive people actually reach for
+  and it was three moves away: press `U`, open the gallery, find one cell in
+  fifteen. `A` was unused.
+- **Step badges can start at any number.** A run often spans two screenshots and
+  the second one starts at 4. Restart-at-1 was the only control, so continuing a
+  sequence meant three throwaway badges and three undos.
+- **Both Match sliders stop at 40 rather than 128.** The sweep recorded in
+  `ToolSettings` found coverage stable from 8 through 32 and then a cliff: at 48 a
+  probe in dark window chrome jumps from 4% to 91%. Most of the old track did not
+  match more, it flooded the screenshot. Saved documents keep any value they had.
+
+### Added
+- **Spotlight.** Drag a box and everything outside it dims, so the eye lands where
+  you meant it to. `S`, or the last button on the rail. The dim is adjustable from
+  10% to 90% and defaults to 45%.
+
+  It darkens rather than veiling, so transparency survives: compositing black over
+  the outside would paint across the checkerboard on anything whose background had
+  already been removed. Dragging a second one darkens the first, which is inherent to
+  an app that flattens every edit, and undo is the way back.
+
 ## [0.14.1] — 2026-08-11
 
 **0.14.0 was tagged and never built.** Its release run died at the first step on

@@ -40,6 +40,8 @@ public struct ToolSettings: Equatable, Sendable {
     public var highlighterColour: PaintColour?
     /// Mosaic cell size for the pixelate tool.
     public var pixelateBlockSize: Int
+    /// How far the area outside a spotlight is darkened, 0 to 1.
+    public var spotlightDim: Double
     /// Whether shape outlines are solid, dashed or dotted.
     public var strokeDash: Raster.Dash
     /// Which region the select tool resolves.
@@ -83,6 +85,7 @@ public struct ToolSettings: Equatable, Sendable {
         highlighterOpacity: Double = 0.38,
         highlighterColour: PaintColour? = PaintColour(hex: "FFE24D"),
         pixelateBlockSize: Int = 12,
+        spotlightDim: Double = 0.45,
         strokeDash: Raster.Dash = .solid,
         selectionKind: SelectionKind = .rectangle,
         selectionTolerance: Int = 12,
@@ -100,6 +103,7 @@ public struct ToolSettings: Equatable, Sendable {
         self.highlighterOpacity = min(1, max(0.05, highlighterOpacity))
         self.highlighterColour = highlighterColour
         self.pixelateBlockSize = max(2, pixelateBlockSize)
+        self.spotlightDim = min(max(spotlightDim, 0.1), 0.9)
         self.strokeDash = strokeDash
         self.selectionKind = selectionKind
         self.selectionTolerance = min(255, max(0, selectionTolerance))
@@ -144,6 +148,38 @@ public struct ToolSettings: Equatable, Sendable {
     /// 1px is deliberately absent: that is the pencil's whole job, and the slider
     /// still reaches it.
     public static let sizeStops = [2, 6, 14, 28]
+
+    /// As far as a tolerance slider is worth travelling.
+    ///
+    /// The sweep recorded against `fillTolerance` above found coverage stable from
+    /// 8 through 32 and then a cliff: at 48 a probe in dark window chrome goes from
+    /// 4% to 91%, because adjacent near-blacks in a dark UI sit within 48 of each
+    /// other. The sliders offered 0 to 128 anyway, so most of the track did not
+    /// match more, it flooded the screenshot, and a bucket that floods reads as a
+    /// broken bucket rather than as a setting turned up too far.
+    ///
+    /// The stored properties still clamp to 0...255. A document saved with a wider
+    /// tolerance keeps it; this only bounds what the slider can dial in.
+    public static let usefulTolerance = 40
+
+    /// The sizes a given tool can actually paint at.
+    ///
+    /// `nib` clamps the highlighter to a 4px chisel, and for a long time nothing
+    /// told the options panel that. The slider offered 1, the stop strip lit up 2,
+    /// the readout said 2, and the stroke came out 4. Worse, `[` walked 4 → 3 → 2 → 1
+    /// without changing a single pixel, which reads as a dead key rather than a
+    /// clamp. A control that cannot be wrong beats a comment asking the next person
+    /// to keep two numbers in step.
+    public static func sizeRange(for tool: ToolKind) -> ClosedRange<Int> {
+        tool == .highlighter ? 4...sizeRange.upperBound : sizeRange
+    }
+
+    /// The stop strip for a tool, with any stop below its floor pulled up to it.
+    public static func sizeStops(for tool: ToolKind) -> [Int] {
+        let floor = sizeRange(for: tool).lowerBound
+        var seen = Set<Int>()
+        return sizeStops.map { max($0, floor) }.filter { seen.insert($0).inserted }
+    }
 
     /// Shape and diameter the current settings resolve to.
     ///

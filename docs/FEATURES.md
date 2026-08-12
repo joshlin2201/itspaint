@@ -8,7 +8,7 @@ bug in one of the two.
 
 ## Tools
 
-Eleven rail buttons in three runs. Every one has a single-key shortcut, shown on
+Twelve rail buttons in three runs. Every one has a single-key shortcut, shown on
 hover and in the Tools menu.
 
 ### Draw
@@ -17,7 +17,7 @@ hover and in the Tools menu.
 |---|---|---|
 | `P` | **Pencil** | Always a hard 1px nib. Not size-aware on purpose — that is the promise of the tool; making it size-aware would make it a small brush. |
 | `B` | **Brush** | Four tips at 1–96px. Round and square are hard-edged; soft antialiases over the outer ring; **spray is the airbrush** — it scatters coverage weighted to the centre and **keeps spraying while you hold still**, which is the whole feel of it. Flow sets density, and appears only for the spray tip. Seeded randomness, so a given engine sprays reproducibly. Spray used to be its own rail button; it is a nib, not a job. |
-| `H` | **Highlighter** | Chisel nib and a coverage buffer: overlapping passes within one stroke **never darken**. Drag back over your own line and it stays one flat tone, the way a real highlighter does. |
+| `H` | **Highlighter** | A 4px floor, because the chisel nib clamps there: the size control shows what the stroke will be rather than a number the engine would round up. Coverage buffer, so overlapping passes within one stroke **never darken**. Drag back over your own line and it stays one flat tone, the way a real highlighter does. |
 | `E` | **Eraser** | Lays down the *background* colour — which is what makes it read as removing paint. Right-drag inverts that pairing. |
 
 ### Insert
@@ -26,16 +26,17 @@ hover and in the Tools menu.
 |---|---|---|
 | `U` | **Shape** | Fifteen kinds, below. Stroke weight, dash, fill/outline, corner radius. |
 | `T` | **Text** | Drag a box and type in place, at the size and font it will land at. `⌘-drag` moves the box while you type. `⌘↩` places it, `⎋` discards. Rasterises on commit. A click instead of a drag gets a one-line box pulled back inside the canvas, so clicking near an edge still gives you something usable. |
-| `N` | **Step badge** | Click to drop `1`, `2`, `3`… in the current colour, numeral auto-contrasted. Size follows the brush size. "Restart at 1" is in the options. |
-| `K` | **Fill** | Scanline flood fill with a tolerance slider (0–128, per channel). Explicitly iterative — a recursive fill overflows the stack on any realistic canvas. Filling with the colour already there is a no-op rather than an infinite loop. |
+| `N` | **Step badge** | Click to drop `1`, `2`, `3`… in the current colour, numeral auto-contrasted. Size follows the brush size. The options set the next number, so a run continued on a second screenshot can start at 4, and "Restart at 1" puts it back. |
+| `K` | **Fill** | Scanline flood fill with a tolerance slider (0–40, per channel). A sweep on a real screenshot found coverage stable from 8 through 32, then a cliff at 48 where a probe in dark window chrome went from 4% to 91%, so the slider stops before it. The stored value still allows 0–255 for a document that already had one. Explicitly iterative — a recursive fill overflows the stack on any realistic canvas. Filling with the colour already there is a no-op rather than an infinite loop. |
 | `I` | **Eyedropper** | Samples into Colour 1. **Hold `⌥` with any tool** to do the same without switching — right-button samples into Colour 2. Never enters undo: a colour pick on the undo stack is a classic way to make ⌘Z feel broken. |
 
-### Select
+### Select and effects
 
 | | Tool | Behaviour |
 |---|---|---|
 | `M` | **Select** | Four modes in its options: **rectangle**, **ellipse**, **lasso**, **Instant Alpha**. Instant Alpha selects a connected colour without changing pixels; set tolerance, `⇧`-click to add, `⌥`-click to subtract, then choose **Make transparent**. Its marching ants follow the actual pixel mask rather than its bounds. |
 | `R` | **Pixelate** | Mosaic effect. Averages each block to one value for visual obscuring, with a block size of 4–48. This is not secure redaction; use an opaque filled shape for secrets. |
+| `S` | **Spotlight** | Drag a box and everything outside it dims, so the eye lands where you meant it to. Dim runs 10–90% and defaults to 45%, which leaves the surrounding UI readable as context. The corners are rounded by 10px. It **scales the colour channels rather than compositing black over them**, so alpha survives: veiling the outside would paint across the checkerboard on anything whose background you had already removed. Drags under 8px on either side do nothing, because a stray click would otherwise dim the entire image. |
 
 **Dragging inside an existing marquee lifts it** and moves it, with no separate
 Cut step. Requiring Cut first is the classic reason people conclude a selection

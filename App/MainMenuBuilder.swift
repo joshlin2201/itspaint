@@ -215,7 +215,7 @@ enum MainMenuBuilder {
 
     /// Every tool, named, with its key.
     ///
-    /// The cluster is eleven unlabelled glyphs by design — its stated weakness.
+    /// The cluster is twelve unlabelled glyphs by design — its stated weakness.
     /// This is where a new user reads what they are and learns the shortcuts,
     /// and where a VoiceOver user reaches them without hunting a floating bar.
     private static func toolsMenu() -> NSMenuItem {
@@ -249,12 +249,19 @@ enum MainMenuBuilder {
         // than fifteen rail buttons — the same trade the options panel makes.
         let shapes = NSMenu(title: "Shape")
         for (index, kind) in ShapeKind.allCases.enumerated() {
+            // Arrow gets a bare letter, everything else gets ⌥ and a digit.
+            //
+            // It is the annotation primitive people actually came for, and it was
+            // three moves away: press `U`, open the gallery, find one cell in
+            // fifteen. Meanwhile `A` was sitting unused. A tool you reach for on
+            // every screenshot should cost one key.
+            let arrow = kind == .arrow
             let entry = NSMenuItem(
                 title: kind.displayName,
                 action: #selector(AppCommands.selectShapeFromMenu(_:)),
-                keyEquivalent: index < 9 ? String(index + 1) : ""
+                keyEquivalent: arrow ? "a" : index < 9 ? String(index + 1) : ""
             )
-            entry.keyEquivalentModifierMask = [.option]
+            entry.keyEquivalentModifierMask = arrow ? [] : [.option]
             entry.target = nil
             entry.representedObject = kind.rawValue
             entry.image = NSImage(

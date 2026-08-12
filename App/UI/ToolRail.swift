@@ -484,13 +484,57 @@ private struct PaletteGrid: View {
                 }
             }
             .contentShape(Rectangle())
-            .onTapGesture { model.applySwatch(colour, to: .foreground) }
-            .contextMenu {
-                Button("Set as Colour 1") { model.applySwatch(colour, to: .foreground) }
-                Button("Set as Colour 2") { model.applySwatch(colour, to: .background) }
+            .overlay {
+                MouseButtons(
+                    tooltip: "\(colour.hexString) · click for Colour 1, right-click for Colour 2",
+                    primary: { model.applySwatch(colour, to: .foreground) },
+                    secondary: { model.applySwatch(colour, to: .background) }
+                )
             }
-            .help("\(colour.hexString) · click for Colour 1, right-click for Colour 2")
+            .accessibilityElement()
             .accessibilityLabel("Swatch \(colour.hexString)")
+            .accessibilityValue(
+                colour == model.foreground ? "Colour 1"
+                    : colour == model.background ? "Colour 2" : ""
+            )
+            .accessibilityAddTraits(
+                colour == model.foreground || colour == model.background ? [.isButton, .isSelected] : .isButton
+            )
+    }
+}
+
+/// A real right-click.
+///
+/// `.contextMenu` claims the secondary button and opens a menu with it, so every
+/// swatch in the palette advertised "right-click for Colour 2" behind a gesture that
+/// could only ever show a menu. The canvas has painted with Colour 2 on the right
+/// button since the first build, which is precisely the muscle memory the help text
+/// was appealing to, and the one place it did not hold was the control that taught it.
+///
+/// Both buttons run through here rather than leaving the left one on `onTapGesture`,
+/// because an overlaid `NSView` takes the whole hit area or none of it, and a chip
+/// where one button works is worse than one where neither does.
+struct MouseButtons: NSViewRepresentable {
+    let tooltip: String
+    let primary: () -> Void
+    let secondary: () -> Void
+
+    final class Catcher: NSView {
+        var primary: () -> Void = {}
+        var secondary: () -> Void = {}
+        override func mouseDown(with event: NSEvent) { primary() }
+        override func rightMouseDown(with event: NSEvent) { secondary() }
+        // Without this, a control-click arrives as `rightMouseDown` on some
+        // trackpad configurations and as a modified `mouseDown` on others.
+        override func otherMouseDown(with event: NSEvent) { secondary() }
+    }
+
+    func makeNSView(context: Context) -> Catcher { Catcher() }
+
+    func updateNSView(_ view: Catcher, context: Context) {
+        view.primary = primary
+        view.secondary = secondary
+        view.toolTip = tooltip
     }
 }
 
