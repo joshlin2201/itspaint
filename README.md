@@ -184,7 +184,7 @@ the app so you can pick whichever suits you:
 The engine is also a dependency you can use without the app:
 
 ```swift
-.package(url: "https://github.com/joshlin2201/itspaint", from: "0.14.1")
+.package(url: "https://github.com/joshlin2201/itspaint", from: "0.15.0")
 ```
 
 That gets you a product shot off its page in four lines, on device, with no model and

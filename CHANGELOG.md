@@ -5,7 +5,7 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
-## [Unreleased]
+## [0.15.0] — 2026-08-12
 ### Fixed
 - **The highlighter said 2px and painted 4px.** Its chisel nib clamps to a 4px
   floor, and nothing told the options panel, so the readout, the slider and the lit
