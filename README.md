@@ -10,7 +10,7 @@
 
 ### MS Paint for the Mac. Open it, draw, close it.
 
-**2.96 MB** · free on the App Store, no trial · MIT ·
+**2.96 MB** · free on the App Store · MIT ·
 **no network entitlement, so the kernel refuses a socket**
 
 [![Release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&style=flat-square&label=release&color=2563eb)](https://github.com/joshlin2201/itspaint/releases)
@@ -31,22 +31,21 @@ brew install --cask itspaint
 
 ## What makes it different
 
-- **2.96 MB, and a window on screen in about half a second.** Everything else
-  capable is a gigabyte with a subscription attached, and half the free ones turn
-  out to be a trial.
-- **No network entitlement.** `com.apple.security.network.client` is not
-  requested, so the kernel refuses an outbound socket whatever the code asks for —
-  [three commands to check it yourself](#no-network-three-commands-to-prove-it).
-- **Background removal with no ML model** and nothing to download: four
-  corner-seeded flood selections, unioned, and it declines rather than handing you
-  a blank canvas — [thirty lines of code](docs/BACKGROUND_REMOVAL.md).
+- **2.96 MB, and a window on screen in about half a second.** Everything else that
+  can do this is a gigabyte with a subscription attached.
+- **No network entitlement.** `com.apple.security.network.client` is not requested,
+  so the kernel will not open a socket for it.
+  [Three commands to check that yourself](#no-network-three-commands-to-prove-it).
+- **Background removal with no ML model** and nothing to download. Four
+  corner-seeded flood selections, unioned.
+  [Thirty lines of code](docs/BACKGROUND_REMOVAL.md).
 - **The drawing engine has no UI.** `Packages/PaintKit` imports Foundation,
   CoreGraphics and ImageIO and nothing else, so `swift test` verifies most changes
-  with no Xcode and no GUI session.
-- **Free, not free-for-now.** No account, no subscription, no trial, no telemetry.
+  with no Xcode.
+- **Free, and it stays free.** No account, no trial, no telemetry.
 
-It is the app you reach for *between* the real tools — mark up the screenshot,
-crop the thing, drag it into Slack, close the window without saving.
+You open it between the real tools. Mark up the screenshot, crop the thing, drag it
+into Slack, close the window without saving.
 
 ## What it does
 
@@ -58,34 +57,30 @@ crop the thing, drag it into Slack, close the window without saving.
 
 </div>
 
-One command. Four corner-seeded flood selections, unioned. If the page is not
-actually separable it says so and changes nothing, instead of handing you a
-nearly blank canvas.
+One command. It floods from all four corners and makes the union transparent. If the
+page is not actually separable it says so and changes nothing.
+
+It knows what a page is, not what a subject is, so it works on logos, product shots
+and scanned diagrams. It is useless on hair.
 
 **[How it works, in thirty lines of code →](docs/BACKGROUND_REMOVAL.md)**
 
-Its safety check was also wrong for three releases, in a way worth reading about:
-it measured how much of the canvas was background, so the better an image fitted the
-feature the more certainly it was refused, while its test stayed green and its
-documentation defended it —
-**[a guard tuned to its test →](docs/A_GUARD_TUNED_TO_ITS_TEST.md)**
-
 ### And the rest
 
-- **Drag the image straight out** into Slack, Mail or the Finder. No save panel, no
-  `Screenshot 2026-08-07 at 11.42.13.png` left on your Desktop.
+- **Drag the image straight out** into Slack, Mail or the Finder. No save panel, and
+  no `Screenshot 2026-08-07 at 11.42.13.png` on your Desktop.
 - **Paste anything on top of anything.** It arrives floating, and if it is bigger
-  than the canvas the canvas grows rather than cropping it.
+  than the canvas the canvas grows instead of cropping it.
 - **Mark up a screenshot properly.** Auto-numbered step badges, arrows, a
-  highlighter with its own ink, pixelate for what you would rather not publish.
-- **Annotation text stays readable** on any screenshot — it carries a contrasting
+  highlighter with its own ink, and pixelate for what you would rather not publish.
+- **Annotation text stays readable** on any screenshot. It carries a contrasting
   rim, because one colour cannot work across a light panel and a dark one.
 - **Snap to grid** (`⇧⌘'`) at 8–64px for shapes, selections and pasted content.
-  Never for freehand: a stroke that jumped to a grid would not be freehand.
-- **Fifteen shapes**, four brush nibs, four ways to select — each folded behind one
-  rail button rather than sprawling across the window.
-- **Real pixel control** — pointer-centred zoom, nearest-neighbour above 100%, a
-  pixel grid, live tool footprints, rotate by any angle.
+  Never for freehand, since a stroke that jumped to a grid would not be freehand.
+- **Fifteen shapes**, four brush nibs and four ways to select, each folded behind
+  one rail button rather than sprawling across the window.
+- **Real pixel control.** Pointer-centred zoom, nearest-neighbour above 100%, a
+  pixel grid, live tool footprints, and rotate by any angle.
 
 <div align="center">
 
@@ -103,17 +98,17 @@ brew tap joshlin2201/itspaint
 brew install --cask itspaint
 ```
 
-Or the [disk image](https://github.com/joshlin2201/itspaint/releases) — open it,
-drag **ItsPaint** to Applications. Or the
-[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12), free.
+Or take the [disk image](https://github.com/joshlin2201/itspaint/releases), open it
+and drag **ItsPaint** to Applications. It is also free on the
+[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12).
 
-It ships often while it is in beta, so **Watch ▸ Custom ▸ Releases** is the quietest
-way to hear about a new build.
+It ships often while it is in beta. **Watch ▸ Custom ▸ Releases** is the quietest way
+to hear about a new build.
 
 | | |
 |---|---|
 | **Requires** | macOS 14 Sonoma or later |
-| **Architecture** | universal — one build for Apple silicon and Intel |
+| **Architecture** | universal, one build for Apple silicon and Intel |
 | **Signing** | Developer ID, notarised, ticket stapled to the image *and* the app, so the check needs no network and there is nothing to clear from the Terminal |
 | **Download** | 2.96 MB for the disk image, with a SHA-256 in `checksums.txt` |
 
@@ -123,12 +118,12 @@ xcrun stapler validate ItsPaint-*.dmg
 ```
 
 If macOS asks you to confirm the first launch, open **System Settings ▸ Privacy &
-Security** and click **Open Anyway** — [why that happens](#first-launch).
+Security** and click **Open Anyway**. [Why that happens](#first-launch).
 
 ## No network. Three commands to prove it
 
-Not a promise — a property the kernel enforces. Run these against the copy you
-installed:
+This is a property the kernel enforces rather than a promise. Run these against the
+copy you installed:
 
 ```bash
 codesign -d --entitlements - --xml /Applications/ItsPaint.app | plutil -p -
@@ -138,23 +133,24 @@ grep -rniE 'URLSession|NWConnection|import Network|CFSocket' App Packages
 
 | Command | What comes back |
 |---|---|
-| `codesign` | three — sandbox, files you pick in a panel, app-scoped bookmarks. No `network.client`, no `.server`, so the kernel refuses a socket whatever the code asks for |
+| `codesign` | Three entitlements: sandbox, files you pick in a panel, app-scoped bookmarks. No `network.client` and no `.server`, so the kernel will not open a socket for it |
 | `otool` | Apple frameworks and the Swift runtime, on both architectures. No `CFNetwork`, no `Network.framework`, no bundled dylib |
-| `grep` | nothing. And `Package.swift` declares no dependency, so there is no third-party code behind it |
+| `grep` | Nothing. `Package.swift` also declares no dependency, so there is no third-party code behind it |
 
-The entitlements check is first on purpose: it reports what the kernel will
-*permit*, not what the developer wrote, so it holds even if the developer is lying.
+The entitlements check goes first on purpose. It reports what the kernel will
+*permit* rather than what the developer wrote, so it holds even if the developer is
+lying to you.
 
 **[Why that order, and how to make the same claim falsifiable in your own app →](docs/PROVING_NO_NETWORK.md)**
 
-## Contributing — the engine needs no Xcode
+## Contributing, and the engine needs no Xcode
 
-`Packages/PaintKit` is a **UI-free Swift package**: no AppKit, no SwiftUI, no
-third-party dependency. It imports Foundation, CoreGraphics, ImageIO, CoreText
-and UniformTypeIdentifiers, and nothing else.
+`Packages/PaintKit` is a **UI-free Swift package**. No AppKit, no SwiftUI, no
+third-party dependency. It imports Foundation, CoreGraphics, ImageIO, CoreText and
+UniformTypeIdentifiers, and nothing else.
 
-That means most changes to how ItsPaint *draws* can be made and verified with a
-text editor and a terminal — no simulator, no GUI session, no Xcode project:
+So most changes to how ItsPaint *draws* can be made and checked with a text editor
+and a terminal. No simulator, no GUI session, no Xcode project:
 
 ```bash
 git clone https://github.com/joshlin2201/itspaint.git
@@ -163,30 +159,30 @@ swift test          # the whole engine suite, in a fresh clone
 ```
 
 **Seven issues are open and labelled [`good first issue`](https://github.com/joshlin2201/itspaint/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)**,
-each naming the file and the line to start at, in three different parts of the app so
-you can pick the one that suits you:
+each naming the file and the line to start at. They sit in three different parts of
+the app so you can pick whichever suits you:
 
 *View layer, AppKit drawing, no engine knowledge needed*
-- [#11](https://github.com/joshlin2201/itspaint/issues/11) — A loupe that follows the pointer
+- [**#11** A loupe that follows the pointer](https://github.com/joshlin2201/itspaint/issues/11)
 
 *Engine, pure functions over pixels, no Xcode needed*
-- [#12](https://github.com/joshlin2201/itspaint/issues/12) — Brightness, contrast and saturation
-- [#5](https://github.com/joshlin2201/itspaint/issues/5) — Arrowheads as a line style, not a separate shape
+- [**#12** Brightness, contrast and saturation](https://github.com/joshlin2201/itspaint/issues/12)
+- [**#5** Arrowheads as a line style, not a separate shape](https://github.com/joshlin2201/itspaint/issues/5)
 
 *Selection arithmetic, also engine-only*
-- [#3](https://github.com/joshlin2201/itspaint/issues/3) — Grow and shrink a selection by a pixel amount
-- [#4](https://github.com/joshlin2201/itspaint/issues/4) — Make a selection from the alpha channel
-- [#6](https://github.com/joshlin2201/itspaint/issues/6) — Flip and rotate the selection, not the whole image
-- [#7](https://github.com/joshlin2201/itspaint/issues/7) — Add to and subtract from a selection
+- [**#3** Grow and shrink a selection by a pixel amount](https://github.com/joshlin2201/itspaint/issues/3)
+- [**#4** Make a selection from the alpha channel](https://github.com/joshlin2201/itspaint/issues/4)
+- [**#6** Flip and rotate the selection, not the whole image](https://github.com/joshlin2201/itspaint/issues/6)
+- [**#7** Add to and subtract from a selection](https://github.com/joshlin2201/itspaint/issues/7)
 
-It is also a dependency you can use without the app. Add it:
+The engine is also a dependency you can use without the app:
 
 ```swift
-.package(url: "https://github.com/joshlin2201/itspaint", from: "0.13.1")
+.package(url: "https://github.com/joshlin2201/itspaint", from: "0.14.1")
 ```
 
-and take a product shot off its page in four lines, on device, with no model and no
-network:
+That gets you a product shot off its page in four lines, on device, with no model and
+no network:
 
 ```swift
 import PaintKit
@@ -196,13 +192,13 @@ guard engine.removeBackground() else { fatalError("no background to remove") }
 try ImageCodec.encode(engine.canvas, as: .png).write(to: output)
 ```
 
-That snippet is compiled and run against the published tag rather than written out
-here, and the check is the transparent-pixel count before and after, not that it
-exited without complaining. On a 60px mark centred on a 400×400 page it takes the
-count from 0 to 156,400 — which is 160,000 minus the 3,600 pixels of subject.
+Those four lines are compiled and run against the published tag, and checked by
+counting transparent pixels rather than by whether the program exited quietly. On a
+60px mark centred on a 400×400 page the count goes from 0 to 156,400, which is
+160,000 minus the 3,600 pixels of subject.
 
-[CONTRIBUTING.md](CONTRIBUTING.md) covers the structure, the design constraints,
-and what a change has to prove before it lands.
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the structure, the design constraints, and
+what a change has to prove before it lands.
 
 <br>
 
@@ -218,9 +214,9 @@ and what a change has to prove before it lands.
 | **Select** | Rectangle, Ellipse, Lasso, Instant Alpha |
 | **Effects** | Pixelate |
 
-Eleven rail buttons. Variations live inside the tool that owns them — fifteen
-shapes behind Shape, four nibs behind Brush, four modes behind Select — so the
-whole set stays available without a button each.
+Eleven rail buttons. Variations live inside the tool that owns them, so there are fifteen
+shapes behind Shape, four nibs behind Brush and four modes behind Select. The whole
+set stays available without a button each.
 
 | Shortcut | Action | Shortcut | Action |
 |---|---|---|---|
@@ -235,14 +231,14 @@ whole set stays available without a button each.
 | `⌘K` | Crop to selection | `⌘9` | Fit to window |
 | `⇧⌘E` | Export | `⌘V` | Paste as a floating image |
 
-Pinch or `⌘`-scroll to zoom around the pointer. Hold `⌥` to sample a colour
-without changing tools. Right-drag uses the second colour. `Esc` cancels the
-current shape, text box, selection, floating paste, or options panel.
+Pinch or `⌘`-scroll to zoom around the pointer. Hold `⌥` to sample a colour without
+changing tools. Right-drag uses the second colour. `Esc` cancels the current shape,
+text box, selection, floating paste, or options panel.
 
-Instant Alpha selects connected pixels by colour — `⇧`-click adds, `⌥`-click
+Instant Alpha selects connected pixels by colour. `⇧`-click adds, `⌥`-click
 subtracts, then **Make transparent**.
 
-Pixelate is for visual de-emphasis, not secure redaction. Cover private
+Pixelate is for visual de-emphasis and not for secure redaction. Cover private
 information with an opaque filled shape before you export a flattened image.
 
 </details>
@@ -252,19 +248,19 @@ information with an opaque filled shape before you export a flattened image.
 
 <br>
 
-ItsPaint documents use the `.itspaint` package format: a lossless PNG with JSON
-metadata for the canvas, colours, and palette.
+ItsPaint documents use the `.itspaint` package format, which is a lossless PNG with
+JSON metadata for the canvas, colours and palette.
 
-Export supports PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF, and ICO when the
-corresponding encoder ships with the installed macOS version. The export panel
-has format and scale controls, and formats without alpha are flattened onto the
-second colour.
+Export supports PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF and ICO, when the
+corresponding encoder ships with the installed macOS version. The export panel has
+format and scale controls, and formats without alpha are flattened onto the second
+colour.
 
-ItsPaint registers as an editor for PNG, JPEG, TIFF, BMP, GIF and HEIC, so it
-appears under right-click ▸ **Open With**.
+ItsPaint registers as an editor for PNG, JPEG, TIFF, BMP, GIF and HEIC, so it appears
+under right-click ▸ **Open With**.
 
-WebP export is not available, because macOS does not provide a WebP encoder.
-Text becomes pixels when it is committed.
+WebP export is not available, because macOS does not provide a WebP encoder. Text
+becomes pixels once it is committed.
 
 </details>
 
@@ -278,29 +274,25 @@ Packages/PaintKit/   UI-free drawing engine, raster operations, undo, and codecs
 App/                 AppKit document lifecycle, canvas, and SwiftUI interface
 ```
 
-PaintKit stores pixels as premultiplied RGBA8 and returns the changed rectangle
-from every edit. The canvas redraws only that area, and undo history is bounded
-by memory rather than by a fixed number of steps.
+PaintKit stores pixels as premultiplied RGBA8 and returns the changed rectangle from
+every edit. The canvas redraws only that area, and undo history is bounded by memory
+rather than by a fixed number of steps.
 
 [**Background removal without a model**](docs/BACKGROUND_REMOVAL.md) is a worked
-example of both layers: four corner-seeded flood selections unioned through the
-same combiner `⇧`-click uses, and a remainder guard that declines rather than
-returning a nearly blank canvas.
+example of both layers. Four corner-seeded flood selections unioned through the same
+combiner `⇧`-click uses, and a guard that declines rather than returning a nearly
+blank canvas.
 
-**Using the engine on its own.** PaintKit is a product of the root package, so it
-can be a dependency of anything that wants a raster canvas without an editor around
-it. The four-line example is in the **Contributing** section above, where it is
-compiled against the published tag and checked by counting pixels.
+That guard was also wrong for three releases, in a way worth reading about:
+**[a guard tuned to its test →](docs/A_GUARD_TUNED_TO_ITS_TEST.md)**
 
-This block used to carry its own snippet, and the snippet ended
-`PaintEngine(width: 800, height: 600)` followed by `engine.removeBackground()` — a
-blank white canvas, which the command correctly declines. A README example whose
-last line returns `false` is worse than no example, and having two of them in one
-file is how that goes unnoticed.
+PaintKit is a product of the root package, so it can be a dependency of anything that
+wants a raster canvas without an editor around it. The four-line example is in
+**Contributing** above.
 
 [docs/README.md](docs/README.md) has the design notes, architecture, feature
-reference, testing guide, and roadmap. [CHANGELOG.md](CHANGELOG.md) has the
-version history.
+reference, testing guide and roadmap. [CHANGELOG.md](CHANGELOG.md) has the version
+history.
 
 </details>
 
@@ -314,14 +306,12 @@ version history.
 **The app is fine and so is your download.** Open **System Settings ▸ Privacy &
 Security** and click **Open Anyway**.
 
-This was observed once, on macOS 26.6, with a freshly downloaded 0.12.0 — on the
-same disk image that `spctl --assess` accepts and whose stapled ticket validates.
-It reads like a first-launch check that went to Apple and did not come back
-rather than anything about the build, and it is not reproducible on demand. It is
-alarming enough when it happens that it belongs here rather than buried in an
-issue.
+This happened once, on macOS 26.6, with a freshly downloaded 0.12.0, on a disk image
+that `spctl --assess` accepts and whose stapled ticket validates. It looks like a
+first-launch check that went to Apple and did not come back. It is alarming enough
+when it happens that it belongs here rather than in an issue.
 
-You can check the download yourself:
+Check the download yourself:
 
 ```bash
 shasum -a 256 -c checksums.txt
