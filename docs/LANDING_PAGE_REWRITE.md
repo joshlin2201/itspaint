@@ -36,12 +36,12 @@ before it was written down.
 
 > Native, free, open source, under 3 MB.
 
-The disk image is **3.02 MB** as of 0.15.1. It crossed three megabytes and the sentence
+The disk image was **"3.02 MB"** at 0.15.1. It crossed three megabytes and the sentence
 stayed.
 
 **Replace with:** `Native, free, open source, 3 MB.`
 
-Or carry the decimal, `3.02 MB`, which is what the README does and what the checker
+Or carry the decimal, `"3.02 MB"` as it was then, which is what the README does and what the checker
 watches. A round number that drifts is how this broke; a decimal that a script compares
 against the published asset does not.
 
