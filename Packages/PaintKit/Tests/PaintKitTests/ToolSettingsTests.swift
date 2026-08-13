@@ -128,3 +128,80 @@ struct SmoothEdgeTests {
         #expect(bmp.pixels.count == 144)
     }
 }
+
+/// The edge cases a smoothed freehand path has to survive. Short strokes are the
+/// common case — a tap, a tick, a two-sample flick — and they are the ones a
+/// smoother written for long drags gets wrong.
+@Suite("Short and degenerate strokes")
+@MainActor
+struct ShortStrokeTests {
+
+    private func engine() -> PaintEngine {
+        let e = PaintEngine(width: 80, height: 80)
+        e.reset(to: Bitmap(width: 80, height: 80, fill: RGBA8(r: 255, g: 255, b: 255)))
+        e.colours.foreground = PaintColour(hex: "000000")!
+        e.settings.tool = .brush
+        e.settings.brushShape = .round
+        e.settings.brushSize = 4
+        return e
+    }
+
+    private func inked(_ e: PaintEngine) -> Int {
+        e.canvas.pixels.filter { $0.r < 200 }.count
+    }
+
+    /// A click with no movement must still leave a mark. A path smoother that only
+    /// draws between distinct samples leaves nothing at all.
+    @Test func aClickWithNoMovementStillMarks() {
+        let e = engine()
+        let p = PixelPoint(x: 40, y: 40)
+        _ = e.beginStroke(at: p)
+        _ = e.endStroke(at: p)
+        #expect(inked(e) > 0, "a click left no pixels")
+    }
+
+    @Test func repeatedIdenticalSamplesDoNotCrashOrSpread() {
+        let e = engine()
+        let p = PixelPoint(x: 40, y: 40)
+        _ = e.beginStroke(at: p)
+        for _ in 0..<20 { _ = e.continueStroke(to: p) }
+        _ = e.endStroke(at: p)
+        // A round 4px nib on one spot covers well under a 12x12 box.
+        #expect(inked(e) < 144, "holding still spread the mark over \(inked(e)) pixels")
+    }
+
+    /// Two, three and four samples each take a different branch through the tail
+    /// window, and all three have to reach the last point the hand visited.
+    @Test(arguments: [2, 3, 4, 5])
+    func aShortStrokeReachesItsFinalPoint(samples: Int) {
+        let e = engine()
+        let points = (0..<samples).map { PixelPoint(x: 10 + $0 * 12, y: 40) }
+        _ = e.beginStroke(at: points[0])
+        for p in points.dropFirst() { _ = e.continueStroke(to: p) }
+        _ = e.endStroke(at: points.last!)
+
+        let last = points.last!
+        let nearEnd = e.canvas.pixels.enumerated().contains { index, pixel in
+            let x = index % 80, y = index / 80
+            return pixel.r < 200 && abs(x - last.x) <= 3 && abs(y - last.y) <= 3
+        }
+        #expect(nearEnd, "a \(samples)-sample stroke stopped short of its last point")
+    }
+
+    /// The stroke must be continuous: no gap left undrawn between the samples.
+    @Test func aStrokeHasNoHoleAlongItsLength() {
+        let e = engine()
+        let points = (0..<8).map { PixelPoint(x: 8 + $0 * 8, y: 40) }
+        _ = e.beginStroke(at: points[0])
+        for p in points.dropFirst() { _ = e.continueStroke(to: p) }
+        _ = e.endStroke(at: points.last!)
+
+        // Every column between the first and last sample should carry some ink.
+        var empty: [Int] = []
+        for x in (points[0].x + 2)...(points.last!.x - 2) {
+            let any = (0..<80).contains { y in e.canvas.pixels[y * 80 + x].r < 200 }
+            if !any { empty.append(x) }
+        }
+        #expect(empty.isEmpty, "columns with no ink: \(empty)")
+    }
+}
