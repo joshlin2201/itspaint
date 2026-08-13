@@ -128,8 +128,9 @@ struct ToolbarGeometryTests {
         // working, not it being in the way.
         for phrase in [
             "Twelve rail buttons",
-            "**Fifteen shapes**",
+            "Fifteen shapes in all",
             "fifteen shapes behind Shape",
+            "**Twelve tools**",
         ] {
             #expect(prose.contains(phrase), "README no longer says \"\(phrase)\"")
         }

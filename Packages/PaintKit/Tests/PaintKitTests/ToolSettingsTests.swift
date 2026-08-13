@@ -63,3 +63,68 @@ struct BadgeNumberingTests {
         #expect(engine.nextBadgeNumber == expected)
     }
 }
+
+@Suite("Smooth edges")
+@MainActor
+struct SmoothEdgeTests {
+
+    private func line(smooth: Bool) -> Bitmap {
+        let engine = PaintEngine(width: 60, height: 40)
+        engine.colours.foreground = PaintColour(hex: "000000")!
+        engine.settings.brushSize = 3
+        engine.settings.smoothEdges = smooth
+        engine.settings.tool = .shape
+        engine.settings.shapeKind = .line
+        _ = engine.beginStroke(at: PixelPoint(x: 4, y: 6))
+        _ = engine.continueStroke(to: PixelPoint(x: 55, y: 33))
+        _ = engine.endStroke(at: PixelPoint(x: 55, y: 33))
+        return engine.canvas
+    }
+
+    /// Partial coverage over an opaque canvas shows up in the colour channels, not
+    /// in alpha: black composited over white at 40% is mid grey with `a` still 255.
+    /// An earlier version of this counted partial *alpha* and found none, which is
+    /// true of a correct antialiased stroke and would have passed on a broken one.
+    private func midTones(_ bitmap: Bitmap) -> Int {
+        bitmap.pixels.filter { $0.r > 8 && $0.r < 247 }.count
+    }
+
+    /// The staircase in one assertion: an aliased diagonal is only ink or paper,
+    /// so there is nothing in between to soften the step.
+    @Test func aliasedDiagonalHasNoMidTones() {
+        #expect(midTones(line(smooth: false)) == 0, "the hard path is supposed to be hard")
+    }
+
+    @Test func smoothDiagonalFillsTheStepsWithMidTones() {
+        let found = midTones(line(smooth: true))
+        #expect(found > 40, "only \(found) mid-tone pixels; the edge is still a staircase")
+    }
+
+    /// A stroke has to be a function of the segment, not of the direction it was
+    /// walked, or scrubbing back and forth thickens it.
+    @Test func smoothStrokeIsTheSameBothWays() {
+        var forward = Bitmap(width: 40, height: 30, fill: RGBA8(r: 255, g: 255, b: 255))
+        var backward = forward
+        let a = PixelPoint(x: 3, y: 4), b = PixelPoint(x: 36, y: 25)
+        Raster.strokeSegmentSmooth(from: a, to: b, width: 3, colour: .black, into: &forward)
+        Raster.strokeSegmentSmooth(from: b, to: a, width: 3, colour: .black, into: &backward)
+        #expect(forward.pixels == backward.pixels)
+    }
+
+    /// A stray click must not leave a stroke wider than the nib.
+    @Test func aZeroLengthSegmentIsOneRoundCap() {
+        var bmp = Bitmap(width: 20, height: 20, fill: RGBA8(r: 255, g: 255, b: 255))
+        let p = PixelPoint(x: 10, y: 10)
+        let dirty = Raster.strokeSegmentSmooth(from: p, to: p, width: 4, colour: .black, into: &bmp)
+        #expect(!dirty.isEmpty)
+        #expect(dirty.width <= 6 && dirty.height <= 6, "a dot spread to \(dirty.width)x\(dirty.height)")
+    }
+
+    @Test func smoothingStaysInsideTheCanvas() {
+        var bmp = Bitmap(width: 12, height: 12, fill: RGBA8(r: 255, g: 255, b: 255))
+        Raster.strokeSegmentSmooth(
+            from: PixelPoint(x: -20, y: -20), to: PixelPoint(x: 30, y: 30),
+            width: 6, colour: .black, into: &bmp)
+        #expect(bmp.pixels.count == 144)
+    }
+}

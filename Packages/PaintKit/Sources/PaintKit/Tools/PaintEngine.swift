@@ -1549,14 +1549,14 @@ public final class PaintEngine {
         switch settings.shapeKind {
         // A curve lays its chord first; bending it is the second gesture.
         case .line, .curve:
-            dirty = Raster.strokeLine(
-                from: origin, to: end, brush: brush, colour: stroke,
-                into: &canvas, dash: settings.strokeDash
+            dirty = strokeEdge(
+                from: origin, to: end, brush: brush, colour: stroke, dash: settings.strokeDash
             )
 
         case .arrow:
             dirty = Raster.strokeArrow(
-                from: origin, to: end, brush: brush, colour: stroke, into: &canvas
+                from: origin, to: end, brush: brush, colour: stroke, into: &canvas,
+                smooth: settings.smoothEdges
             )
 
         case .polygon:
@@ -1620,7 +1620,7 @@ public final class PaintEngine {
         if style.drawsOutline || !closed || points.count < 3 {
             dirty = dirty.union(Raster.strokePolyline(
                 points, brush: activeBrush, colour: stroke, closed: closed,
-                into: &canvas, dash: settings.strokeDash
+                into: &canvas, dash: settings.strokeDash, smooth: settings.smoothEdges
             ))
         }
         return dirty
@@ -1654,12 +1654,26 @@ public final class PaintEngine {
                 skippingBottomBetween: (mouthLeft.x, mouthRight.x)
             ))
             for (a, b) in [(mouthLeft, tip), (tip, mouthRight)] {
-                dirty = dirty.union(
-                    Raster.strokeLine(from: a, to: b, brush: brush, colour: stroke, into: &canvas)
-                )
+                dirty = dirty.union(strokeEdge(from: a, to: b, brush: brush, colour: stroke))
             }
         }
         return dirty
+    }
+
+    /// One straight edge of a shape, antialiased or not according to the setting.
+    ///
+    /// Every shape outline goes through here rather than calling `Raster` directly, so
+    /// a callout's tail and a rounded rectangle's straight runs cannot end up smooth
+    /// while its neighbour is stepped.
+    private func strokeEdge(
+        from a: PixelPoint, to b: PixelPoint, brush: Brush, colour: RGBA8,
+        dash: Raster.Dash = .solid
+    ) -> PixelRect {
+        settings.smoothEdges
+            ? Raster.strokeSegmentSmooth(
+                from: a, to: b, width: brush.size, colour: colour, into: &canvas, dash: dash)
+            : Raster.strokeLine(
+                from: a, to: b, brush: brush, colour: colour, into: &canvas, dash: dash)
     }
 
     /// Four quarter-ellipse corners joined by four straight runs, so its
@@ -1745,9 +1759,8 @@ public final class PaintEngine {
 
         var dirty = PixelRect.empty
         for (a, b) in runs where b.x >= a.x && b.y >= a.y {
-            dirty = dirty.union(Raster.strokeLine(
-                from: a, to: b, brush: brush, colour: colour,
-                into: &canvas, dash: settings.strokeDash
+            dirty = dirty.union(strokeEdge(
+                from: a, to: b, brush: brush, colour: colour, dash: settings.strokeDash
             ))
         }
         for corner in cornerRects(of: rect, radius: radius) {

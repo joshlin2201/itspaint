@@ -8,7 +8,7 @@
 
 # ItsPaint
 
-### MS Paint for the Mac. Paste a screenshot, number the steps, drag it into Slack.
+### MS Paint for the Mac. Paste a screenshot, number the steps, drag it out.
 
 Preview markup has no step badges, no pixelate and no drag-out.
 
@@ -46,23 +46,30 @@ brew install --cask joshlin2201/itspaint/itspaint
   `swift test` verifies most changes with no Xcode.
 - **Free, MIT, and it stays that way.** There is no account and no telemetry.
 
-Paste the screenshot, number the steps, crop it, drag it into Slack, close the
-window. Nothing lands on your Desktop.
+Paste the screenshot, number the steps, crop it, drag it out, close the window.
+Nothing lands on your Desktop.
 
 ## What it does
 
-### Mark up a screenshot and drag it out
+### Marking up
 
-- **Auto-numbered step badges, arrows, a highlighter with its own ink, and
-  pixelate** for what you would rather not publish. Preview markup does none of it.
-- **Drag the image straight out** into Slack, Mail or the Finder. No save panel, and
-  no `Screenshot 2026-08-07 at 11.42.13.png` on your Desktop.
-- **Spotlight the part that matters.** Drag a box and everything outside it dims, so
-  the eye lands where you meant it to on a busy screenshot.
-- **Paste anything on top of anything.** It arrives floating, and if it is bigger
-  than the canvas the canvas grows instead of cropping it.
-- **Annotation text stays readable** on any screenshot. It carries a contrasting
-  rim, because one colour cannot work across a light panel and a dark one.
+| | |
+|---|---|
+| **Step badges** | `1`, `2`, `3`… auto-numbered, numeral auto-contrasted, and the sequence can start anywhere for a run that spans two screenshots. |
+| **Arrows and callouts** | `A` draws an arrow. Fifteen shapes in all, solid, dashed or dotted, outlined or filled. |
+| **Highlighter** | Its own ink, kept apart from the colour pair. Overlapping passes in one stroke never darken. |
+| **Pixelate** | A mosaic over the part you would rather not publish. Block size 4–48. |
+| **Spotlight** | Drag a box and everything outside it dims, so the eye lands where you meant it to. |
+| **Text with a rim** | One colour cannot stay legible across a light panel and a dark one, so annotation text carries a contrasting edge. |
+
+### Getting things in and out
+
+| | |
+|---|---|
+| **Drag straight out** | Into any app that takes an image. No save panel, and no `Screenshot 2026-08-07 at 11.42.13.png` left behind. |
+| **Paste onto anything** | It arrives floating. Bigger than the canvas and the canvas grows rather than cropping it. |
+| **Nine export formats** | PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF, ICO. Formats without alpha flatten onto Colour 2, not onto black. |
+| **Open With** | Registered for PNG, JPEG, TIFF, BMP, GIF and HEIC. |
 
 ### Remove a background with no model and no network
 
@@ -80,14 +87,15 @@ and scanned diagrams. It is useless on hair.
 
 **[How it works, in thirty lines of code →](docs/BACKGROUND_REMOVAL.md)**
 
-### And it is still a paint app
+### Painting
 
-- **Snap to grid** (`⇧⌘'`) at 8–64px for shapes, selections and pasted content.
-  Freehand ignores it.
-- **Fifteen shapes**, four brush nibs and four ways to select, each folded behind
-  one rail button rather than sprawling across the window. `A` draws an arrow.
-- **Pixel control.** Pointer-centred zoom, nearest-neighbour above 100%, a
-  pixel grid, live tool footprints, and rotate by any angle.
+| | |
+|---|---|
+| **Twelve tools** | Pencil, brush, highlighter, eraser, shape, text, badge, fill, eyedropper, select, pixelate, spotlight. One rail button each, every one a single key. |
+| **Four brush nibs** | Round, square, soft, and spray. Spray keeps spraying while you hold still, which is the whole feel of an airbrush. |
+| **Four ways to select** | Rectangle, ellipse, lasso, and Instant Alpha. Marching ants follow the pixel mask rather than its bounds. |
+| **Pixel control** | Pointer-centred zoom, nearest-neighbour above 100%, a pixel grid, live tool footprints, rotate by any angle. |
+| **Snap to grid** | `⇧⌘'` at 8–64px for shapes, selections and pasted content. Freehand ignores it. |
 
 <div align="center">
 

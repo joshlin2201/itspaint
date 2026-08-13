@@ -5,6 +5,23 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## [Unreleased]
+### Fixed
+- **Diagonal shape outlines were a staircase.** Every outline stamped a hard nib
+  along a Bresenham walk, which is exactly right for the pencil and exactly wrong for
+  an arrow across a screenshot: at a 3px weight the steps are wide enough to read as
+  jagged at 100% zoom. Lines, curves, arrows, polygons, stars, callout tails and
+  rounded-rectangle runs are now rendered by coverage, which also fixes the corners,
+  because two segments meeting at a join both report partial coverage there instead
+  of overstamping.
+
+  **Edges** in the shape options switches it off for pixel art, where a fully covered
+  pixel and nothing in between is the point. The pencil is unaffected and always hard.
+
+### Changed
+- The README's feature sections are a breakdown rather than a narrative, and no
+  longer name one chat app three times.
+
 ## [0.15.1] — 2026-08-12
 ### Fixed
 - **`A` worked from the menu and did nothing on the canvas.** The canvas resolves

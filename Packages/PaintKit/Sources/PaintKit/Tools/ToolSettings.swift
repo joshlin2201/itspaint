@@ -44,6 +44,18 @@ public struct ToolSettings: Equatable, Sendable {
     /// spotlight that dims by nothing is a no-op, and one that dims to black hides
     /// the context that makes it a spotlight rather than a crop.
     public var spotlightDim: Double
+    /// Whether a shape outline is antialiased.
+    ///
+    /// On, because a diagonal arrow across a screenshot is the most common mark this
+    /// app makes and a stamped hard nib leaves a visible staircase on one. At a 3px
+    /// weight the steps are wide enough to read as jagged at 100% zoom, which is the
+    /// single thing that makes a drawing tool look cheap.
+    ///
+    /// Off is not a fallback, it is pixel art: every covered pixel fully covered, no
+    /// half-lit neighbours, which is what you want when the image will be scaled with
+    /// nearest-neighbour or its colours counted. The pencil ignores this entirely and
+    /// is always hard, because that is the promise of the pencil.
+    public var smoothEdges: Bool
     /// Whether shape outlines are solid, dashed or dotted.
     public var strokeDash: Raster.Dash
     /// Which region the select tool resolves.
@@ -88,6 +100,7 @@ public struct ToolSettings: Equatable, Sendable {
         highlighterColour: PaintColour? = PaintColour(hex: "FFE24D"),
         pixelateBlockSize: Int = 12,
         spotlightDim: Double = 0.45,
+        smoothEdges: Bool = true,
         strokeDash: Raster.Dash = .solid,
         selectionKind: SelectionKind = .rectangle,
         selectionTolerance: Int = 12,
@@ -106,6 +119,7 @@ public struct ToolSettings: Equatable, Sendable {
         self.highlighterColour = highlighterColour
         self.pixelateBlockSize = max(2, pixelateBlockSize)
         self.spotlightDim = min(max(spotlightDim, 0.1), 0.9)
+        self.smoothEdges = smoothEdges
         self.strokeDash = strokeDash
         self.selectionKind = selectionKind
         self.selectionTolerance = min(255, max(0, selectionTolerance))

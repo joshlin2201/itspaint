@@ -24,7 +24,7 @@ hover and in the Tools menu.
 
 | | Tool | Behaviour |
 |---|---|---|
-| `U` | **Shape** | Fifteen kinds, below. Stroke weight, dash, fill/outline, corner radius. `A` arms Shape with Arrow in one key. |
+| `U` | **Shape** | Fifteen kinds, below. Stroke weight, dash, fill/outline, corner radius, and **Edges**. `A` arms Shape with Arrow in one key. |
 | `T` | **Text** | Drag a box and type in place, at the size and font it will land at. `⌘-drag` moves the box while you type. `⌘↩` places it, `⎋` discards. Rasterises on commit. A click instead of a drag gets a one-line box pulled back inside the canvas, so clicking near an edge still gives you something usable. |
 | `N` | **Step badge** | Click to drop `1`, `2`, `3`… in the current colour, numeral auto-contrasted. Size follows the brush size. The options set the next number, so a run continued on a second screenshot can start at 4, and "Restart at 1" puts it back. |
 | `K` | **Fill** | Scanline flood fill with a tolerance slider (0–32, per channel). A sweep on a real screenshot found coverage stable from 8 through 32, then a cliff at 48 where a probe in dark window chrome went from 4% to 91%. The slider stops at 32 because that is the last value the sweep covered. The engine still accepts 0–255. Explicitly iterative — a recursive fill overflows the stack on any realistic canvas. Filling with the colour already there is a no-op rather than an infinite loop. |
@@ -78,6 +78,13 @@ Speech bubble · Polygon**
   generator** sampled on the ellipse inscribed in the drag rect, so they stretch
   with the drag instead of staying stubbornly regular in a box that is not
   square.
+
+**Edges** are antialiased by default. An outline is rendered by coverage rather than
+by stamping a nib along a Bresenham walk, so a diagonal has no staircase and a corner
+where two segments meet composites instead of overstamping. Switching it to hard
+pixels gives every covered pixel full coverage and nothing in between, which is what
+pixel art and nearest-neighbour scaling want. The pencil ignores the setting and is
+always hard, because that is the promise of the pencil.
 
 **Every outline** can be solid, dashed or dotted, at any stroke weight; closed
 shapes can be outline, fill, or both. Fill uses Colour 2, outline uses Colour 1 —

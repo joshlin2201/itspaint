@@ -183,6 +183,100 @@ public enum Raster {
         return dirty
     }
 
+    /// A straight segment rendered by coverage rather than by stamping a nib.
+    ///
+    /// `strokeLine` walks Bresenham and stamps a mask at every step, which is exactly
+    /// right for the pencil: a 1px hard nib has to land on the pixels the drag passed
+    /// over, with no half-covered neighbours. It is exactly wrong for an arrow across
+    /// a screenshot. A stamped hard nib on a diagonal leaves a visible staircase, and
+    /// at 3px the steps are wide enough to read as jagged at 100% zoom.
+    ///
+    /// This computes, for each pixel in the segment's bounding box, the distance from
+    /// the pixel centre to the segment, and takes coverage as the fraction of a pixel
+    /// the stroke covers there: `halfWidth + 0.5 - distance`, clamped to 0...1. That
+    /// is the standard one-pixel-wide analytic approximation, and it costs one
+    /// `sqrt` per pixel over a box rather than per step over a mask.
+    ///
+    /// Two things fall out of it for free. Joins stop needing a special case, because
+    /// two segments meeting at a corner both report partial coverage there and the
+    /// coverages composite. And a stroke is a function of the *geometry*, not of the
+    /// direction it was walked, so scrubbing back and forth cannot thicken it.
+    ///
+    /// The caller decides. `Brush.Shape.square` and `.round` still mean "aliased" and
+    /// still go through `strokeLine`, so pixel art keeps hard edges and the pencil
+    /// keeps its promise.
+    @discardableResult
+    public static func strokeSegmentSmooth(
+        from a: PixelPoint,
+        to b: PixelPoint,
+        width: Int,
+        colour: RGBA8,
+        into bitmap: inout Bitmap,
+        dash: Dash = .solid
+    ) -> PixelRect {
+        let w = max(1, width)
+        let half = Double(w) / 2
+        // Pixel centres, so a segment between two pixel indices is measured between
+        // the middles of those pixels rather than their corners.
+        let ax = Double(a.x) + 0.5, ay = Double(a.y) + 0.5
+        let bx = Double(b.x) + 0.5, by = Double(b.y) + 0.5
+        let vx = bx - ax, vy = by - ay
+        let lengthSquared = vx * vx + vy * vy
+        let length = lengthSquared.squareRoot()
+
+        // One pixel of feather beyond the geometric edge is where the partial
+        // coverage lives; without it the box clips the ramp and the edge is hard
+        // again on one side.
+        let pad = Int(half.rounded(.up)) + 1
+        let box = PixelRect(
+            x: min(a.x, b.x) - pad, y: min(a.y, b.y) - pad,
+            width: abs(a.x - b.x) + 1 + pad * 2, height: abs(a.y - b.y) + 1 + pad * 2
+        ).intersection(bitmap.bounds)
+        guard !box.isEmpty else { return .empty }
+
+        let runs = dash.runs(weight: w)
+        var dirty = PixelRect.empty
+
+        for y in box.minY..<box.maxY {
+            for x in box.minX..<box.maxX {
+                let px = Double(x) + 0.5, py = Double(y) + 0.5
+                // Project onto the segment, clamped, which gives round caps at both
+                // ends. A square cap would need the unclamped `t` and a separate
+                // half-plane test, and round is what a drawn line wants.
+                var t = 0.0
+                if lengthSquared > 0 {
+                    t = ((px - ax) * vx + (py - ay) * vy) / lengthSquared
+                    t = min(max(t, 0), 1)
+                }
+                let dx = px - (ax + t * vx), dy = py - (ay + t * vy)
+                let distance = (dx * dx + dy * dy).squareRoot()
+                var coverage = half + 0.5 - distance
+                guard coverage > 0 else { continue }
+                if coverage > 1 { coverage = 1 }
+
+                // Dashes are measured in arc length along the segment, so a dash
+                // pattern does not change density with the line's angle.
+                if let runs {
+                    let along = Int(t * length)
+                    if along % (runs.on + runs.off) >= runs.on { continue }
+                }
+
+                let alpha = Double(colour.a) * coverage
+                let src = RGBA8(
+                    r: UInt8((Double(colour.r) * coverage).rounded()),
+                    g: UInt8((Double(colour.g) * coverage).rounded()),
+                    b: UInt8((Double(colour.b) * coverage).rounded()),
+                    a: UInt8(alpha.rounded())
+                )
+                guard src.a > 0 else { continue }
+                let i = bitmap.index(PixelPoint(x: x, y: y))
+                bitmap.pixels[i] = src.overCompositing(bitmap.pixels[i])
+                dirty = dirty.union(PixelRect(x: x, y: y, width: 1, height: 1))
+            }
+        }
+        return dirty
+    }
+
     // MARK: - Rectangles
 
     @discardableResult
@@ -343,7 +437,8 @@ public enum Raster {
         to b: PixelPoint,
         brush: Brush,
         colour: RGBA8,
-        into bitmap: inout Bitmap
+        into bitmap: inout Bitmap,
+        smooth: Bool = false
     ) -> PixelRect {
         let dx = Double(b.x - a.x)
         let dy = Double(b.y - a.y)
@@ -366,13 +461,11 @@ public enum Raster {
         let px = -uy
         let py = ux
 
-        var dirty = strokeLine(
-            from: a,
-            to: PixelPoint(x: Int(baseX.rounded()), y: Int(baseY.rounded())),
-            brush: brush,
-            colour: colour,
-            into: &bitmap
-        )
+        let shaftEnd = PixelPoint(x: Int(baseX.rounded()), y: Int(baseY.rounded()))
+        var dirty = smooth
+            ? strokeSegmentSmooth(from: a, to: shaftEnd, width: brush.size,
+                                  colour: colour, into: &bitmap)
+            : strokeLine(from: a, to: shaftEnd, brush: brush, colour: colour, into: &bitmap)
 
         let head = [
             b,
@@ -389,7 +482,8 @@ public enum Raster {
         // Outline the head too, so its edges match the shaft's weight and it
         // does not look softer than the line it terminates.
         dirty = dirty.union(
-            strokePolyline(head, brush: Brush(shape: .round, size: 1), colour: colour, closed: true, into: &bitmap)
+            strokePolyline(head, brush: Brush(shape: .round, size: 1), colour: colour,
+                           closed: true, into: &bitmap, smooth: smooth)
         )
         return dirty
     }
@@ -645,7 +739,8 @@ public enum Raster {
         colour: RGBA8,
         closed: Bool,
         into bitmap: inout Bitmap,
-        dash: Dash = .solid
+        dash: Dash = .solid,
+        smooth: Bool = false
     ) -> PixelRect {
         guard points.count > 1 else {
             guard let only = points.first else { return .empty }
@@ -654,12 +749,20 @@ public enum Raster {
         var dirty = PixelRect.empty
         for i in 0..<(points.count - 1) {
             dirty = dirty.union(
-                strokeLine(from: points[i], to: points[i + 1], brush: brush, colour: colour, into: &bitmap, dash: dash)
+                smooth
+                    ? strokeSegmentSmooth(from: points[i], to: points[i + 1], width: brush.size,
+                                          colour: colour, into: &bitmap, dash: dash)
+                    : strokeLine(from: points[i], to: points[i + 1], brush: brush, colour: colour,
+                                 into: &bitmap, dash: dash)
             )
         }
         if closed, let first = points.first, let last = points.last, first != last {
             dirty = dirty.union(
-                strokeLine(from: last, to: first, brush: brush, colour: colour, into: &bitmap, dash: dash)
+                smooth
+                    ? strokeSegmentSmooth(from: last, to: first, width: brush.size,
+                                          colour: colour, into: &bitmap, dash: dash)
+                    : strokeLine(from: last, to: first, brush: brush, colour: colour,
+                                 into: &bitmap, dash: dash)
             )
         }
         return dirty

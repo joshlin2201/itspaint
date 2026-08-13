@@ -227,6 +227,14 @@ struct ToolOptions: View {
                     })
                 }
             }
+            if strokes {
+                OptionRow("Edges") {
+                    OptionSegment(selection: $model.smoothEdges, options: [
+                        .init(value: true, symbol: "scribble", help: "Smooth"),
+                        .init(value: false, symbol: "squareshape.split.2x2", help: "Hard pixels"),
+                    ])
+                }
+            }
             if model.shapeKind == .roundedRectangle || model.shapeKind == .callout {
                 OptionRow("Corner") {
                     OptionSlider(

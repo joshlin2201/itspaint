@@ -121,6 +121,7 @@ final class EditorModel {
     var highlighterColour: PaintColour? { didSet { engine.settings.highlighterColour = highlighterColour } }
     var pixelateBlockSize: Int { didSet { engine.settings.pixelateBlockSize = pixelateBlockSize } }
     var spotlightDim: Double { didSet { engine.settings.spotlightDim = spotlightDim } }
+    var smoothEdges: Bool { didSet { engine.settings.smoothEdges = smoothEdges } }
 
     var foreground: PaintColour {
         didSet {
@@ -294,6 +295,7 @@ final class EditorModel {
         self.highlighterColour = engine.settings.highlighterColour
         self.pixelateBlockSize = engine.settings.pixelateBlockSize
         self.spotlightDim = engine.settings.spotlightDim
+        self.smoothEdges = engine.settings.smoothEdges
         self.selectionKind = engine.settings.selectionKind
         self.strokeDash = engine.settings.strokeDash
         self.sprayDensity = engine.settings.sprayDensity
