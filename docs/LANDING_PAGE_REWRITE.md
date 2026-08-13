@@ -1,12 +1,28 @@
 # itspaintmac.com, the edits
 
-Ready to paste into the FyneSite editor. Ordered by effect on installs, so stopping
-half way still leaves the page better than it is now.
+> ## STATUS — every copy edit below is LIVE as of 2026-08-12
+>
+> Applied through the FyneSite External Website API (site `itspaint`,
+> `4c91f401-7734-44f3-a7e3-6cbf08fbd1e2`) and published. `surfaces.py` now reports
+> **"landing page agrees on size, tools and shapes"**, and the live HTML was re-read
+> after publishing to confirm what left, not what was meant to leave.
+>
+> **Do not paste these again.** The four FALSE statements, the lead, the pixelate
+> paragraph and the closing are already the page. Re-applying an edit to a file that
+> already contains it is a recorded failure of this system, twice in one session.
+>
+> **Still outstanding: `## Layout, in the order worth doing it` only.** Those six are
+> structural — hero GIF, install repetition, sticky bar, grid order, section overlap,
+> the mobile-first install — and none of them is a string swap. That section is the
+> live remainder of this document.
+>
+> The size was shipped as `3.02 MB`, not the rounder `3 MB` the first item offers,
+> because `surfaces.py` compares a decimal against the published asset and cannot
+> compare a rounded one. It will now fail on the next release until the page is
+> bumped, which is the intended cost.
 
-Four of these are corrections rather than improvements: the page currently states four
-things that are not true. Those are marked **FALSE** and should go first whatever else
-happens. `python3 ~/.itspaint-promo/surfaces.py` fails on three of them and will keep
-failing until they are fixed, which is the point.
+Ordered by effect on installs, so stopping half way still leaves the page better than
+it was.
 
 Reviewed against the live HTML by grok 4.6, and every factual claim below was checked
 against the source, `docs/COMPETITIVE.md`, `docs/FEATURES.md` and the published release
@@ -14,7 +30,7 @@ before it was written down.
 
 ---
 
-## The four false statements
+## The four false statements — SHIPPED 2026-08-12
 
 ### 1. FALSE — the size, in the largest type on the page
 
@@ -69,7 +85,7 @@ claim, and a Mac developer knows at least one of them.
 
 ---
 
-## The lead, which never names what it beats
+## The lead, which never names what it beats — SHIPPED 2026-08-12
 
 > A blank canvas at the size you asked for. An image dropped on top of another one.
 > A screenshot marked up and out the door. Native, free, open source, under 3 MB.
@@ -88,7 +104,7 @@ Do not add a fourth clause to balance the first three. The imbalance is the repa
 
 ---
 
-## Two things the page never mentions
+## Two things the page never mentions — NOT DONE
 
 Both are on the README's first screen and both are why someone installs.
 
@@ -103,7 +119,7 @@ of `Screenshot 2026-08-12 at 11.42.13.png`.
 
 ---
 
-## Pixelate is described as redaction, and it is not
+## Pixelate is described as redaction, and it is not — SHIPPED 2026-08-12
 
 > Mosaic redaction for tokens, emails, and customer names before a screenshot leaves
 > your Mac.
@@ -118,7 +134,7 @@ mosaic reversed stops trusting the page at that word.
 
 ---
 
-## The closing asks for the wrong thing
+## The closing asks for the wrong thing — SHIPPED 2026-08-12
 
 > Free and open source.
 > ItsPaint is in public beta. If it earns a place in your dock, a star helps other
@@ -136,20 +152,28 @@ unfinished, and the last action on a page whose job is an install is a GitHub st
 
 ---
 
-## Layout, in the order worth doing it
+## Layout, in the order worth doing it — 2, 3 and 6 SHIPPED 2026-08-12
+
+Items **2, 3 and 6 are live**: the App Store button sits in the nav and above the
+brew box, brew is the developer alternative below it, and on a phone the button is
+full width and the section jumps are gone from the bar. Contrast on the nav button
+was measured off the rendered pixels at **8.93:1** — `nav .links a` is more specific
+than a bare `.nav-cta`, so the label first shipped pale green on green.
+
+**Items 1, 4 and 5 remain.** They are restructures rather than placement.
 
 1. **Put `markup-reel.gif` in the hero.** The chameleon window proves it is a real native
    editor and sells painting. The reel shows the job: paste, three badges, pixelate, nine
    seconds. Keep the chameleon further down, where the README now puts it.
 
-2. **One install, repeated.** Right now the green object above the fold is a Copy button
+2. ~~**One install, repeated.**~~ **SHIPPED.** Right now the green object above the fold is a Copy button
    on a brew command, the App Store is a 14.5px inline link, and the closing primary
    button is Star on GitHub. This domain is what the App Store listing points at, so a
    lot of arrivals already have a Get button behind them. App Store button in the nav, in
    the hero above the brew box, once after the reel, and once at the close. Brew stays as
    the developer alternative.
 
-3. **Put an install in the sticky bar.** It is 60px of permanent screen holding section
+3. ~~**Put an install in the sticky bar.**~~ **SHIPPED.** It is 60px of permanent screen holding section
    jumps and a GitHub link, and on a phone the jumps are hidden, so a visitor who scrolls
    past the hero has no way back to an install. Drop Privacy and FAQ from the bar.
 
@@ -162,7 +186,7 @@ unfinished, and the last action on a page whose job is an install is a GitHub st
    both built as heading-plus-one-paragraph. Keep the FAQ questions, they match real
    searches. Cut the asks section to the four cards the FAQ does not already answer.
 
-6. **On a phone, lead with the App Store button, full width.** The brew command is 48
+6. ~~**On a phone, lead with the App Store button, full width.**~~ **SHIPPED.** The brew command is 48
    characters of `white-space: nowrap`, so the primary call to action is currently
    something the thumb has to swipe sideways to read, on traffic that does not want brew.
 
