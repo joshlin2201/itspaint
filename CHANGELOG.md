@@ -5,7 +5,7 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
-## [Unreleased]
+## [0.16.1] — 2026-08-13
 ### Fixed
 - **A closed-hand cursor could outlive its drag.** `NSCursor.push` is a global stack
   and the pop only happened on mouse-up or Escape, so Command-Tab, a notification
