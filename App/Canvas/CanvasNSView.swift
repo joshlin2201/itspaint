@@ -652,14 +652,34 @@ final class CanvasNSView: NSView {
     /// the deinit would never run to release it.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        grabWatch.forEach(NotificationCenter.default.removeObserver)
+        grabWatch = []
         if window == nil {
             antsTimer?.invalidate()
             antsTimer = nil
+            // Closing a document mid-drag has to hand the cursor back too.
+            releaseGrab()
         } else {
             installSheetShadow()
             updateAntsAnimation()
+            // `NSCursor.push` is a global stack and `finish` is not guaranteed to
+            // run: Command-Tab, a notification stealing focus, or a sheet opening
+            // during a drag all end the carry without a mouse-up. Without this the
+            // pointer stays a closed hand over every window, for the rest of the
+            // session, and nothing the user does brings it back.
+            for name in [NSWindow.didResignKeyNotification, NSWindow.willCloseNotification] {
+                grabWatch.append(NotificationCenter.default.addObserver(
+                    forName: name, object: window, queue: .main
+                ) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.releaseGrab() }
+                })
+            }
         }
     }
+
+    /// Observers that hand the grabbed cursor back when the window stops being the
+    /// one the drag belongs to.
+    private var grabWatch: [any NSObjectProtocol] = []
 
     /// A hairline grid, only once a pixel is comfortably larger than the line.
     /// The alignment grid, drawn wherever snapping is on.

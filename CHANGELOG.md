@@ -7,6 +7,13 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 ### Fixed
+- **A closed-hand cursor could outlive its drag.** `NSCursor.push` is a global stack
+  and the pop only happened on mouse-up or Escape, so Command-Tab, a notification
+  stealing focus, a sheet opening or closing the document mid-drag each left the
+  pointer stuck as a closed hand over every window for the rest of the session. It is
+  now handed back when the window resigns key, when it closes, and when the view
+  leaves its window. Introduced by the fix directly below it, in the same night.
+
 - **The text box did not grow when you pressed Return.** CoreText drops one trailing
   empty line when it measures, so a Return at the end of the text reported the same
   height as before the keystroke: the box stayed put while the caret dropped below it,

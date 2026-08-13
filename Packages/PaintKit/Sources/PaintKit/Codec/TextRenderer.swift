@@ -196,7 +196,10 @@ public enum TextRenderer {
     /// box sized from the font metrics was a quarter of a line short at every size.
     /// Swapping one guess for a more official-looking guess is not measuring.
     public static func lineHeight(for style: Style) -> Int {
-        max(1, measure("H", style: style, maxWidth: .max / 2).height)
+        // A wide-but-sane constraint. `Int.max / 2` reaches CoreText as ~4.6e18 and,
+        // while finite, is the kind of number that turns into an infinity the first
+        // time anything multiplies it. One line of one character never wraps at 100k.
+        max(1, measure("H", style: style, maxWidth: 100_000).height)
     }
 
     public static func measure(_ string: String, style: Style, maxWidth: Int) -> (width: Int, height: Int) {
