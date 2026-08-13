@@ -6,6 +6,21 @@ Notable changes, newest first. This project follows
 version may still carry breaking changes to the document format.
 
 ## [Unreleased]
+### Changed
+- **The tool options panel is built from clusters rather than labelled rows.** Every
+  property used to be a 42pt right-aligned word, a stock `Slider` at `.mini`, a
+  trailing number and, for size, a second row of capsules setting the same integer.
+  Four pieces saying one word, repeated until the panel was one grey surface.
+
+  The rule now: cover the title and you should still know which tool you are holding.
+  Size is a wedge that thickens to the right with the stops as ticks on it. The
+  highlighter's opacity control is a wash of the current ink. Spotlight's dim is a
+  plate whose darkness is the value. The step badge leads with the number, at 22pt,
+  because the number is the thing being set.
+
+  The property names move to VoiceOver, where a name is worth having. **Restart at 1**
+  appears only when the next number is not already 1.
+
 ### Fixed
 - **Diagonal shape outlines were a staircase.** Every outline stamped a hard nib
   along a Bresenham walk, which is exactly right for the pencil and exactly wrong for

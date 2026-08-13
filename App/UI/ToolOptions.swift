@@ -144,7 +144,6 @@ struct ToolOptions: View {
         case .select where model.selectionKind == .lasso: "Closes itself"
         case .select where model.selectionKind == .instantAlpha: "⇧ add · ⌥ subtract"
         case .select: "⌘A selects all"
-        case .badge: "Drops \(model.nextBadgeNumber) next"
         case .shape where model.shapeKind == .curve:
             model.hasPendingShape ? "Now drag to bend it" : "Drag, then bend it"
         case .shape where model.shapeKind == .polygon:
@@ -162,7 +161,7 @@ struct ToolOptions: View {
             EmptyView()
 
         case .brush:
-            sizeControl
+            widthMark(name: "Size")
             // Four tips, including the one that used to be its own rail button.
             // Icons rather than words: "Round / Square / Soft / Spray" is four
             // labels in a 238pt row, which is where truncation starts, and the
@@ -189,18 +188,21 @@ struct ToolOptions: View {
             }
 
         case .highlighter:
-            sizeControl
-            OptionRow("Colour") { HighlighterInks(model: model) }
-            OptionRow("Ink") {
-                OptionSlider(
-                    value: $model.highlighterOpacity,
-                    range: 0.1...0.8,
-                    readout: "\(Int(model.highlighterOpacity * 100))%"
-                )
-            }
+            // Three clusters, three looks. Cover the title and the yellow wash still
+            // says highlighter.
+            widthMark(name: "Size")
+            HighlighterInks(model: model)
+            Mark(
+                value: $model.highlighterOpacity,
+                range: 0.1...0.8,
+                style: .wash(ink: Color(cgColor: (model.highlighterColour ?? model.foreground).cgColor)),
+                name: "Ink",
+                readout: "\(Int(model.highlighterOpacity * 100))%",
+                normal: 0.38
+            )
 
         case .eraser:
-            sizeControl
+            widthMark(name: "Size")
 
         case .shape:
             ShapeGallery(model: model, columns: isVertical ? 5 : 8)
@@ -209,7 +211,7 @@ struct ToolOptions: View {
             // and the same for ellipse, rounded rect and callout), so the weight is
             // the difference between a box and a smaller box. Only the dash is
             // genuinely dead, and only that row goes.
-            sizeControl(title: "Stroke")
+            widthMark(name: "Stroke")
             let strokes = model.shapeStyle.drawsOutline || !model.shapeKind.isClosed
             if model.shapeKind.isClosed {
                 OptionRow("Fill") {
@@ -284,24 +286,11 @@ struct ToolOptions: View {
             }
 
         case .badge:
-            sizeControl
-            // A run of badges often spans two screenshots, and the second one
-            // starts at 4. Reset alone meant either three throwaway badges and
-            // three undos, or a figure with a second `1` in it.
-            OptionRow("Next") {
-                OptionStepper(
-                    value: Binding(
-                        get: { model.nextBadgeNumber },
-                        set: { model.setNextBadgeNumber($0) }
-                    ),
-                    range: 1...99
-                )
-            }
-            OptionRow(nil) {
-                OptionButton("Restart at 1", symbol: "arrow.counterclockwise") {
-                    model.resetBadgeNumbering()
-                }
-            }
+            // The number is the working object, so it goes first and it goes large.
+            // Size recedes underneath. "Drops 1 next" is gone because the 22pt
+            // numeral is that sentence.
+            BadgeNumber(model: model)
+            widthMark(name: "Size")
 
         case .fill:
             OptionRow("Match") {
@@ -316,19 +305,10 @@ struct ToolOptions: View {
             }
 
         case .spotlight:
-            // One control, and it is the one CleanShot exposes too: how dark the
-            // outside goes. Percent rather than 0-to-1, because the slider is read
-            // at a glance and nobody thinks in fractions of a veil.
-            OptionRow("Dim") {
-                OptionSlider(
-                    value: Binding(
-                        get: { model.spotlightDim * 100 },
-                        set: { model.spotlightDim = $0 / 100 }
-                    ),
-                    range: 10...90,
-                    readout: "\(Int((model.spotlightDim * 100).rounded()))%"
-                )
-            }
+            // One property, so the panel is that property: a plate whose darkness is
+            // the value, dragged anywhere across it. A trough with a caret and the
+            // word "Dim" would describe the setting; this one shows it.
+            SpotlightDimPlate(dim: $model.spotlightDim)
 
         case .pixelate:
             OptionRow("Block") {
@@ -372,65 +352,33 @@ struct ToolOptions: View {
 
     // MARK: - Size
 
-    private var sizeControl: some View { sizeControl(title: "Size") }
+    // MARK: - Size
 
-    /// Size, with the useful end of the range stretched out.
+    /// Size as one object: a wedge that thickens to the right, with the stops as ticks
+    /// on it.
     ///
-    /// A linear 1–96 slider spends four fifths of its travel on sizes nobody
-    /// picks and makes 2px versus 5px a subpixel decision. Squaring the input
-    /// puts ~24px at the halfway point, and the stops cover the four weights
-    /// the classic Size dropdown offered.
+    /// Replaces a 42pt right-aligned label, a stock `Slider` at `.mini`, a trailing
+    /// number and a second row of capsules — four pieces all saying "size", in a panel
+    /// where that pattern then repeated for every other property until the whole thing
+    /// read as one grey surface.
     ///
-    /// The stops now sit on their own line, inside a real segmented track. As
-    /// four bare capsules trailing a slider they read as decoration — four
-    /// dashes of different lengths with no container, no baseline and no
-    /// indication they were clickable at all.
-    @ViewBuilder
-    private func sizeControl(title: String) -> some View {
-        // Asked of the armed tool, never assumed: the highlighter's chisel floor
-        // is 4, so offering it 1 and lighting up 2 described a stroke the engine
-        // would not draw.
+    /// The range and the ticks are asked of the armed tool, so the highlighter's 4px
+    /// chisel floor cannot be offered a 2 it will not draw.
+    private func widthMark(name: String) -> some View {
         let allowed = ToolSettings.sizeRange(for: model.tool)
-        OptionRow(title) {
-            OptionSlider(
-                value: Binding(
-                    get: { Double(model.brushSize) },
-                    set: { model.brushSize = Int($0.rounded()) }
-                ),
-                range: Double(allowed.lowerBound)...Double(allowed.upperBound),
-                readout: "\(model.brushSize)",
-                gamma: 2
-            )
-        }
-        OptionRow(nil) {
-            SegmentTrack {
-                ForEach(ToolSettings.sizeStops(for: model.tool), id: \.self) { stop in
-                    let isSelected = model.brushSize == stop
-                    Button {
-                        model.brushSize = stop
-                    } label: {
-                        Capsule()
-                            .fill(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary.opacity(Tokens.Ink.muted)))
-                            .frame(height: max(1.5, min(7, CGFloat(stop) / 4)))
-                            .frame(maxWidth: .infinity)
-                            .padding(.horizontal, 6)
-                            .frame(height: Tokens.Size.segment)
-                            .background {
-                                RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                                    .fill(.clear)
-                                    .overlay { if isSelected { SelectedSegmentFill(cornerRadius: Tokens.Radius.segmentInner) } }
-                            }
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("\(stop) px")
-                    .accessibilityLabel("\(stop) pixel \(title.lowercased())")
-                    .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
-                }
-            }
-        }
+        return Mark(
+            value: Binding(
+                get: { Double(model.brushSize) },
+                set: { model.brushSize = Int($0.rounded()) }
+            ),
+            range: Double(allowed.lowerBound)...Double(allowed.upperBound),
+            style: .wedge(stops: ToolSettings.sizeStops(for: model.tool)),
+            name: name,
+            gamma: 2,
+            readout: "\(model.brushSize)",
+            normal: Double(max(allowed.lowerBound, 2))
+        )
     }
-
 
     // MARK: - Selection
 
@@ -595,11 +543,15 @@ private struct HighlighterInks: View {
         Button(action: action) {
             RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
                 .fill(fill)
-                .frame(height: 20)
+                .frame(height: 22)
                 .overlay {
+                    // The chip's own contrast colour, never the accent. A blue ring on
+                    // the blue ink disappears into it, and a blue ring on the yellow
+                    // fights the thing it is pointing at. Same rule the rail palette
+                    // already follows.
                     RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
                         .strokeBorder(
-                            isSelected ? Color.accentColor : Color.primary.opacity(0.18),
+                            isSelected ? ring(on: fill) : Color.primary.opacity(0.18),
                             lineWidth: isSelected ? 2 : 1
                         )
                 }
@@ -607,6 +559,14 @@ private struct HighlighterInks: View {
         .buttonStyle(.plain)
         .help(label)
         .accessibilityLabel(label)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// Black on a light ink, white on a dark one, judged on relative luminance.
+    private func ring(on fill: Color) -> Color {
+        let c = NSColor(fill).usingColorSpace(.sRGB) ?? .white
+        let luma = 0.2126 * c.redComponent + 0.7152 * c.greenComponent + 0.0722 * c.blueComponent
+        return luma > 0.55 ? .black.opacity(0.7) : .white.opacity(0.9)
     }
 }
 
@@ -671,6 +631,56 @@ extension EnvironmentValues {
 /// Pass `nil` for a row that continues the one above it — the label column is
 /// still reserved, so the control stays aligned with the one it belongs to
 /// rather than sliding back to the panel's edge.
+/// The next badge number, as the number.
+///
+/// A stepper wrapped in a pill, under a right-aligned "Next", was the same grey slab
+/// as every other row in the panel. The numeral is the thing being set, so it is the
+/// thing shown, at a size that reads before the title does.
+///
+/// Restart appears only when it would do something. A control that is present and
+/// inert at the moment you look at it teaches you to stop reading the panel.
+private struct BadgeNumber: View {
+    let model: EditorModel
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: Tokens.Space.base) {
+                end("minus", enabled: model.nextBadgeNumber > 1) {
+                    model.setNextBadgeNumber(model.nextBadgeNumber - 1)
+                }
+                Text("\(model.nextBadgeNumber)")
+                    .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.strong))
+                    .frame(minWidth: 28)
+                end("plus", enabled: model.nextBadgeNumber < 99) {
+                    model.setNextBadgeNumber(model.nextBadgeNumber + 1)
+                }
+            }
+            if model.nextBadgeNumber != 1 {
+                Button("Restart at 1") { model.resetBadgeNumbering() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func end(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .medium))
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .foregroundStyle(.primary.opacity(enabled ? Tokens.Ink.regular : Tokens.Ink.disabled))
+        .accessibilityLabel(symbol == "plus" ? "Increase" : "Decrease")
+    }
+}
+
 struct OptionRow<Content: View>: View {
     let title: String?
     @ViewBuilder let content: Content

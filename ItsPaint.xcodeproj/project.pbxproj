@@ -41,6 +41,7 @@
 		970A38652FFECA2910FFAAFF /* CanvasOverlays.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8468DB5919B3A21F63903298 /* CanvasOverlays.swift */; };
 		979898D93E97297A55E27038 /* ScreenshotWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0EAC5ED7B22052E9BBBE8C9 /* ScreenshotWatcher.swift */; };
 		A75FAC3C0CD78F3C12737311 /* Tooltip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D10B48F97C15A6294B5737E /* Tooltip.swift */; };
+		C8F6D5D56AB4B3B9C07FC626 /* Mark.swift in Sources */ = {isa = PBXBuildFile; fileRef = A822F8D017517676617751C9 /* Mark.swift */; };
 		CA7E69B188CC2D88EC2CE781 /* EditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B04711CAED447B409481B1 /* EditorModel.swift */; };
 		D00A7C03ECFC7BC4575AF104 /* SizeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2ACA876E800C1AB89C90365 /* SizeSheet.swift */; };
 		F0389C97B6274DF2552FE2B9 /* ScreenshotWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 073EFE49D21C2976F9D72BB4 /* ScreenshotWatcherTests.swift */; };
@@ -86,6 +87,7 @@
 		86C35AB5A1478944CF8934D3 /* RotateSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotateSheet.swift; sourceTree = "<group>"; };
 		8D10B48F97C15A6294B5737E /* Tooltip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tooltip.swift; sourceTree = "<group>"; };
 		951512EED8AAC0B1B7716D54 /* ClipboardHotKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHotKey.swift; sourceTree = "<group>"; };
+		A822F8D017517676617751C9 /* Mark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mark.swift; sourceTree = "<group>"; };
 		B063B5E24D6EBB4CEB198E5B /* PasteGrowthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteGrowthTests.swift; sourceTree = "<group>"; };
 		B0EAC5ED7B22052E9BBBE8C9 /* ScreenshotWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotWatcher.swift; sourceTree = "<group>"; };
 		BC3E9F635AA81443BB4BF957 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -138,6 +140,7 @@
 				392ADD8A7EEC36D1855BA3D5 /* DesignTokens.swift */,
 				6E86C21F2F8518B426159B77 /* EditorView.swift */,
 				E80562B1588560C2E61CCE65 /* FixedGrid.swift */,
+				A822F8D017517676617751C9 /* Mark.swift */,
 				86C35AB5A1478944CF8934D3 /* RotateSheet.swift */,
 				1BDFB5F76AC906C0238C2DA8 /* SettingsWindow.swift */,
 				EA6F6F30090979763C866F84 /* SignatureSheet.swift */,
@@ -357,6 +360,7 @@
 				8CFB1C6C1779CAF721DD34EA /* FixedGrid.swift in Sources */,
 				48905D56B247546BA33C44F8 /* ItsPaintApp.swift in Sources */,
 				1976F8F0D1BA69C8D0910DED /* MainMenuBuilder.swift in Sources */,
+				C8F6D5D56AB4B3B9C07FC626 /* Mark.swift in Sources */,
 				6B8140C107D4A209AD6CD789 /* RotateSheet.swift in Sources */,
 				979898D93E97297A55E27038 /* ScreenshotWatcher.swift in Sources */,
 				623D371268183070226716CB /* SettingsWindow.swift in Sources */,
