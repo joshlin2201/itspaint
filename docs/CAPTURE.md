@@ -183,3 +183,22 @@ demonstrably cannot phone home, and the source is right there.
 - [Turn off the screenshot floating thumbnail — LazyScreenshots](https://www.lazyscreenshots.com/blog/disable-screenshot-floating-thumbnail-mac/)
 - [Snipping Tool for Mac: the complete guide — LazyScreenshots](https://www.lazyscreenshots.com/blog/snipping-tool-for-mac/)
 - [Snapzy — open-source macOS capture app](https://github.com/duongductrong/Snapzy)
+
+## The share card bakes its claims into pixels
+
+`docs/images/social-preview.png` is what renders on X, Slack, Discord and LinkedIn,
+and as the landing page's `og:image`. It is generated, and it carries text: the app
+name, the job, and **3.15 MB**.
+
+No checker can read a PNG. `claims.py` catches a stale number in prose and
+`surfaces.py` catches one on the landing page, and both would sail past a share card
+that had been wrong for six releases — which is exactly how the card came to be
+advertising a chameleon and three measured-dead hooks for a fortnight.
+
+So the size the card was drawn with is written here, in a file `claims.py` reads. When
+the download grows, this line fails, and regenerating the card is the fix rather than
+editing the number.
+
+Regenerate: capture a window with `WindowCaptureTests`, then compose. The script lives
+with the promo tooling; the card is 1280×640 and the window shot is bled off the right
+edge.
