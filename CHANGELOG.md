@@ -7,6 +7,25 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 ### Fixed
+- **The Help menu only ever apologised.** `ItsPaint Help` called the stock
+  `showHelp(_:)`, which needs a help book in the bundle, and there has never been one,
+  so the item put up "Help isn't available for ItsPaint." It now opens the README,
+  the feature reference and the issue tracker. These go to the browser through
+  LaunchServices, which is a handoff rather than a connection: the sandbox still
+  requests no network entitlement and the binary still links no networking framework.
+- **Committed text was coarser than the text you typed.** The bitmap context did not
+  enable subpixel glyph positioning, so every glyph origin was rounded to a whole
+  pixel and stem spacing came out uneven. Turned on, along with explicit antialiasing.
+  Font smoothing is deliberately left off: subpixel RGB would bake one display's
+  stripe order into an image meant to be shared.
+
+  The canvas is still one pixel per pixel, so a commit at 100% zoom on a Retina
+  display carries less detail than an editor drawn at the screen's own scale. This
+  closes the part of that gap that was ours.
+- **Nothing said a selection could be dragged.** With a marquee on screen the pointer
+  kept showing a crosshair, including inside the marquee, where a drag lifts the
+  pixels and moves them. It shows an open hand there now.
+
 - **A freehand curve came out as a chain of straight chords.** The engine joined
   consecutive mouse samples with a straight line, so a quick drag left a visible
   corner at every sample and read as a low frame rate rather than as a drawing.

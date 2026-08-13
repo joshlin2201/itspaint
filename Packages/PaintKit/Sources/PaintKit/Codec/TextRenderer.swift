@@ -143,6 +143,24 @@ public enum TextRenderer {
                                : [frame(isHaloPass: false)]
 
         bitmap.drawWithCoreGraphics { context in
+            // A bitmap `CGContext` does not turn these on for you, and without them
+            // every glyph origin is rounded to a whole pixel. That is why committed
+            // text read as coarse next to the live editor: AppKit positions glyphs on
+            // fractions of a pixel and this context was quantising them, so stem
+            // spacing came out uneven and small sizes looked chunky.
+            //
+            // The canvas is still one pixel per pixel, so a commit at 100% zoom on a
+            // Retina display will always carry less detail than an editor drawn at the
+            // screen's own scale. This closes the part of the gap that was ours.
+            context.setShouldAntialias(true)
+            context.setAllowsAntialiasing(true)
+            context.setShouldSmoothFonts(false)   // greyscale AA; subpixel RGB would
+                                                  // bake the display's stripe order
+                                                  // into an image that gets shared
+            context.setAllowsFontSubpixelPositioning(true)
+            context.setShouldSubpixelPositionFonts(true)
+            context.setAllowsFontSubpixelQuantization(false)
+            context.setShouldSubpixelQuantizeFonts(false)
             for pass in passes {
                 context.saveGState()
                 // The surrounding context is flipped so canvas coordinates work;

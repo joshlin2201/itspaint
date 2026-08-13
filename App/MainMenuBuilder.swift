@@ -352,10 +352,23 @@ enum MainMenuBuilder {
         return item
     }
 
+    /// Help, pointing at documentation that exists.
+    ///
+    /// `NSApplication.showHelp(_:)` needs a help book in the bundle, and this app has
+    /// never had one, so the stock item put up "Help isn't available for ItsPaint."
+    /// A menu item that only ever produces an apology is worse than no menu item.
+    ///
+    /// These open in the default browser through LaunchServices, which is a handoff
+    /// rather than a connection: the app still requests no network entitlement and
+    /// still links no networking framework, so the three commands in the README
+    /// return exactly what they returned before.
     private static func helpMenu() -> NSMenuItem {
         let item = NSMenuItem()
         let menu = NSMenu(title: "Help")
-        add(to: menu, "ItsPaint Help", #selector(NSApplication.showHelp(_:)), "?")
+        add(to: menu, "ItsPaint Help", #selector(AppCommands.openHelp(_:)), "?")
+        menu.addItem(.separator())
+        add(to: menu, "Keyboard Shortcuts", #selector(AppCommands.openShortcuts(_:)), "")
+        add(to: menu, "Report an Issue", #selector(AppCommands.openIssues(_:)), "")
         item.submenu = menu
         NSApp.helpMenu = menu
         return item
@@ -380,6 +393,9 @@ enum MainMenuBuilder {
 /// checks the names; the responder chain supplies the real implementations.
 @objc protocol AppCommands {
     func showSettings(_ sender: Any?)
+    func openHelp(_ sender: Any?)
+    func openShortcuts(_ sender: Any?)
+    func openIssues(_ sender: Any?)
     func swapColours(_ sender: Any?)
     func toggleBold(_ sender: Any?)
     func toggleItalic(_ sender: Any?)

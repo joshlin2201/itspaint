@@ -1448,7 +1448,13 @@ final class CanvasNSView: NSView {
             zoomStep: Int(max(zoom, 1)),
             hasFloating: model.floating != nil,
             hasPendingShape: model.engine.hasPendingShape,
-            isSpaceHeld: isSpaceHeld
+            isSpaceHeld: isSpaceHeld,
+            // Crossing the edge of a marquee changes what a drag will do, so it has
+            // to change the pointer. Keyed on the boolean rather than the position,
+            // so this still costs one rebuild per crossing and not one per move.
+            isOverSelection: model.pointerPosition.map {
+                model.engine.selection?.contains($0) == true
+            } ?? false
         )
         guard key != cursorKey else { return }
         cursorKey = key
@@ -1462,6 +1468,7 @@ final class CanvasNSView: NSView {
         var hasFloating: Bool
         var hasPendingShape: Bool
         var isSpaceHeld: Bool
+        var isOverSelection: Bool
     }
 
     private var cursorKey: CursorKey?
@@ -1480,6 +1487,18 @@ final class CanvasNSView: NSView {
         }
 
         if isSpaceHeld { return .openHand }
+
+        // Inside an existing marquee, a drag lifts the pixels and moves them. That is
+        // the app's answer to "why does my selection do nothing", and until now the
+        // pointer kept claiming it was about to draw a new one. An affordance nobody
+        // can see is a feature nobody finds.
+        if model.tool == .select,
+           !model.engine.settings.selectionKind.isPointSelect,
+           let point = model.pointerPosition,
+           model.engine.selection?.contains(point) == true
+        {
+            return .openHand
+        }
 
         switch model.tool {
         case .text: return .iBeam

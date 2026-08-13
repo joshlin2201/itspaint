@@ -93,4 +93,16 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
     @IBAction func showSettings(_ sender: Any?) {
         SettingsWindowController.show()
     }
+
+    // Help, opened in the browser. `NSWorkspace.open` hands the URL to whichever app
+    // is registered for it; nothing here opens a socket, and the sandbox still
+    // declares no network entitlement.
+    @IBAction func openHelp(_ sender: Any?) { Self.open("#readme") }
+    @IBAction func openShortcuts(_ sender: Any?) { Self.open("/blob/main/docs/FEATURES.md") }
+    @IBAction func openIssues(_ sender: Any?) { Self.open("/issues") }
+
+    private static func open(_ path: String) {
+        guard let url = URL(string: "https://github.com/joshlin2201/itspaint" + path) else { return }
+        NSWorkspace.shared.open(url)
+    }
 }
