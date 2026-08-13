@@ -304,3 +304,48 @@ struct ResizeDirtyRectTests {
         #expect(dirty.width < 100, "a small stroke invalidated \(dirty.width)px")
     }
 }
+
+@Suite("Line height comes from the font")
+struct LineHeightTests {
+
+    /// It used to be four different multipliers of the point size, in four files.
+    @Test(arguments: [9.0, 12.0, 18.0, 36.0, 72.0])
+    func aLineIsTallEnoughForTheTextItHolds(size: Double) {
+        var style = TextRenderer.Style()
+        style.pointSize = size
+        let line = TextRenderer.lineHeight(for: style)
+        let measured = TextRenderer.measure("Hxg", style: style, maxWidth: 4000).height
+        #expect(line >= measured, "one line of \(size)pt reports \(line)px but needs \(measured)px")
+        // And not so tall that a single line looks double spaced.
+        #expect(Double(line) < size * 2)
+    }
+
+    /// Two lines must be about twice one line, or a box grown per line drifts.
+    @Test func linesStack() {
+        var style = TextRenderer.Style()
+        style.pointSize = 16
+        let one = TextRenderer.measure("Hxg", style: style, maxWidth: 4000).height
+        let two = TextRenderer.measure("Hxg\nHxg", style: style, maxWidth: 4000).height
+        #expect(two >= one * 2 - 2 && two <= one * 2 + 2,
+                "one line is \(one)px and two are \(two)px")
+    }
+
+    /// The empty string still has to report a line, or a fresh box has no height.
+    @Test func anEmptyStringIsOneLineTall() {
+        var style = TextRenderer.Style()
+        style.pointSize = 20
+        #expect(TextRenderer.measure("", style: style, maxWidth: 400).height
+                == TextRenderer.lineHeight(for: style))
+    }
+
+    /// The bug behind a box that did not grow on Return: CoreText measures a
+    /// trailing newline as nothing, so the caller has to count them.
+    @Test func aTrailingNewlineAddsNoMeasuredHeight() {
+        var style = TextRenderer.Style()
+        style.pointSize = 16
+        let text = TextRenderer.measure("Hxg", style: style, maxWidth: 4000).height
+        let withReturn = TextRenderer.measure("Hxg\n", style: style, maxWidth: 4000).height
+        #expect(withReturn == text,
+                "CoreText now counts a trailing newline; growTextBoxToFit adds one too")
+    }
+}

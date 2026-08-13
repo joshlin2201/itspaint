@@ -1640,6 +1640,17 @@ public final class PaintEngine {
 
     /// Where a clone stroke reads from. Session state: a pinned pick, not part of the
     /// document, and deliberately not written to `document.json`.
+    /// Whether the live gesture is carrying pixels rather than making marks.
+    ///
+    /// The chrome needs this to close the hand cursor: hovering over something
+    /// draggable and actually dragging it looked identical.
+    public var isMovingContent: Bool {
+        switch gesture {
+        case .moveFloating, .resizeFloating: true
+        default: false
+        }
+    }
+
     public private(set) var cloneSource: PixelPoint?
 
     /// Destination to source, fixed at the first destination of a pairing.

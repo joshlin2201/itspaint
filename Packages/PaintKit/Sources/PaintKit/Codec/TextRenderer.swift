@@ -178,8 +178,29 @@ public enum TextRenderer {
 
     /// The size `string` needs at this style, for auto-growing the text box as
     /// the user types.
+    /// One line of this style, in pixels, from the font rather than from a guess.
+    ///
+    /// This used to be four different guesses at the same quantity: `pointSize * 1.3`
+    /// in `measure`, `* 1.35` where the box grew for a new line, `* 1.4` where a
+    /// clicked box got its minimum height, and AppKit's own metrics inside the live
+    /// editor. So the box the caret sat in and the box the text landed in were sized
+    /// by two numbers that had never agreed, and a new line moved them further apart.
+    ///
+    /// Measured by laying out one line through the same framesetter that draws them,
+    /// because every other way of computing it is a different answer.
+    ///
+    /// The first repair here replaced the multipliers with the font's own metrics,
+    /// `CTFontGetAscent + Descent + Leading`, which sounds authoritative and is not
+    /// the number CoreText uses to stack lines. For Helvetica those three sum to
+    /// exactly the point size while the framesetter lays a line out 25% taller, so a
+    /// box sized from the font metrics was a quarter of a line short at every size.
+    /// Swapping one guess for a more official-looking guess is not measuring.
+    public static func lineHeight(for style: Style) -> Int {
+        max(1, measure("H", style: style, maxWidth: .max / 2).height)
+    }
+
     public static func measure(_ string: String, style: Style, maxWidth: Int) -> (width: Int, height: Int) {
-        guard !string.isEmpty else { return (0, Int(style.pointSize * 1.3)) }
+        guard !string.isEmpty else { return (0, lineHeight(for: style)) }
         let attributed = attributedString(string, style: style)
         let framesetter = CTFramesetterCreateWithAttributedString(attributed)
         let constraint = CGSize(width: Double(maxWidth), height: .greatestFiniteMagnitude)

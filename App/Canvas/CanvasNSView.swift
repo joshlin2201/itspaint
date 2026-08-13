@@ -875,6 +875,15 @@ final class CanvasNSView: NSView {
         } else {
             commit(dirty)
         }
+        // The hand closes while you are actually carrying something. Hovering already
+        // showed an open hand; without this the pointer looks identical before and
+        // during the drag, which is the difference between "you can pick this up" and
+        // "you have it". Space-panning has done this since the beginning and nothing
+        // else did.
+        if model.engine.isMovingContent {
+            NSCursor.closedHand.push()
+            isGrabbing = true
+        }
         // A double-click closes a polygon where it stands, which is the other
         // half of the gesture people already know from every vector tool.
         if NSApp.currentEvent?.clickCount ?? 1 > 1, model.tool == .shape, model.shapeKind == .polygon {
@@ -937,6 +946,7 @@ final class CanvasNSView: NSView {
             openTextEditor(in: textBox ?? PixelRect(corners: origin, origin))
             return
         }
+        releaseGrab()
         guard let model, activeButton != nil else { return }
         let point = pixelPoint(for: event)
         let dirty = model.engine.endStroke(at: point, constrained: isShiftHeld)
@@ -987,7 +997,7 @@ final class CanvasNSView: NSView {
         // near the bottom would look like the tool was broken.
         var rect = box
         if rect.width < 8 || rect.height < 8 {
-            let lineHeight = max(1, Int((style.pointSize * 1.4).rounded()))
+            let lineHeight = TextRenderer.lineHeight(for: style)
             let minWidth = min(model.canvas.width, Int((style.pointSize * 4).rounded()))
             let x = min(box.minX, max(0, model.canvas.width - minWidth))
             let y = min(box.minY, max(0, model.canvas.height - lineHeight))
@@ -1053,10 +1063,19 @@ final class CanvasNSView: NSView {
         style.colour = model.foreground
 
         let needed = TextRenderer.measure(editor.string, style: style, maxWidth: box.width)
-        // One line of slack, so the caret on a freshly opened line is inside
-        // the box rather than sitting on its bottom edge.
-        let lineHeight = max(1, Int((style.pointSize * 1.35).rounded()))
-        let height = max(lineHeight, needed.height + lineHeight / 3)
+        let lineHeight = TextRenderer.lineHeight(for: style)
+
+        // CoreText drops exactly one trailing empty line, so pressing Return at the
+        // end of the text measured the same height it did before the keystroke: the
+        // box stayed put while the caret dropped below it, and it only caught up once
+        // a character was typed. One line back, because the editor has to hold a caret
+        // the renderer has nothing to draw for.
+        //
+        // Exactly one, not one per trailing newline. Interior blank lines *are*
+        // measured, so counting them all made a box three times too tall after three
+        // Returns — which a test caught, having been written to the wrong rule first.
+        let endsOnEmptyLine = editor.string.last?.isNewline == true
+        let height = max(lineHeight, needed.height + (endsOnEmptyLine ? lineHeight : 0))
         guard height != box.height else { return }
 
         let grown = PixelRect(x: box.minX, y: box.minY, width: box.width, height: height)
@@ -1218,6 +1237,7 @@ final class CanvasNSView: NSView {
 
         switch event.keyCode {
         case 53:  // Escape — the one key that gets you out of anything.
+            releaseGrab()
             cancelText()
             if let box = textBox { textOrigin = nil; textBox = nil; invalidate(box.insetBy(-2)) }
             stopSpraying()
@@ -1472,6 +1492,21 @@ final class CanvasNSView: NSView {
     }
 
     private var cursorKey: CursorKey?
+
+    /// Whether a closed-hand cursor is currently pushed, so it is popped exactly once.
+    private var isGrabbing = false
+
+    /// Put the grabbed cursor back.
+    ///
+    /// Every way a carry can end has to come through here. `NSCursor.push` and `pop`
+    /// are a stack, so a push that is only popped on mouse-up survives an Escape and
+    /// leaves the pointer stuck as a closed hand over a canvas that is not being
+    /// dragged — for the rest of the session.
+    private func releaseGrab() {
+        guard isGrabbing else { return }
+        isGrabbing = false
+        NSCursor.pop()
+    }
 
     private func cursorForCurrentTool() -> NSCursor {
         guard let model else { return .arrow }

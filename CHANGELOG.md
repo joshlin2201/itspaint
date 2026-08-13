@@ -7,6 +7,26 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 ### Fixed
+- **The text box did not grow when you pressed Return.** CoreText drops one trailing
+  empty line when it measures, so a Return at the end of the text reported the same
+  height as before the keystroke: the box stayed put while the caret dropped below it,
+  and it only caught up once a character was typed.
+- **Four different guesses at one line of text.** `pointSize * 1.3` in the measurer,
+  `* 1.35` where the box grew, `* 1.4` where a clicked box got its minimum height, and
+  AppKit's real metrics inside the live editor. The box the caret sat in and the box
+  the text landed in were sized by numbers that had never agreed.
+
+  There is now one `TextRenderer.lineHeight(for:)`, and it lays out a line through the
+  same framesetter that draws them. The first repair used the font's own
+  `ascent + descent + leading`, which sounds authoritative and is not what CoreText
+  stacks lines by: for Helvetica those sum to exactly the point size while a laid-out
+  line is 25% taller, so every box came out a quarter-line short.
+- **The hand never closed while you were dragging.** Hovering over floating content
+  showed an open hand and so did carrying it, so the pointer looked identical before
+  and during a drag. Space-panning had done this since the beginning and nothing else
+  did. Released through one path, because a pushed cursor popped only on mouse-up
+  survives an Escape and leaves the pointer stuck as a closed hand.
+
 - **The Help menu only ever apologised.** `ItsPaint Help` called the stock
   `showHelp(_:)`, which needs a help book in the bundle, and there has never been one,
   so the item put up "Help isn't available for ItsPaint." It now opens the README,

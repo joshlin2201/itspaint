@@ -159,3 +159,52 @@ struct TextEditorLayoutTests {
                 "editor says \(editorHeight), renderer says \(measured.height)")
     }
 }
+
+@Suite("The box holds what is typed into it")
+@MainActor
+struct TextBoxGrowthTests {
+
+    private func style(_ size: Double) -> TextRenderer.Style {
+        var s = TextRenderer.Style()
+        s.pointSize = size
+        return s
+    }
+
+    /// The complaint: pressing Return did not move the box. CoreText measures a
+    /// trailing newline as nothing, so the caller has to count them, and the height
+    /// the box grows to has to come from the same measurement that draws the text.
+    @Test(arguments: [12.0, 18.0, 32.0])
+    func aReturnAddsExactlyOneLine(size: Double) {
+        let s = style(size)
+        let line = TextRenderer.lineHeight(for: s)
+        let one = TextRenderer.measure("Hello", style: s, maxWidth: 400).height
+        let afterReturn = TextRenderer.measure("Hello\n", style: s, maxWidth: 400).height + line
+        #expect(afterReturn == one + line,
+                "Return grew the box by \(afterReturn - one)px, not one \(line)px line")
+    }
+
+    /// Interior blank lines are measured by CoreText; only the final one is dropped.
+    /// The first version of this test added a line per trailing newline and made a box
+    /// three times too tall after three Returns.
+    @Test func onlyTheFinalEmptyLineIsUncounted() {
+        let s = style(16)
+        let line = TextRenderer.lineHeight(for: s)
+        let one = TextRenderer.measure("Hi", style: s, maxWidth: 400).height
+        for (text, expectedLines) in [("Hi", 1), ("Hi\n", 2), ("Hi\n\n", 3), ("Hi\n\n\n", 4)] {
+            let measured = TextRenderer.measure(text, style: s, maxWidth: 400).height
+            let box = measured + (text.last?.isNewline == true ? line : 0)
+            #expect(box == expectedLines * line,
+                    "\(text.debugDescription) sized to \(box)px, wanted \(expectedLines) x \(line)px")
+        }
+        #expect(one == line)
+    }
+
+    /// A line has to be tall enough for the glyphs it holds, at every size, or the
+    /// box clips its own text. This is the assertion the old multipliers failed.
+    @Test(arguments: [9.0, 11.0, 14.0, 24.0, 48.0, 96.0])
+    func aLineIsNeverShorterThanItsText(size: Double) {
+        let s = style(size)
+        #expect(TextRenderer.lineHeight(for: s)
+                >= TextRenderer.measure("Hxgjq", style: s, maxWidth: 4000).height)
+    }
+}
