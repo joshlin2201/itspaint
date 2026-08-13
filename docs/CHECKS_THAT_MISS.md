@@ -3,14 +3,15 @@
 This is a list of checks that passed while the thing they were checking was broken.
 
 They come from [ItsPaint](https://github.com/joshlin2201/itspaint), a free open-source
-paint and markup app for the Mac, and from the tooling around it — three are in the
-app and its tests, four are in the release and publishing machinery. That split is
-worth stating rather than blurring, because the machinery is where the sloppier checks
-live: nobody reviews a health check.
+paint and markup app for the Mac, and from the tooling around it. Some are in the app
+and its tests, more are in the release and publishing machinery. That split is worth
+stating rather than blurring, because the machinery is where the sloppier checks live:
+nobody reviews a health check.
 
-All were found between 2026-08-08 and 2026-08-11, most of them in one day, which is
-what made them worth writing down. They are not seven different mistakes. They are one
-mistake with seven costumes.
+They were found between 2026-08-08 and 2026-08-13. They are not eleven different
+mistakes. They are one mistake with eleven costumes, and the last four are the ones
+that should worry you most, because by then the whole point of the exercise was
+catching exactly this.
 
 The shape is always the same. There is a claim. Checking the claim directly is
 awkward, slow, or requires a thing you do not have. So you check something adjacent
@@ -122,6 +123,78 @@ minutes** — once at 288, and again at 290, because two tests had been added be
 the two runs. Then it caught its own fix: a stated commit count went stale the moment
 the fix was pushed. A number that changes on every push does not belong in prose.
 
+
+## 9. The checker that had never read the documents that were wrong
+
+`claims.py` measures the test counts, the download size, the tool count and the repo
+statistics, then fails on any document that disagrees. It is the thing that stops a
+stale number reaching a public page, and it works.
+
+It read a hand-written list of six files.
+
+So a document was checked only if somebody had remembered to add it, which means the
+default state of every new document was *unchecked* — and unchecked printed the same
+`no contradicted numbers found` as clean. On 2026-08-12 two documents were quietly
+advertising eight export formats against a measured nine. Neither was on the list.
+Six files passed and the report said the documentation agreed.
+
+The fix is one line of intent: glob every markdown file in the repository, and keep an
+`EXCLUDE` set that somebody has to write a reason into. A file is now checked unless
+excluded, rather than ignored unless included.
+
+**An allowlist inverts the default.** Anything you forget to add is silently exempt,
+and the report cannot tell you what it did not look at.
+
+## 10. The fix was published, the checker agreed, and half of it was still wrong
+
+The landing page said "under 3 MB" while the download had grown past three megabytes.
+Corrected through the site's API, published, and `surfaces.py` — the checker written
+specifically to compare that page against the release — reported **every surface
+agrees**.
+
+Two of the three wrong sizes were still live. They were in `og:description` and
+`meta description`, which the platform keeps in a separate field and writes over the
+document on serve. `surfaces.py` strips tags before scanning, so it had never read a
+`content="…"` attribute in its life.
+
+The visible headline said 3.12 MB. Every link preview, on every platform, still said
+3.02.
+
+**A page has more than one copy of its own claims.** The one a human reads and the one
+a crawler reads are different strings, and a checker that reads the visible text has
+checked the half that somebody would have noticed anyway.
+
+## 11. The test that was written for the bug, and passed with the bug present
+
+A clone stamp must read the canvas as it was *before* the stroke started. Read the
+live canvas instead and dragging back across your own source turns the source into a
+copy of the hole, then a copy of that.
+
+So the test drove exactly that gesture, and passed. Then the rule was deliberately
+broken — sample `canvas` instead of `before` — and it passed again.
+
+The fixture put the source 34 pixels from the destination. Painting back over the
+source therefore read from *off-canvas*, which is skipped, so those strokes wrote
+nothing at all. The test drove a gesture no user could produce, and the assertion it
+made was true for a reason that had nothing to do with the rule it was named after.
+
+**Break the code and watch the test fail, or you have not tested the code.** This is
+the same lesson as §1 and it was learned four days earlier, in writing, in this file.
+
+## 12. A screenshot of the new UI, perfectly present and perfectly invisible
+
+Tooltips gained a second line, so a test rendered every one of them to a PNG and
+asserted the size — new chrome nobody has looked at is chrome nobody has checked.
+
+The first run produced images containing the heading and nothing else. The detail line
+was rendered correctly, in `.primary`, over the black background the test had set, in
+the light colour scheme. Black on black. The size assertions passed, because the text
+occupied its space perfectly.
+
+**A render test that only measures geometry has not seen the picture.** Look at the
+image, or assert something about its pixels.
+
+
 ## What actually generalises
 
 - **Name the claim in one sentence, then ask what would be true if the claim were
@@ -141,9 +214,14 @@ the fix was pushed. A number that changes on every push does not belong in prose
 - **Prose is a check that never re-runs.** If a number in a document matters, have
   something measure it and fail.
 
-None of this is clever. It is all the same discipline applied seven times, and the
-reason it needed applying seven times is that each disguise looked like a different
-problem.
+- **An allowlist is a default, and the default is "unchecked".** Whatever you forget
+  to add is silently exempt, and the report cannot tell you what it never read.
+- **A page has more than one copy of its own claims.** The visible text and the
+  metadata a crawler reads are different strings.
+
+None of this is clever. It is the same discipline applied a dozen times, and the reason
+it kept needing applying is that each disguise looked like a different problem. Four of
+these were found *after* the list was published, by someone who had written the list.
 
 ---
 
