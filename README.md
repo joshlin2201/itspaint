@@ -211,6 +211,12 @@ counting transparent pixels rather than by whether the program exited quietly. O
 60px mark centred on a 400×400 page the count goes from 0 to 156,400, which is
 160,000 minus the 3,600 pixels of subject.
 
+If you do depend on it: it ships often while it is in beta, and until 1.0 a minor
+version may still carry a breaking change to the document format —
+[CHANGELOG.md](CHANGELOG.md) says so at the top. **Watch ▸ Custom ▸ Releases** is the
+notification for that one thing. Watching the repository outright also mails you every
+issue and every comment, which is why most people do not.
+
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the structure, the design constraints, and
 what a change has to prove before it lands.
 
