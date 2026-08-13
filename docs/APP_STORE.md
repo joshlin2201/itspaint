@@ -194,7 +194,7 @@ for someone using the app, not how it was done. 4,000 characters.
 
 **0.11.0 (first release)**
 
-> First Mac App Store release. Twelve tools, fifteen shapes, automatic step
+> First Mac App Store release. Thirteen tools, fifteen shapes, automatic step
 > badges, pixelation, Instant Alpha, and export to nine formats.
 
 ### Screenshots

@@ -144,6 +144,8 @@ struct ToolOptions: View {
         case .select where model.selectionKind == .lasso: "Closes itself"
         case .select where model.selectionKind == .instantAlpha: "⇧ add · ⌥ subtract"
         case .select: "⌘A selects all"
+        case .clone where model.cloneMode == .clone && !model.hasCloneSource:
+            "Click to set the source"
         case .shape where model.shapeKind == .curve:
             model.hasPendingShape ? "Now drag to bend it" : "Drag, then bend it"
         case .shape where model.shapeKind == .polygon:
@@ -203,6 +205,27 @@ struct ToolOptions: View {
 
         case .eraser:
             widthMark(name: "Size")
+
+        case .clone:
+            OptionSegment(selection: $model.cloneMode, options: CloneMode.allCases.map {
+                .init(value: $0, symbol: $0.symbolName, help: $0.displayName)
+            })
+            widthMark(name: "Size")
+            if model.cloneMode == .clone {
+                Mark(
+                    value: $model.cloneOpacity, range: 0.1...1, style: .meter, name: "Opacity",
+                    readout: "\(Int((model.cloneOpacity * 100).rounded()))%", normal: 1
+                )
+            } else {
+                Mark(
+                    value: $model.softenStrength, range: 0.15...0.85, style: .meter, name: "Strength",
+                    readout: "\(Int((model.softenStrength * 100).rounded()))%", normal: 0.4
+                )
+            }
+            OptionSegment(selection: $model.cloneSoftTip, options: [
+                .init(value: true, symbol: "circle.dashed.inset.filled", help: "Soft edge"),
+                .init(value: false, symbol: "circle.fill", help: "Hard edge"),
+            ])
 
         case .shape:
             ShapeGallery(model: model, columns: isVertical ? 5 : 8)

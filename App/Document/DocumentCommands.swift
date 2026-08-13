@@ -244,7 +244,7 @@ extension DrawingDocument {
 
         case #selector(selectToolFromMenu(_:)):
             // Tick the active tool, so the menu is also where you check which
-            // of twelve unlabelled glyphs is currently armed.
+            // of thirteen unlabelled glyphs is currently armed.
             menuItem.state = (menuItem.representedObject as? String) == model.tool.rawValue ? .on : .off
             return true
 

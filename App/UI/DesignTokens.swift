@@ -196,12 +196,20 @@ enum Tokens {
 
         /// Columns of the classic grid a side rail carries.
         ///
-        /// Half of them. A thin rail spends its length on tools, and the full
-        /// fourteen pairs would run past the bottom of the window on a laptop
-        /// screen. The other half is one click away in the colour popover, and
-        /// the pairs kept are the leading ones, so a swatch is where it always
-        /// was.
-        static let swatchPairs = 7
+        /// A thin rail spends its length on tools, and the full fourteen pairs
+        /// would run past the bottom of the window on a laptop screen. The rest
+        /// are one click away in the colour popover, and the pairs kept are the
+        /// leading ones, so a swatch is where it always was.
+        ///
+        /// Six rather than seven since Clone joined the Draw run. A thirteenth
+        /// tool cell put the rail 3pt over the height a 800pt window can give it,
+        /// and the two answers were to take the space from the palette or to
+        /// relax the test that measures it. The palette in the rail is already an
+        /// explicitly truncated view of a full set that `⇧⌘C` opens; the height
+        /// budget is a real constraint on a real screen. Loosening a geometry
+        /// check so a new button fits is the move `docs/A_GUARD_TUNED_TO_ITS_TEST.md`
+        /// exists to warn about.
+        static let swatchPairs = 6
 
         /// Chrome hugs its controls: the old 90pt thickness read as a dock
         /// rather than a toolbar. What replaced it is `thickness` below, which

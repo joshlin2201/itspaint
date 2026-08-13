@@ -215,7 +215,7 @@ enum MainMenuBuilder {
 
     /// Every tool, named, with its key.
     ///
-    /// The cluster is twelve unlabelled glyphs by design — its stated weakness.
+    /// The cluster is thirteen unlabelled glyphs by design — its stated weakness.
     /// This is where a new user reads what they are and learns the shortcuts,
     /// and where a VoiceOver user reaches them without hunting a floating bar.
     private static func toolsMenu() -> NSMenuItem {

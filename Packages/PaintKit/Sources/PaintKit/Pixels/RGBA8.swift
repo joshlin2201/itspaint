@@ -32,6 +32,26 @@ public struct RGBA8: Equatable, Hashable, Sendable {
 
     /// Composite `self` over `dst` using source-over in premultiplied space.
     ///
+    /// Mix towards another pixel. `t` is 0 for self, 255 for `other`.
+    ///
+    /// A convex combination of two premultiplied pixels is still premultiplied, so no
+    /// un-premultiply round trip is needed and none should be added: unpremultiplying
+    /// to blend and repremultiplying afterwards throws fireflies in any fringe where
+    /// alpha is small and the stored channels are near zero.
+    ///
+    /// Same `+127` rounding as `overCompositing`, so a long chain of mixes does not
+    /// drift the way truncation would.
+    @inlinable
+    public func lerping(toward other: RGBA8, t: UInt8) -> RGBA8 {
+        if t == 0 { return self }
+        if t == 255 { return other }
+        let ti = UInt32(t), inv = UInt32(255 - t)
+        @inline(__always) func mix(_ x: UInt8, _ y: UInt8) -> UInt8 {
+            UInt8(min(255, (UInt32(x) * inv + UInt32(y) * ti + 127) / 255))
+        }
+        return RGBA8(r: mix(r, other.r), g: mix(g, other.g), b: mix(b, other.b), a: mix(a, other.a))
+    }
+
     /// Both operands are premultiplied, so the standard Porter-Duff form
     /// `out = src + dst * (1 - srcAlpha)` applies per channel with no
     /// un-premultiply round trip.

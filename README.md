@@ -91,7 +91,7 @@ and scanned diagrams. It is useless on hair.
 
 | | |
 |---|---|
-| **Twelve tools** | Pencil, brush, highlighter, eraser, shape, text, badge, fill, eyedropper, select, pixelate, spotlight. One rail button each, every one a single key. |
+| **Thirteen tools** | Pencil, brush, highlighter, eraser, clone, shape, text, badge, fill, eyedropper, select, pixelate, spotlight. One rail button each, every one a single key. |
 | **Four brush nibs** | Round, square, soft, and spray. Spray keeps spraying while you hold still, which is the whole feel of an airbrush. |
 | **Four ways to select** | Rectangle, ellipse, lasso, and Instant Alpha. Marching ants follow the pixel mask rather than its bounds. |
 | **Pixel control** | Pointer-centred zoom, nearest-neighbour above 100%, a pixel grid, live tool footprints, rotate by any angle. |
@@ -101,7 +101,7 @@ and scanned diagrams. It is useless on hair.
 
 <img src="docs/images/editor-window.png" alt="ItsPaint editing a chameleon painting on a transparent canvas, with the brush options open">
 
-**Twelve tools, fifteen shapes, and a transparent canvas.**
+**Thirteen tools, fifteen shapes, and a transparent canvas.**
 The window above is ItsPaint painting, not marking up.
 
 </div>
@@ -223,12 +223,12 @@ what a change has to prove before it lands.
 
 | Group | Tools |
 |---|---|
-| **Draw** | Pencil, Brush (round / square / soft / spray), Highlighter (own ink, four colours), Eraser |
+| **Draw** | Pencil, Brush (round / square / soft / spray), Highlighter (own ink, four colours), Eraser, Clone (clone / soften) |
 | **Insert** | Shape, Text, Step Badge, Fill, Eyedropper |
 | **Select** | Rectangle, Ellipse, Lasso, Instant Alpha |
 | **Effects** | Pixelate, Spotlight |
 
-Twelve rail buttons. Variations live inside the tool that owns them, so there are fifteen
+Thirteen rail buttons. Variations live inside the tool that owns them, so there are fifteen
 shapes behind Shape, four nibs behind Brush and four modes behind Select. The whole
 set stays available without a button each.
 
@@ -236,6 +236,7 @@ set stays available without a button each.
 |---|---|---|---|
 | `P` | Pencil | `B` | Brush |
 | `H` | Highlighter | `E` | Eraser |
+| `C` | Clone | `F` | Soften |
 | `U` | Shape | `T` | Text |
 | `N` | Step Badge | `K` | Fill |
 | `I` | Eyedropper | `M` | Select |

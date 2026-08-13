@@ -1262,6 +1262,14 @@ final class CanvasNSView: NSView {
         }
 
         switch key {
+        case "c", "f":
+            // Before the ToolKind.shortcut scan below, and never through
+            // `selectTool`: that toggles the options panel when the tool is already
+            // armed, so a second `C` would collapse the panel and leave you in
+            // Soften with nothing on screen saying which mode you are in.
+            model.selectCloneMode(key == "c" ? .clone : .soften)
+            needsDisplay = true
+            return
         case "a":
             // Arrow is the annotation primitive people reach for, and reaching it
             // meant arming Shape and finding one cell in a gallery of fifteen. Bound

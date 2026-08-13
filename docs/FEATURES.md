@@ -8,7 +8,7 @@ bug in one of the two.
 
 ## Tools
 
-Twelve rail buttons in three runs. Every one has a single-key shortcut, shown on
+Thirteen rail buttons in three runs. Every one has a single-key shortcut, shown on
 hover and in the Tools menu.
 
 ### Draw
@@ -18,6 +18,8 @@ hover and in the Tools menu.
 | `P` | **Pencil** | Always a hard 1px nib. Not size-aware on purpose — that is the promise of the tool; making it size-aware would make it a small brush. |
 | `B` | **Brush** | Four tips at 1–96px. Round and square are hard-edged; soft antialiases over the outer ring; **spray is the airbrush** — it scatters coverage weighted to the centre and **keeps spraying while you hold still**, which is the whole feel of it. Flow sets density, and appears only for the spray tip. Seeded randomness, so a given engine sprays reproducibly. Spray used to be its own rail button; it is a nib, not a job. |
 | `H` | **Highlighter** | A 4px floor, because the chisel nib clamps there: the size control shows what the stroke will be rather than a number the engine would round up. Arming it raises a smaller size to 4 and hands the old one back when you leave, so one highlighter stroke does not cost you the 1–3px sizes everywhere else. Coverage buffer, so overlapping passes within one stroke **never darken**. Drag back over your own line and it stays one flat tone, the way a real highlighter does. |
+| `C` | **Clone** | Copy pixels from one part of the canvas to another, which is how you put back a chunk an AI generator left out. Click once to set the source, then drag where the pixels should go. The pairing is **aligned**: the offset holds across strokes, so you set it once and paint the hole in as many passes as it takes, and it survives until you pick a new source. Every destination reads the canvas as it was before the stroke started, so dragging back across your own source cannot turn the source into a copy of the hole. A source that falls outside the canvas is skipped rather than wrapped. Honours a selection, unlike the brush. |
+| `F` | **Soften** | The same cell in its other mode, for hiding the seam a clone leaves. Blurs towards the neighbourhood as it was before the stroke, so holding still does nothing at all — the pixel you get after two hundred events is the pixel you got after one. That is what stops it being a smudge, and a smudge is what turns crisp artwork to mush. Strength runs 15–85%. |
 | `E` | **Eraser** | Lays down the *background* colour — which is what makes it read as removing paint. Right-drag inverts that pairing. |
 
 ### Insert

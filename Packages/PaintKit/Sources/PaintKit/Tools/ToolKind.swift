@@ -22,6 +22,12 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
     case brush
     case highlighter
     case eraser
+    /// Copy pixels from elsewhere on this canvas, or soften what is already there.
+    ///
+    /// The repair tool. Nothing else puts missing *content* back: the brush paints
+    /// the loaded colour, fill floods one, Instant Alpha selects, and Shape draws a
+    /// new star rather than mending this one.
+    case clone
     // Insert
     case shape
     case text
@@ -41,6 +47,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .brush: "Brush"
         case .highlighter: "Highlighter"
         case .eraser: "Eraser"
+        case .clone: "Clone"
         case .shape: "Shape"
         case .text: "Text"
         case .badge: "Step badge"
@@ -60,6 +67,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .brush: "paintbrush"
         case .highlighter: "highlighter"
         case .eraser: "eraser"
+        case .clone: "plus.rectangle.on.rectangle"
         case .shape: "square.on.circle"
         case .text: "textformat"
         // Outline, like every other tool. The rail overrides this with the
@@ -84,6 +92,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .brush: "b"
         case .highlighter: "h"
         case .eraser: "e"
+        case .clone: "c"
         case .shape: "u"
         case .text: "t"
         case .badge: "n"
@@ -97,7 +106,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
 
     public var isFreehand: Bool {
         switch self {
-        case .pencil, .brush, .highlighter, .eraser: true
+        case .pencil, .brush, .highlighter, .eraser, .clone: true
         default: false
         }
     }
@@ -121,7 +130,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
 
     public var usesBrushSize: Bool {
         switch self {
-        case .brush, .highlighter, .eraser, .shape, .badge: true
+        case .brush, .highlighter, .eraser, .clone, .shape, .badge: true
         default: false
         }
     }
@@ -134,7 +143,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
     /// would imply an area those tools do not have.
     public var showsBrushPreview: Bool {
         switch self {
-        case .pencil, .brush, .highlighter, .eraser, .shape, .badge: true
+        case .pencil, .brush, .highlighter, .eraser, .clone, .shape, .badge: true
         default: false
         }
     }
@@ -147,7 +156,7 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
     /// Rail order, grouped by job. Three short runs scan far faster than one
     /// undifferentiated column.
     public static let groups: [[ToolKind]] = [
-        [.pencil, .brush, .highlighter, .eraser],
+        [.pencil, .brush, .highlighter, .eraser, .clone],
         [.shape, .text, .badge, .fill, .eyedropper],
         [.select, .pixelate, .spotlight],
     ]

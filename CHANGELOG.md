@@ -6,6 +6,33 @@ Notable changes, newest first. This project follows
 version may still carry breaking changes to the document format.
 
 ## [Unreleased]
+### Added
+- **Clone (`C`) and Soften (`F`).** The repair tool: copy pixels from one part of the
+  canvas to another, which is how you put back a chunk an AI generator left out of a
+  shape. Click once to set the source, then drag where the pixels should go.
+
+  The pairing is aligned, so the offset holds across strokes and you set it once and
+  paint the hole in as many passes as it takes. Every destination reads the canvas as
+  it was before the stroke began, so dragging back across your own source cannot turn
+  the source into a copy of the hole and then a copy of that. A source that falls
+  outside the canvas is skipped rather than wrapped, and the pairing is forgotten when
+  the canvas is resized, because the coordinates it was expressed in are gone.
+
+  **Soften** is the same cell in its other mode, for the seam a clone leaves. It blurs
+  towards the neighbourhood as it was before the stroke, so holding still does nothing
+  at all: the pixel after two hundred events is the pixel after one. That is what
+  stops it being a smudge, and a smudge is what turns crisp artwork to mush.
+
+  Designed with grok 4.6, which argued against Poisson healing for this job and was
+  right: seamless cloning solves towards the boundary colours, so a flat patch pushed
+  into a page-bounded hole erases the very point you copied. The star melts. Cheap
+  imitations of it do the same smear without the solver.
+
+  The rail was full. The thirteenth cell put it 3pt past what a 800pt window can give,
+  so the side palette shows six swatch pairs rather than seven; the rest are one
+  `⇧⌘C` away. Relaxing the geometry test instead is the move
+  `docs/A_GUARD_TUNED_TO_ITS_TEST.md` exists to warn about.
+
 ### Changed
 - **The tool options panel is built from clusters rather than labelled rows.** Every
   property used to be a 42pt right-aligned word, a stock `Slider` at `.mini`, a
@@ -539,7 +566,7 @@ First public beta.
   traces the real pixel boundary and **Make transparent** is undoable.
 - A checkerboard beneath the artwork makes cleared and imported transparency
   visible before save.
-- **Twelve tools**: pencil, brush, airbrush, highlighter, eraser, shape, text,
+- **The tool set as it stood**: pencil, brush, airbrush, highlighter, eraser, shape, text,
   numbered step badges, fill, eyedropper, select, and Pixelate.
 - **Fifteen shapes** inside one Shape tool — line, curve (drag then bend),
   arrow, rectangle, rounded rectangle, ellipse, triangle, right triangle,

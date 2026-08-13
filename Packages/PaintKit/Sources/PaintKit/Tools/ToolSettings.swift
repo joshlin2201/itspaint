@@ -1,6 +1,19 @@
 import Foundation
 
 /// Everything the inspector can change about how the active tool paints.
+/// The two jobs the clone cell does.
+public enum CloneMode: String, CaseIterable, Codable, Sendable {
+    /// Copy pixels from a pinned source, at a fixed offset.
+    case clone
+    /// Blur towards the pre-stroke neighbourhood, which is what hides a clone seam.
+    case soften
+
+    public var displayName: String { self == .clone ? "Clone" : "Soften" }
+    public var symbolName: String {
+        self == .clone ? "plus.rectangle.on.rectangle" : "drop.halffull"
+    }
+}
+
 public struct ToolSettings: Equatable, Sendable {
     public var tool: ToolKind
     public var shapeKind: ShapeKind
@@ -44,6 +57,27 @@ public struct ToolSettings: Equatable, Sendable {
     /// spotlight that dims by nothing is a no-op, and one that dims to black hides
     /// the context that makes it a spotlight rather than a crop.
     public var spotlightDim: Double
+    /// Which job the clone cell is doing.
+    ///
+    /// Two jobs on one rail cell because the *job* is repair and the Draw run has no
+    /// legal sixth button. They differ by more than a brush tip does — source, what
+    /// the first click means, parameters, undo name — and less than a second rail
+    /// slot would justify.
+    public var cloneMode: CloneMode
+    /// How hard a clone stroke lays the copied pixels down, 0.1...1.
+    public var cloneOpacity: Double
+    /// How far Soften moves a pixel towards its blurred neighbourhood, 0.15...0.85.
+    ///
+    /// Not 1: at full strength one stroke melts a hard edge, which is smudge arriving
+    /// by another road. Not below 0.15: a slider that can be a no-op is a dead control.
+    public var softenStrength: Double
+    /// Whether the clone nib has a soft edge.
+    ///
+    /// Its own setting rather than `brushShape`, because sharing that pair would make
+    /// the first clone stroke inherit whatever the brush was doing and then change the
+    /// brush on the way out. Soft by default: it hides a one-pixel misalignment at the
+    /// edge of a patch, which is the whole reason a repair looks repaired.
+    public var cloneSoftTip: Bool
     /// Whether a shape outline is antialiased.
     ///
     /// On, because a diagonal arrow across a screenshot is the most common mark this
@@ -101,6 +135,10 @@ public struct ToolSettings: Equatable, Sendable {
         pixelateBlockSize: Int = 12,
         spotlightDim: Double = 0.45,
         smoothEdges: Bool = true,
+        cloneMode: CloneMode = .clone,
+        cloneOpacity: Double = 1,
+        softenStrength: Double = 0.4,
+        cloneSoftTip: Bool = true,
         strokeDash: Raster.Dash = .solid,
         selectionKind: SelectionKind = .rectangle,
         selectionTolerance: Int = 12,
@@ -120,6 +158,10 @@ public struct ToolSettings: Equatable, Sendable {
         self.pixelateBlockSize = max(2, pixelateBlockSize)
         self.spotlightDim = min(max(spotlightDim, 0.1), 0.9)
         self.smoothEdges = smoothEdges
+        self.cloneMode = cloneMode
+        self.cloneOpacity = min(1, max(0.1, cloneOpacity))
+        self.softenStrength = min(0.85, max(0.15, softenStrength))
+        self.cloneSoftTip = cloneSoftTip
         self.strokeDash = strokeDash
         self.selectionKind = selectionKind
         self.selectionTolerance = min(255, max(0, selectionTolerance))

@@ -122,6 +122,24 @@ final class EditorModel {
     var pixelateBlockSize: Int { didSet { engine.settings.pixelateBlockSize = pixelateBlockSize } }
     var spotlightDim: Double { didSet { engine.settings.spotlightDim = spotlightDim } }
     var smoothEdges: Bool { didSet { engine.settings.smoothEdges = smoothEdges } }
+    var cloneMode: CloneMode { didSet { engine.settings.cloneMode = cloneMode } }
+    var cloneOpacity: Double { didSet { engine.settings.cloneOpacity = cloneOpacity } }
+    var softenStrength: Double { didSet { engine.settings.softenStrength = softenStrength } }
+    var cloneSoftTip: Bool { didSet { engine.settings.cloneSoftTip = cloneSoftTip } }
+
+    /// Whether a source has been picked, so the panel can say what the next click does.
+    var hasCloneSource: Bool { engine.cloneSource != nil }
+
+    /// Arm the clone cell in a specific mode.
+    ///
+    /// Not `selectTool`, which toggles the options panel when the tool is already
+    /// armed — pressing `F` while on Clone would collapse the panel and leave you in
+    /// Soften with nothing on screen saying so.
+    func selectCloneMode(_ mode: CloneMode) {
+        cloneMode = mode
+        tool = .clone
+        isOptionsExpanded = true
+    }
 
     var foreground: PaintColour {
         didSet {
@@ -296,6 +314,10 @@ final class EditorModel {
         self.pixelateBlockSize = engine.settings.pixelateBlockSize
         self.spotlightDim = engine.settings.spotlightDim
         self.smoothEdges = engine.settings.smoothEdges
+        self.cloneMode = engine.settings.cloneMode
+        self.cloneOpacity = engine.settings.cloneOpacity
+        self.softenStrength = engine.settings.softenStrength
+        self.cloneSoftTip = engine.settings.cloneSoftTip
         self.selectionKind = engine.settings.selectionKind
         self.strokeDash = engine.settings.strokeDash
         self.sprayDensity = engine.settings.sprayDensity

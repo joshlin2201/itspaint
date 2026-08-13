@@ -52,6 +52,11 @@ public final class PaintEngine {
         /// Highlighter: accumulates coverage, recomposites from `before` so
         /// overlapping passes within one stroke never darken.
         case highlight(before: Bitmap, coverage: [UInt8], last: PixelPoint, dirty: PixelRect, colour: RGBA8)
+        /// Clone and Soften: the same accumulate-and-recomposite shape as the
+        /// highlighter, and for the same reason. Every pixel written is computed from
+        /// `before`, never from what this stroke has already put down, so dragging
+        /// back across the source cannot make the source a copy of the hole.
+        case clone(before: Bitmap, coverage: [UInt8], last: PixelPoint, dirty: PixelRect, origin: PixelPoint)
         /// Live-previewed shape or redaction, committed on release.
         case shape(before: Bitmap, origin: PixelPoint, dirty: PixelRect, button: PointerButton)
         /// Dragging out a rectangular marquee.
@@ -273,6 +278,25 @@ public final class PaintEngine {
         let before = canvas
         activeBrush = settings.brush
 
+        if tool == .clone {
+            // No source yet: this gesture only aims. It paints nothing, records no
+            // undo, and the next drag is the one that repairs.
+            if settings.cloneMode == .clone && (cloneSource == nil || button == .secondary) {
+                cloneSource = point
+                cloneOffset = nil
+                return dirty
+            }
+            if settings.cloneMode == .clone, let source = cloneSource, cloneOffset == nil {
+                cloneOffset = PixelPoint(x: source.x - point.x, y: source.y - point.y)
+            }
+            var coverage = [UInt8](repeating: 0, count: canvas.count)
+            let stepDirty = stampClone(at: point, into: &coverage, before: before)
+            gesture = .clone(
+                before: before, coverage: coverage, last: point, dirty: stepDirty, origin: point
+            )
+            return dirty.union(stepDirty)
+        }
+
         if tool == .highlighter {
             let colour = highlighterColour(for: button)
             var coverage = [UInt8](repeating: 0, count: canvas.count)
@@ -338,6 +362,19 @@ public final class PaintEngine {
                   )
             gesture = .freehand(
                 before: before, last: point, dirty: dirty.union(stepDirty), button: button
+            )
+            return stepDirty
+
+        case let .clone(before, coverage, last, dirty, origin):
+            // Shift locks the stroke to a row or a column through its first point.
+            // Not `constrain()`, which snaps to a square or 45 degrees and would
+            // throw the destination onto a diagonal.
+            let aimed = constrained ? axisLocked(point, through: origin) : point
+            var updated = coverage
+            let stepDirty = strokeClone(from: last, to: aimed, into: &updated, before: before)
+            gesture = .clone(
+                before: before, coverage: updated, last: aimed,
+                dirty: dirty.union(stepDirty), origin: origin
             )
             return stepDirty
 
@@ -481,6 +518,14 @@ public final class PaintEngine {
             recordEdit(name: "Highlighter", before: before, dirty: dirty)
             return refreshed.union(dirty)
 
+        case let .clone(before, _, _, dirty, _):
+            gesture = .idle
+            // `recordEdit` already declines an empty rect, which is what keeps an
+            // aim-only gesture and a stroke whose source was entirely out of bounds
+            // off the undo stack.
+            recordEdit(name: settings.cloneMode.displayName, before: before, dirty: dirty)
+            return refreshed.union(dirty)
+
         case let .shape(before, origin, dirty, _):
             gesture = .idle
             // A curve's first drag only lays the chord: hold it as a pending
@@ -570,6 +615,15 @@ public final class PaintEngine {
 
         case let .highlight(before, _, _, dirty, _):
             gesture = .idle
+            guard !dirty.isEmpty else { return .empty }
+            let patch = before.extract(dirty)
+            canvas.restore(patch.pixels, to: patch.rect)
+            return dirty
+
+        case let .clone(before, _, _, dirty, _):
+            gesture = .idle
+            // The pairing is session state and survives Escape. Cancelling a stroke
+            // means undoing the paint, not making you re-pick the source.
             guard !dirty.isEmpty else { return .empty }
             let patch = before.extract(dirty)
             canvas.restore(patch.pixels, to: patch.rect)
@@ -1326,6 +1380,12 @@ public final class PaintEngine {
     /// instead — so resizing, rotating by an arbitrary angle or cropping is
     /// undoable like everything else, and the work before it survives.
     public func replaceCanvas(with newCanvas: Bitmap, actionName: String) {
+        // A pairing is a pair of coordinates, and a resize changes what those
+        // coordinates mean. Keeping it would leave a repair tool quietly copying
+        // whatever now occupies the old source.
+        if newCanvas.width != canvas.width || newCanvas.height != canvas.height {
+            clearCloneSource()
+        }
         let before = canvas
         let resized = newCanvas.width != canvas.width || newCanvas.height != canvas.height
         canvas = newCanvas
@@ -1351,6 +1411,7 @@ public final class PaintEngine {
     /// canvas coordinates, so replaying it against a different image would
     /// restore pixels into the wrong places.
     public func reset(to newCanvas: Bitmap) {
+        clearCloneSource()
         canvas = newCanvas
         undoStack.removeAll()
         selection = nil
@@ -1496,6 +1557,233 @@ public final class PaintEngine {
 
         recomposite(dirty, coverage: coverage, before: before, colour: colour)
         return dirty
+    }
+
+    // MARK: - Clone and Soften
+
+    /// Where a clone stroke reads from. Session state: a pinned pick, not part of the
+    /// document, and deliberately not written to `document.json`.
+    public private(set) var cloneSource: PixelPoint?
+
+    /// Destination to source, fixed at the first destination of a pairing.
+    ///
+    /// It survives across strokes until the source is re-picked, which is what makes
+    /// the tool *aligned*: you set one pairing and paint the hole in as many passes as
+    /// it takes. A non-aligned clone restarts from the same source pixel on every
+    /// stroke and walks the source around the hole.
+    public private(set) var cloneOffset: PixelPoint?
+
+    public func setCloneSource(_ point: PixelPoint) {
+        cloneSource = point
+        cloneOffset = nil
+    }
+
+    /// Forget the pairing, because the coordinates it was expressed in are gone.
+    ///
+    /// Called when the canvas is resized or reverted. An offset that outlives the
+    /// pixels it referred to points at whatever now occupies those coordinates, which
+    /// is a repair tool quietly copying the wrong thing.
+    public func clearCloneSource() {
+        cloneSource = nil
+        cloneOffset = nil
+    }
+
+    /// Project onto the row or column through `origin`.
+    ///
+    /// Not `constrain()`: that snaps to a square or to 45 degrees, which is right for
+    /// a shape and wrong here, where a diagonal destination would drag the patch off
+    /// the feature being repaired.
+    private func axisLocked(_ point: PixelPoint, through origin: PixelPoint) -> PixelPoint {
+        abs(point.x - origin.x) >= abs(point.y - origin.y)
+            ? PixelPoint(x: point.x, y: origin.y)
+            : PixelPoint(x: origin.x, y: point.y)
+    }
+
+    private func strokeClone(
+        from a: PixelPoint, to b: PixelPoint, into coverage: inout [UInt8], before: Bitmap
+    ) -> PixelRect {
+        var dirty = PixelRect.empty
+        var x = a.x, y = a.y
+        let dx = abs(b.x - a.x)
+        let dy = -abs(b.y - a.y)
+        let sx = a.x < b.x ? 1 : -1
+        let sy = a.y < b.y ? 1 : -1
+        var err = dx + dy
+
+        while true {
+            dirty = dirty.union(stampCloneCoverage(at: PixelPoint(x: x, y: y), into: &coverage))
+            if x == b.x && y == b.y { break }
+            let e2 = 2 * err
+            if e2 >= dy { err += dy; x += sx }
+            if e2 <= dx { err += dx; y += sy }
+        }
+        recompositeClone(dirty, coverage: coverage, before: before)
+        return dirty
+    }
+
+    private func stampClone(
+        at point: PixelPoint, into coverage: inout [UInt8], before: Bitmap
+    ) -> PixelRect {
+        let dirty = stampCloneCoverage(at: point, into: &coverage)
+        recompositeClone(dirty, coverage: coverage, before: before)
+        return dirty
+    }
+
+    /// Maximum coverage, never additive, so holding still is a no-op.
+    private func stampCloneCoverage(
+        at point: PixelPoint, into coverage: inout [UInt8]
+    ) -> PixelRect {
+        let brush = settings.cloneSoftTip
+            ? Brush(shape: .soft, size: max(1, settings.brushSize))
+            : Brush(shape: .round, size: max(1, settings.brushSize))
+        let extent = brush.extent
+        var dirty = PixelRect.empty
+        for dy in extent.minY..<extent.maxY {
+            for dx in extent.minX..<extent.maxX {
+                let value = brush.coverage(dx: dx, dy: dy)
+                guard value > 0 else { continue }
+                let p = PixelPoint(x: point.x + dx, y: point.y + dy)
+                guard canvas.isInBounds(p) else { continue }
+                let index = canvas.index(p)
+                guard coverage[index] < value else { continue }
+                coverage[index] = value
+                dirty = dirty.union(PixelRect(x: p.x, y: p.y, width: 1, height: 1))
+            }
+        }
+        return dirty
+    }
+
+    /// Recompute the touched rect from `before`, every time.
+    ///
+    /// The invariant that makes this tool safe: a destination pixel is a function of
+    /// the pre-stroke canvas and the accumulated coverage, and of nothing this stroke
+    /// has written. Sample the live canvas instead and a drag that passes back over
+    /// its own source turns the source into a copy of the hole, then a copy of that.
+    private func recompositeClone(_ rect: PixelRect, coverage: [UInt8], before: Bitmap) {
+        let region = rect.intersection(canvas.bounds)
+        guard !region.isEmpty else { return }
+
+        let blurred = settings.cloneMode == .soften
+            ? softenSource(for: region, before: before)
+            : nil
+        let offset = cloneOffset
+        let strength = settings.cloneMode == .soften ? settings.softenStrength : settings.cloneOpacity
+
+        for y in region.minY..<region.maxY {
+            for x in region.minX..<region.maxX {
+                let p = PixelPoint(x: x, y: y)
+                let index = y * canvas.width + x
+                let value = coverage[index]
+                guard value > 0 else { continue }
+                // Clone honours the marquee, unlike the pencil and brush. A repair is
+                // aimed, and a stray Instant Alpha of the page would otherwise let a
+                // patch land anywhere.
+                let masked = selection.map { Int(value) * Int($0.coverage(at: p)) / 255 } ?? Int(value)
+                guard masked > 0 else { continue }
+                let t = UInt8(min(255, Double(masked) * strength))
+                guard t > 0 else { continue }
+
+                let target: RGBA8
+                if let blurred {
+                    target = blurred.pixel(at: PixelPoint(x: x - blurred.origin.x, y: y - blurred.origin.y))
+                } else {
+                    guard let offset else { continue }
+                    let source = PixelPoint(x: x + offset.x, y: y + offset.y)
+                    // Skipped, never wrapped and never clamped to the edge: both of
+                    // those paint a stripe of the opposite border into the artwork.
+                    guard before.isInBounds(source) else { continue }
+                    target = before.pixels[before.index(source)]
+                }
+                canvas.pixels[index] = before.pixels[index].lerping(toward: target, t: t)
+            }
+        }
+    }
+
+    /// A blurred copy of the region, taken from the pre-stroke snapshot.
+    ///
+    /// Both the destination pixel and its blur neighbourhood come from `before`, so
+    /// holding the pointer still converges on nothing: the same input produces the
+    /// same output however many events arrive. Sampling the live canvas instead is
+    /// what makes a smudge tool, and a smudge tool turns crisp artwork to mush under
+    /// a paused cursor.
+    private func softenSource(for region: PixelRect, before: Bitmap) -> BlurredCrop? {
+        let radius = max(1, settings.brushSize / 8)
+        let crop = region.insetBy(-radius).intersection(before.bounds)
+        guard !crop.isEmpty else { return nil }
+        let patch = before.extract(crop)
+        return BlurredCrop(
+            origin: PixelPoint(x: crop.minX, y: crop.minY),
+            width: crop.width,
+            height: crop.height,
+            pixels: Self.boxBlurPremul(
+                patch.pixels, width: crop.width, height: crop.height, radius: radius
+            )
+        )
+    }
+
+    /// A separable box blur over premultiplied pixels.
+    ///
+    /// Premultiplied on purpose. Un-premultiplying to blur and re-premultiplying
+    /// afterwards throws fireflies wherever alpha is small: the stored channels are
+    /// near zero there, dividing by a tiny alpha amplifies whatever noise is in them,
+    /// and the result is bright speckle in exactly the soft fringes this tool is
+    /// supposed to tidy up. A convex combination of premultiplied pixels is still
+    /// premultiplied, so `r, g, b <= a` survives.
+    static func boxBlurPremul(
+        _ pixels: [RGBA8], width: Int, height: Int, radius: Int
+    ) -> [RGBA8] {
+        guard width > 0, height > 0, radius > 0 else { return pixels }
+        var horizontal = [RGBA8](repeating: RGBA8(r: 0, g: 0, b: 0, a: 0), count: pixels.count)
+
+        @inline(__always) func mean(_ sum: Int, _ n: Int) -> UInt8 {
+            n == 0 ? 0 : UInt8(min(255, (sum + n / 2) / n))
+        }
+
+        for y in 0..<height {
+            for x in 0..<width {
+                var r = 0, g = 0, b = 0, a = 0, n = 0
+                for dx in -radius...radius {
+                    let sx = x + dx
+                    // Out of the crop simply does not count, which shrinks the window
+                    // at the border rather than pulling it towards black.
+                    guard sx >= 0, sx < width else { continue }
+                    let p = pixels[y * width + sx]
+                    r += Int(p.r); g += Int(p.g); b += Int(p.b); a += Int(p.a); n += 1
+                }
+                horizontal[y * width + x] = RGBA8(
+                    r: mean(r, n), g: mean(g, n), b: mean(b, n), a: mean(a, n))
+            }
+        }
+
+        var out = horizontal
+        for y in 0..<height {
+            for x in 0..<width {
+                var r = 0, g = 0, b = 0, a = 0, n = 0
+                for dy in -radius...radius {
+                    let sy = y + dy
+                    guard sy >= 0, sy < height else { continue }
+                    let p = horizontal[sy * width + x]
+                    r += Int(p.r); g += Int(p.g); b += Int(p.b); a += Int(p.a); n += 1
+                }
+                out[y * width + x] = RGBA8(
+                    r: mean(r, n), g: mean(g, n), b: mean(b, n), a: mean(a, n))
+            }
+        }
+        return out
+    }
+
+    /// A blurred rectangle, indexed in canvas coordinates.
+    struct BlurredCrop {
+        let origin: PixelPoint
+        let width: Int
+        let height: Int
+        let pixels: [RGBA8]
+
+        func pixel(at p: PixelPoint) -> RGBA8 {
+            let x = min(max(p.x, 0), width - 1)
+            let y = min(max(p.y, 0), height - 1)
+            return pixels[y * width + x]
+        }
     }
 
     private func stampHighlighterCoverage(

@@ -94,7 +94,7 @@ struct ToolbarGeometryTests {
     }
 
     /// The README quotes these, and they had rotted: it advertised a 48pt rail
-    /// long after the tool cell shrank to 34, and twelve tools when there have
+    /// long after the tool cell shrank to 34, and thirteen tools when there have
     /// been eleven. A number in prose cannot fail a build, so pin it to one
     /// that can.
     ///
@@ -106,7 +106,7 @@ struct ToolbarGeometryTests {
     @Test("The numbers the README quotes are still the numbers")
     func documentedGeometryMatchesTheTokens() throws {
         #expect(Tokens.Rail.toolColumns == 1)
-        #expect(ToolKind.allCases.count == 12)
+        #expect(ToolKind.allCases.count == 13)
         #expect(ShapeKind.allCases.count == 15)
 
         let readme = URL(fileURLWithPath: #filePath)
@@ -127,10 +127,10 @@ struct ToolbarGeometryTests {
         // is the whole mechanism. This test failing during a rewrite is it
         // working, not it being in the way.
         for phrase in [
-            "Twelve rail buttons",
+            "Thirteen rail buttons",
             "Fifteen shapes in all",
             "fifteen shapes behind Shape",
-            "**Twelve tools**",
+            "**Thirteen tools**",
         ] {
             #expect(prose.contains(phrase), "README no longer says \"\(phrase)\"")
         }
