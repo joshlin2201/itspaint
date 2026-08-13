@@ -14,8 +14,23 @@ import SwiftUI
 struct Tooltip: View {
     let title: String
     let shortcut: String?
+    /// One line under the title, for tools whose first drag is not obvious.
+    var detail: String? = nil
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            heading
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 210, alignment: .leading)
+            }
+        }
+    }
+
+    private var heading: some View {
         HStack(spacing: Tokens.Space.tight + 1) {
             Text(title)
                 .font(.system(size: 11.5, weight: .medium))
@@ -61,13 +76,14 @@ final class TooltipController {
     private(set) var visibleKey: String?
     private(set) var title: String = ""
     private(set) var shortcut: String?
+    private(set) var detail: String?
 
     @ObservationIgnored private var pendingKey: String?
     @ObservationIgnored private var work: DispatchWorkItem?
 
     var isVisible: Bool { visibleKey != nil }
 
-    func hover(key: String, title: String, shortcut: String?) {
+    func hover(key: String, title: String, shortcut: String?, detail: String? = nil) {
         guard pendingKey != key else { return }
         pendingKey = key
         work?.cancel()
@@ -77,6 +93,7 @@ final class TooltipController {
             visibleKey = key
             self.title = title
             self.shortcut = shortcut
+            self.detail = detail
             return
         }
 
@@ -86,6 +103,7 @@ final class TooltipController {
                 self.visibleKey = key
                 self.title = title
                 self.shortcut = shortcut
+                self.detail = detail
             }
         }
         work = item

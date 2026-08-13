@@ -106,6 +106,7 @@ struct ToolRail: View {
             symbol: symbol(for: kind),
             drawnGlyph: kind == .fill ? .bucket : nil,
             title: kind.displayName,
+            detail: kind.tip,
             shortcut: String(kind.shortcut).uppercased(),
             key: kind.rawValue,
             isSelected: model.tool == kind,
@@ -196,6 +197,8 @@ struct ToolCell: View {
     /// A glyph the system does not ship. `nil` uses `symbol`.
     var drawnGlyph: DrawnGlyph?
     let title: String
+    /// One line under the title, for a tool whose first drag is not obvious.
+    var detail: String?
     var shortcut: String?
     let key: String
     let isSelected: Bool
@@ -260,7 +263,7 @@ struct ToolCell: View {
         .onHover { hovering in
             isHovering = hovering
             hovering
-                ? tooltips.hover(key: key, title: title, shortcut: shortcut)
+                ? tooltips.hover(key: key, title: title, shortcut: shortcut, detail: detail)
                 : tooltips.endHover(key: key)
         }
         // A pressed state the finger can feel. `.plain` gives none, and a

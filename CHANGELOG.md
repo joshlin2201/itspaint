@@ -5,6 +5,30 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## [Unreleased]
+### Fixed
+- **A freehand curve came out as a chain of straight chords.** The engine joined
+  consecutive mouse samples with a straight line, so a quick drag left a visible
+  corner at every sample and read as a low frame rate rather than as a drawing.
+
+  Strokes now follow a Catmull-Rom curve through the samples. Catmull-Rom because it
+  passes *through* its control points: the line has to go where the hand went, and a
+  curve that merely approaches the samples would be smoother and also somewhere else.
+  The stroke trails the pointer by two mouse moves, which is what lets each gap be
+  drawn once with a point on either side to shape it, and `endStroke` flushes both.
+
+- **A freehand stroke with a round nib was still aliased.** The coverage renderer
+  that fixed diagonal shape outlines now covers freehand too. `.soft` keeps its own
+  falloff, `.square` stays hard for pixel art, and the pencil is untouched: its
+  promise is landing on the pixels you dragged over, so it gets neither the smoothing
+  nor the antialiasing.
+
+### Added
+- **Tooltips explain the tools a glyph cannot.** Clone, Select, Pixelate, Spotlight,
+  Step badge, Fill, Eyedropper and Highlighter each carry one line under the name
+  saying what the first drag does. Deliberately not every tool: a tip on the pencil
+  is noise, and once a panel explains everything a reader stops reading any of it.
+
 ## [0.16.0] — 2026-08-13
 ### Added
 - **Clone (`C`) and Soften (`F`).** The repair tool: copy pixels from one part of the

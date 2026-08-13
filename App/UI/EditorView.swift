@@ -192,7 +192,7 @@ struct EditorView: View {
         }
         .overlay(alignment: isVertical ? .topLeading : .bottomLeading) {
             if tooltips.isVisible {
-                Tooltip(title: tooltips.title, shortcut: tooltips.shortcut)
+                Tooltip(title: tooltips.title, shortcut: tooltips.shortcut, detail: tooltips.detail)
                     .offset(
                         x: isVertical ? Tokens.Rail.thickness + Tokens.Space.snug : 0,
                         y: isVertical ? Tokens.Chrome.titleReserve : -Tokens.Rail.thickness

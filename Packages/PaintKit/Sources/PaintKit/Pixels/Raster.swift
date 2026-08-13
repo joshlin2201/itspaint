@@ -277,6 +277,47 @@ public enum Raster {
         return dirty
     }
 
+    /// Points along a Catmull-Rom segment from `b` to `c`, using `a` and `d` as the
+    /// surrounding control points.
+    ///
+    /// A freehand stroke arrives as whatever the mouse happened to report, and the
+    /// engine used to join consecutive samples with straight lines. Move the pointer
+    /// quickly and the samples are far apart, so a curve comes out as a chain of
+    /// visible chords with corners at every sample — which is what a drag looks like
+    /// in the app today, and it reads as a low frame rate rather than as a drawing.
+    ///
+    /// Catmull-Rom because it **passes through** its control points. The stroke has to
+    /// go where the hand went; a Bézier that merely approaches the samples would be
+    /// smoother and would also be somewhere else.
+    public static func catmullRom(
+        _ a: PixelPoint, _ b: PixelPoint, _ c: PixelPoint, _ d: PixelPoint
+    ) -> [PixelPoint] {
+        let dx = Double(c.x - b.x), dy = Double(c.y - b.y)
+        let span = (dx * dx + dy * dy).squareRoot()
+        // One sample every two pixels is past the point where more would show, and
+        // the segment is at most a few tens of pixels: this is a mouse move, not a
+        // whole path.
+        let steps = min(48, max(1, Int(span / 2)))
+        guard steps > 1 else { return [c] }
+
+        var out: [PixelPoint] = []
+        out.reserveCapacity(steps)
+        for i in 1...steps {
+            let t = Double(i) / Double(steps)
+            let t2 = t * t, t3 = t2 * t
+            // Uniform Catmull-Rom, tension 0.5.
+            func axis(_ p0: Int, _ p1: Int, _ p2: Int, _ p3: Int) -> Int {
+                let v = 0.5 * ((2 * Double(p1))
+                    + (-Double(p0) + Double(p2)) * t
+                    + (2 * Double(p0) - 5 * Double(p1) + 4 * Double(p2) - Double(p3)) * t2
+                    + (-Double(p0) + 3 * Double(p1) - 3 * Double(p2) + Double(p3)) * t3)
+                return Int(v.rounded())
+            }
+            out.append(PixelPoint(x: axis(a.x, b.x, c.x, d.x), y: axis(a.y, b.y, c.y, d.y)))
+        }
+        return out
+    }
+
     // MARK: - Rectangles
 
     @discardableResult

@@ -48,7 +48,10 @@ public final class PaintEngine {
     private enum Gesture {
         case idle
         /// Continuously committed stroke (pencil, brush, eraser).
-        case freehand(before: Bitmap, last: PixelPoint, dirty: PixelRect, button: PointerButton)
+        /// Freehand carries a short tail of recent samples, not just the last one,
+        /// because a smooth curve through a point needs to know where the path was
+        /// coming from and where it is going next.
+        case freehand(before: Bitmap, tail: [PixelPoint], dirty: PixelRect, button: PointerButton)
         /// Highlighter: accumulates coverage, recomposites from `before` so
         /// overlapping passes within one stroke never darken.
         case highlight(before: Bitmap, coverage: [UInt8], last: PixelPoint, dirty: PixelRect, colour: RGBA8)
@@ -325,7 +328,7 @@ public final class PaintEngine {
                     at: point,
                     into: &canvas
                   )
-            gesture = .freehand(before: before, last: point, dirty: stepDirty, button: button)
+            gesture = .freehand(before: before, tail: [point], dirty: stepDirty, button: button)
             return dirty.union(stepDirty)
         }
 
@@ -339,29 +342,47 @@ public final class PaintEngine {
         case .idle:
             return .empty
 
-        case let .freehand(before, last, dirty, button):
+        case let .freehand(before, tail, dirty, button):
+            let last = tail.last ?? point
             // A spray tip keeps spraying where it is: repeating the same
             // point is how holding still builds density, so it must not
             // early-out.
-            let stepDirty = settings.isSpraying
-                ? Raster.sprayLine(
-                    from: last,
-                    to: point,
-                    brush: activeBrush,
+            if settings.isSpraying {
+                let stepDirty = Raster.sprayLine(
+                    from: last, to: point, brush: activeBrush,
                     colour: strokeColour(for: button).rgba8,
-                    density: settings.sprayDensity,
-                    into: &canvas,
-                    using: &spray
-                  )
-                : Raster.strokeLine(
-                    from: last,
-                    to: point,
-                    brush: activeBrush,
-                    colour: strokeColour(for: button).rgba8,
-                    into: &canvas
-                  )
+                    density: settings.sprayDensity, into: &canvas, using: &spray
+                )
+                gesture = .freehand(
+                    before: before, tail: [point], dirty: dirty.union(stepDirty), button: button
+                )
+                return stepDirty
+            }
+
+            var updated = tail
+            updated.append(point)
+            if updated.count > 4 { updated.removeFirst(updated.count - 4) }
+
+            let colour = strokeColour(for: button).rgba8
+            let stepDirty: PixelRect
+            if settings.tool.drawsPixelExact {
+                stepDirty = strokePath([point], from: last, colour: colour)
+            } else {
+                // Draw the gap *two* samples back, so the curve through it can be
+                // shaped by a point on either side. Each gap is drawn exactly once
+                // and the stroke trails the pointer by two mouse moves, which
+                // `endStroke` then flushes.
+                //
+                // Drawing anything earlier is what produced a visible straight chord
+                // and a forked overlap at the start of every stroke: the priming
+                // segment was drawn flat, and then the first spline drew the same gap
+                // again along a different path.
+                stepDirty = updated.count >= 3
+                    ? strokeGap(in: updated, colour: colour)
+                    : .empty
+            }
             gesture = .freehand(
-                before: before, last: point, dirty: dirty.union(stepDirty), button: button
+                before: before, tail: updated, dirty: dirty.union(stepDirty), button: button
             )
             return stepDirty
 
@@ -504,14 +525,32 @@ public final class PaintEngine {
         case .idle:
             return refreshed
 
-        case let .freehand(before, _, dirty, _):
+        case let .freehand(before, tail, dirty, _):
             gesture = .idle
+            // The smoother draws the segment *behind* the newest sample, so the last
+            // one or two are still pending when the button comes up. Without this the
+            // stroke stops short of where the hand did, by up to two mouse moves.
+            var flushed = dirty
+            if !settings.isSpraying, !settings.tool.drawsPixelExact, tail.count >= 2 {
+                // Two gaps are outstanding, because the smoother draws two samples
+                // behind the pointer. Without both, a stroke stops short of where the
+                // hand actually stopped.
+                let colour = strokeColour(for: .primary).rgba8
+                var points = tail
+                // Repeat the last sample so the final gap has a control point beyond
+                // its end and leaves the curve travelling straight, not hooking.
+                points.append(points[points.count - 1])
+                while points.count >= 3 {
+                    flushed = flushed.union(strokeGap(in: points, colour: colour))
+                    points.removeLast()
+                }
+            }
             // The variation names the edit, not the tool that owns it — the
             // same rule the shape case below follows, where a rectangle undoes
             // as "Rectangle" rather than as "Shape". A spray stroke is a spray.
             let name = settings.isSpraying ? "Spray" : settings.tool.displayName
-            recordEdit(name: name, before: before, dirty: dirty)
-            return refreshed.union(dirty)
+            recordEdit(name: name, before: before, dirty: flushed)
+            return refreshed.union(flushed)
 
         case let .highlight(before, _, _, dirty, _):
             gesture = .idle
@@ -1556,6 +1595,44 @@ public final class PaintEngine {
         }
 
         recomposite(dirty, coverage: coverage, before: before, colour: colour)
+        return dirty
+    }
+
+    /// Draw the gap between the second- and third-newest samples in `tail`.
+    ///
+    /// The neighbours on either side are the curve's controls; where one does not
+    /// exist yet, the endpoint stands in for it, which is what makes the very first
+    /// gap start straight out of the point the hand started at rather than curling.
+    private func strokeGap(in tail: [PixelPoint], colour: RGBA8) -> PixelRect {
+        let n = tail.count
+        guard n >= 3 else { return .empty }
+        let b = tail[n - 3], c = tail[n - 2], d = tail[n - 1]
+        let a = n >= 4 ? tail[n - 4] : b
+        return strokePath(Raster.catmullRom(a, b, c, d), from: b, colour: colour)
+    }
+
+    /// Draw a run of points as one connected stroke.
+    ///
+    /// Antialiased for a round nib, which is the one that produced visible stair steps
+    /// on a diagonal drag. `.soft` already feathers its own edge and `.square` is
+    /// deliberately hard for pixel art, so both keep stamping their mask; the pencil
+    /// never comes through here at all.
+    private func strokePath(_ points: [PixelPoint], from start: PixelPoint, colour: RGBA8) -> PixelRect {
+        var dirty = PixelRect.empty
+        var previous = start
+        let smooth = settings.smoothEdges
+            && !settings.tool.drawsPixelExact
+            && activeBrush.shape == .round
+        for p in points {
+            dirty = dirty.union(
+                smooth
+                    ? Raster.strokeSegmentSmooth(
+                        from: previous, to: p, width: activeBrush.size, colour: colour, into: &canvas)
+                    : Raster.strokeLine(
+                        from: previous, to: p, brush: activeBrush, colour: colour, into: &canvas)
+            )
+            previous = p
+        }
         return dirty
     }
 

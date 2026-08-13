@@ -135,6 +135,44 @@ public enum ToolKind: String, CaseIterable, Codable, Sendable, Identifiable {
         }
     }
 
+    /// One line saying what the drag does, for tools a glyph cannot explain.
+    ///
+    /// Deliberately not every tool. A tip on the pencil would be noise, and once a
+    /// panel explains everything a reader stops reading any of it. These are the
+    /// ones where the first drag does something other than the obvious: two of them
+    /// need a click *before* the drag, and three of them act on a region rather than
+    /// leaving a mark.
+    public var tip: String? {
+        switch self {
+        case .clone:
+            "Click a part that is intact, then drag over the part that is missing"
+        case .select:
+            "Drag a marquee. Rectangle, ellipse, lasso or Instant Alpha in the options"
+        case .pixelate:
+            "Drag over what should not be readable. Not secure redaction"
+        case .spotlight:
+            "Drag the part that matters. Everything outside it dims"
+        case .badge:
+            "Click to drop the next number. It counts up on its own"
+        case .fill:
+            "Click an area to flood it. Match sets how close a colour has to be"
+        case .eyedropper:
+            "Click to load a colour. Hold ⌥ with any tool to do the same"
+        case .highlighter:
+            "Keeps its own ink, and one stroke never darkens where it overlaps"
+        default:
+            nil
+        }
+    }
+
+    /// Whether this tool must land on exactly the pixels the drag passed over.
+    ///
+    /// The pencil, and nothing else. Its whole promise is a hard one-pixel nib on the
+    /// pixels you dragged across, so it gets neither the path smoothing that curves a
+    /// stroke between mouse samples nor an antialiased edge. Every other freehand tool
+    /// is drawing a line, not addressing pixels.
+    public var drawsPixelExact: Bool { self == .pencil }
+
     public var usesShapeKind: Bool { self == .shape }
 
     /// Whether to draw the brush footprint under the pointer.
