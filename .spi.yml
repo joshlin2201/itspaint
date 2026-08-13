@@ -1,0 +1,15 @@
+# Swift Package Index build configuration.
+#
+# Without this file SPI builds the package but shows no documentation link and no
+# declared platform on the package page — which is the page Swift developers actually
+# browse, and the one surface where this project's genuinely unusual property is
+# legible: a drawing engine with no UI and no third-party dependencies, that
+# `swift test` runs in a fresh clone with no Xcode.
+#
+# `documentation_targets` is what turns the doc comments already in the source into a
+# hosted DocC site on the package page.
+version: 1
+builder:
+  configs:
+    - platform: macosSpm
+      documentation_targets: [PaintKit]
