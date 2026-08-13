@@ -5,7 +5,7 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
-## [Unreleased]
+## [0.16.0] — 2026-08-13
 ### Added
 - **Clone (`C`) and Soften (`F`).** The repair tool: copy pixels from one part of the
   canvas to another, which is how you put back a chunk an AI generator left out of a
