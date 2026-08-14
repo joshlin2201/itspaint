@@ -188,7 +188,7 @@ demonstrably cannot phone home, and the source is right there.
 
 `docs/images/social-preview.png` is what renders on X, Slack, Discord and LinkedIn,
 and as the landing page's `og:image`. It is generated, and it carries text: the app
-name, the job, and **3.15 MB**.
+name, the job, and **3.16 MB**.
 
 No checker can read a PNG. `claims.py` catches a stale number in prose and
 `surfaces.py` catches one on the landing page, and both would sail past a share card
