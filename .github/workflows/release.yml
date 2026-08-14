@@ -98,6 +98,15 @@ jobs:
       # Package Index had a version whose tree contained the root manifest, ran
       # the entire build before failing on a mismatch it could have caught in
       # one second.
+      #
+      # It reads BOTH version files because reading one of them is how v0.16.2
+      # failed. `project.yml` is the source a person edits; `ItsPaint.xcodeproj`
+      # is committed, is what `xcodebuild` compiles, and is regenerated from
+      # project.yml by a separate `xcodegen generate` that is easy to forget. The
+      # guard read the file a person edits and the build read the file nobody had
+      # regenerated, so a one-second check passed and the Package step failed
+      # forty minutes later on `Bundle version 0.16.1 does not match release
+      # 0.16.2`. Check the file the compiler reads, not the one that describes it.
       - name: The tag must match the version in the tree
         env:
           EXPECTED: ${{ steps.release.outputs.bundle_version }}
@@ -110,7 +119,20 @@ jobs:
             echo "If this is a package-only tag rather than an app release, it does not belong on v*." >&2
             exit 1
           fi
-          echo "project.yml and the tag agree on $EXPECTED"
+          GENERATED="$(grep -m1 'MARKETING_VERSION = ' ItsPaint.xcodeproj/project.pbxproj | sed 's/.*= *//; s/;.*//')"
+          if [[ "$GENERATED" != "$EXPECTED" ]]; then
+            echo "::error::ItsPaint.xcodeproj builds $GENERATED but the tag asks for $EXPECTED, and the project is what xcodebuild reads." >&2
+            echo "Run 'xcodegen generate' after bumping project.yml, commit the project, then tag." >&2
+            exit 1
+          fi
+          # Every MARKETING_VERSION in the project, not just the first: the app and
+          # test configurations each carry one and they are only equal by generation.
+          if grep 'MARKETING_VERSION = ' ItsPaint.xcodeproj/project.pbxproj | grep -qv "= $EXPECTED;"; then
+            echo "::error::ItsPaint.xcodeproj carries more than one MARKETING_VERSION and they are not all $EXPECTED." >&2
+            grep -n 'MARKETING_VERSION = ' ItsPaint.xcodeproj/project.pbxproj >&2
+            exit 1
+          fi
+          echo "project.yml, ItsPaint.xcodeproj and the tag agree on $EXPECTED"
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.4.app
