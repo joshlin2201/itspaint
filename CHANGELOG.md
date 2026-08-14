@@ -5,7 +5,12 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
-## [0.16.2] — 2026-08-13
+## [0.16.3] — 2026-08-13
+
+`v0.16.2` is a tag with no release behind it. Its build failed on a stale
+`ItsPaint.xcodeproj`, and the tag ruleset does not allow a published `v*` to be moved
+or deleted, so the same changes ship here. As a Swift package either tag resolves.
+
 ### Changed
 - **PaintKit now declares macOS 12 instead of macOS 14.** The engine has no UI and no
   dependencies and uses no API newer than Monterey; it had the app's deployment target

@@ -192,7 +192,7 @@ the app so you can pick whichever suits you:
 The engine is also a dependency you can use without the app:
 
 ```swift
-.package(url: "https://github.com/joshlin2201/itspaint", from: "0.16.2")
+.package(url: "https://github.com/joshlin2201/itspaint", from: "0.16.3")
 ```
 
 The app needs macOS 14, but the engine does not and no longer says it does: PaintKit
