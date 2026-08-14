@@ -7,7 +7,7 @@ body:
     attributes:
       label: ItsPaint version
       description: ItsPaint ▸ About ItsPaint, or the release you downloaded.
-      placeholder: "0.10.0"
+      placeholder: "0.16.1"
     validations: { required: true }
   - type: input
     id: macos
