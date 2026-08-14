@@ -192,8 +192,13 @@ the app so you can pick whichever suits you:
 The engine is also a dependency you can use without the app:
 
 ```swift
-.package(url: "https://github.com/joshlin2201/itspaint", from: "0.16.1")
+.package(url: "https://github.com/joshlin2201/itspaint", from: "0.16.2")
 ```
+
+The app needs macOS 14, but the engine does not and no longer says it does: PaintKit
+declares **macOS 12**. It had the app's floor by inheritance rather than by need, and
+that is not a warning a consumer can ignore — SwiftPM refuses to resolve at all when a
+dependency's deployment target is above yours.
 
 That gets you a product shot off its page in four lines, on device, with no model and
 no network:
@@ -206,10 +211,12 @@ guard engine.removeBackground() else { fatalError("no background to remove") }
 try ImageCodec.encode(engine.canvas, as: .png).write(to: output)
 ```
 
-Those four lines are compiled and run against the published tag, and checked by
-counting transparent pixels rather than by whether the program exited quietly. On a
-60px mark centred on a 400×400 page the count goes from 0 to 156,400, which is
-160,000 minus the 3,600 pixels of subject.
+Those four lines are compiled on every push, by a CI job that builds them from a
+package outside this repository — the one that declares macOS 12, so the floor above
+cannot quietly rise. And the result is checked by counting transparent pixels rather
+than by whether the program exited quietly: on a 60px mark centred on a 400×400 page
+the count goes from 0 to 156,400, which is 160,000 minus the 3,600 pixels of subject,
+asserted for six subject sizes.
 
 If you do depend on it: it ships often while it is in beta, and until 1.0 a minor
 version may still carry a breaking change to the document format —

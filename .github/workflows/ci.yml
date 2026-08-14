@@ -38,23 +38,78 @@ jobs:
       # a `.package(url:)` dependency and the Swift Package Index can all see the
       # engine. It vends the same targets from the same directories, so the two can
       # only disagree by mistake — this is what notices.
+      # Platforms are in here because they were not, and the deployment target is
+      # the one field a consumer feels before any of their code compiles: SwiftPM
+      # refuses to resolve when the dependency's floor is above the consumer's.
       - name: Root and nested manifests agree
         run: |
           names() {
             swift package --package-path "$1" dump-package | python3 -c \
-              'import json,sys; d=json.load(sys.stdin); print(sorted(p["name"] for p in d["products"]), sorted(t["name"] for t in d["targets"]))'
+              'import json,sys; d=json.load(sys.stdin); print(sorted(p["name"] for p in d["products"]), sorted(t["name"] for t in d["targets"]), sorted((p["platformName"], p["version"]) for p in d["platforms"]))'
           }
           root=$(names .)
           nested=$(names Packages/PaintKit)
           echo "root:   $root"
           echo "nested: $nested"
           if [ "$root" != "$nested" ]; then
-            echo "::error::Package.swift and Packages/PaintKit/Package.swift declare different products or targets."
+            echo "::error::Package.swift and Packages/PaintKit/Package.swift declare different products, targets or platforms."
             exit 1
           fi
       # What someone gets from `git clone && swift build`, with no Xcode project.
       - name: Build from the repository root
         run: swift build
+
+  consumer:
+    name: README snippet builds as a dependency
+    runs-on: macos-15
+    # The README tells a stranger to add one `.package(url:)` line and gives four
+    # lines of code. Until this job existed that pair had been compiled exactly once,
+    # by hand, against 0.13.1 — and the README said so in the present tense for four
+    # releases afterwards. It also asserts the floor: this package declares macOS 12,
+    # so raising the engine's deployment target fails here rather than in someone
+    # else's resolver.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+      - name: Build the four README lines from outside the repository
+        run: |
+          set -euo pipefail
+          # Outside the checkout on purpose: inside it, SwiftPM would find the
+          # repository's own manifests and stop proving anything about a consumer.
+          consumer="$RUNNER_TEMP/Consumer"
+          mkdir -p "$consumer/Sources/Consumer"
+          cat > "$consumer/Package.swift" <<EOF
+          // swift-tools-version: 6.0
+          import PackageDescription
+
+          let package = Package(
+              name: "Consumer",
+              platforms: [.macOS(.v12)],
+              dependencies: [.package(path: "$GITHUB_WORKSPACE")],
+              targets: [
+                  .executableTarget(
+                      name: "Consumer",
+                      dependencies: [.product(name: "PaintKit", package: "itspaint")]
+                  )
+              ]
+          )
+          EOF
+          # These four lines are the README's, verbatim. If the README changes them,
+          # change them here; if that feels like duplication, it is the duplication
+          # that makes the README's claim checkable.
+          cat > "$consumer/Sources/Consumer/main.swift" <<'EOF'
+          import Foundation
+          import PaintKit
+
+          let input = URL(fileURLWithPath: CommandLine.arguments[1])
+          let output = URL(fileURLWithPath: CommandLine.arguments[2])
+
+          let engine = PaintEngine(canvas: try ImageCodec.decode(contentsOf: input))
+          guard engine.removeBackground() else { fatalError("no background to remove") }
+          try ImageCodec.encode(engine.canvas, as: .png).write(to: output)
+          EOF
+          swift build --package-path "$consumer"
 
   app:
     name: App build and tests

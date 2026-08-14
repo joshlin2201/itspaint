@@ -20,7 +20,7 @@ import PackageDescription
 // package cannot build on the Xcode that ships with the current GitHub runners.
 let package = Package(
     name: "PaintKit",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v12)],
     products: [
         .library(name: "PaintKit", targets: ["PaintKit"]),
         // Generates sample artwork by driving the real engine. Used for

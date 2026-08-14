@@ -5,6 +5,24 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## [0.16.2] — 2026-08-13
+### Changed
+- **PaintKit now declares macOS 12 instead of macOS 14.** The engine has no UI and no
+  dependencies and uses no API newer than Monterey; it had the app's deployment target
+  because it sits in the app's repository, not because anything in it needed one. That
+  is not a floor a consumer can shrug at either — SwiftPM refuses to resolve the
+  dependency at all when its target is above yours, so every app on 12 or 13 got a hard
+  error instead of a warning. The app still requires macOS 14.
+
+### Fixed
+- **Two claims in the README that nothing measured.** "Compiled and run against the
+  published tag" was true of one manual run against 0.13.1 and had been written in the
+  present tense for four releases; there is now a CI job that builds the four-line
+  snippet from a package outside this repository, which also holds the new floor in
+  place. And "the count goes from 0 to 156,400" was asserted nowhere — the test using
+  that exact fixture checked two pixels. It now counts the page, for all six subject
+  sizes.
+
 ## [0.16.1] — 2026-08-13
 ### Fixed
 - **A closed-hand cursor could outlive its drag.** `NSCursor.push` is a global stack

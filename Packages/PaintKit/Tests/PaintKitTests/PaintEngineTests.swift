@@ -818,6 +818,17 @@ struct SelectionTests {
             engine.canvas.pixel(at: PixelPoint(x: 200, y: 200))?.a == 255,
             "the subject did not survive"
         )
+        // Two pixels are two pixels. Count the page, because "cleared the corner and
+        // kept the middle" is also true of a command that cleared only the corner.
+        // 400×400 minus the subject, exactly — the 60px row is the 156,400 the README
+        // quotes, and every other row is the same arithmetic.
+        var cleared = 0
+        for y in 0..<400 {
+            for x in 0..<400 where engine.canvas.pixel(at: PixelPoint(x: x, y: y))?.a == 0 {
+                cleared += 1
+            }
+        }
+        #expect(cleared == 160_000 - subject * subject, "cleared \(cleared) pixels")
     }
 
     /// A page that is already transparent is not a background to remove.
