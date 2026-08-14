@@ -32,8 +32,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
-    MARKETING_VERSION: "0.16.1"
-    CURRENT_PROJECT_VERSION: "11"
+    MARKETING_VERSION: "0.16.2"
+    CURRENT_PROJECT_VERSION: "12"
     DEVELOPMENT_TEAM: ""
     # Ad-hoc signing. This is the correct choice for a locally built sandboxed
     # app: the sandbox and its entitlements work, and it needs no provisioning
