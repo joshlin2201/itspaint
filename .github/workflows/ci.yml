@@ -95,20 +95,35 @@ jobs:
               ]
           )
           EOF
-          # These four lines are the README's, verbatim. If the README changes them,
-          # change them here; if that feels like duplication, it is the duplication
-          # that makes the README's claim checkable.
-          cat > "$consumer/Sources/Consumer/main.swift" <<'EOF'
-          import Foundation
-          import PaintKit
+          # The code is READ OUT OF THE README rather than copied here. A copy would
+          # compile happily while the README drifted away from it, which is the exact
+          # failure this job exists to catch, one level up.
+          python3 - "$consumer/Sources/Consumer/main.swift" <<'PY'
+          import re, sys
 
-          let input = URL(fileURLWithPath: CommandLine.arguments[1])
-          let output = URL(fileURLWithPath: CommandLine.arguments[2])
+          readme = open("README.md").read()
+          blocks = [b for b in re.findall(r"```swift\n(.*?)```", readme, re.S)
+                    if "import PaintKit" in b]
+          if len(blocks) != 1:
+              sys.exit(f"expected one ```swift block importing PaintKit in README.md, found {len(blocks)}")
+          block = blocks[0]
+          if "removeBackground" not in block:
+              sys.exit("the README's PaintKit example no longer calls removeBackground — "
+                       "this job would compile something that proves nothing")
 
-          let engine = PaintEngine(canvas: try ImageCodec.decode(contentsOf: input))
-          guard engine.removeBackground() else { fatalError("no background to remove") }
-          try ImageCodec.encode(engine.canvas, as: .png).write(to: output)
-          EOF
+          # Swift wants imports at the top, and the README's snippet leaves `input`
+          # and `output` to the reader. Everything between is the README's, unedited.
+          imports = [l for l in block.splitlines() if l.startswith("import ")]
+          body = [l for l in block.splitlines() if not l.startswith("import ")]
+          open(sys.argv[1], "w").write("\n".join([
+              "import Foundation", *imports,
+              'let input = URL(fileURLWithPath: CommandLine.arguments[1])',
+              'let output = URL(fileURLWithPath: CommandLine.arguments[2])',
+              *body,
+          ]) + "\n")
+          PY
+          echo "--- what the README actually says, and what is being compiled ---"
+          cat "$consumer/Sources/Consumer/main.swift"
           swift build --package-path "$consumer"
 
   app:
