@@ -29,11 +29,11 @@ not use this app.
   that rejected an image more certainly the better it fitted the feature, for three
   releases. A threshold satisfied by its own test fixture and crossed by ordinary
   input, kept invisible by a paragraph arguing the failure was deliberate.
-- **[CHECKS_THAT_MISS.md](CHECKS_THAT_MISS.md)** — seven checks that passed while the
-  thing they were checking was broken, three in the app and four in the release
-  tooling. A guard satisfied only by its own fixture, a probe that read the exit code
-  instead of the pixels, a health check verifying a different service than the one it
-  gated, and a quorum gate with one judge left alive.
+- **[CHECKS_THAT_MISS.md](CHECKS_THAT_MISS.md)** — a running list of checks that
+  passed while the thing they were checking was broken, some in the app and more in
+  the release tooling. A guard satisfied only by its own fixture, a probe that read
+  the exit code instead of the pixels, a health check verifying a different service
+  than the one it gated, and a quorum gate with one judge left alive.
 - **[BACKGROUND_REMOVAL.md](BACKGROUND_REMOVAL.md)** — taking a product shot off its
   page with no model, no weights and no network: four corner-seeded flood fills
   unioned, in about thirty lines on top of the paint bucket.

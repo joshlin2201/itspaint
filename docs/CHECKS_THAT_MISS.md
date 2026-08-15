@@ -124,7 +124,7 @@ the two runs. Then it caught its own fix: a stated commit count went stale the m
 the fix was pushed. A number that changes on every push does not belong in prose.
 
 
-## 9. The checker that had never read the documents that were wrong
+## 8. The checker that had never read the documents that were wrong
 
 `claims.py` measures the test counts, the download size, the tool count and the repo
 statistics, then fails on any document that disagrees. It is the thing that stops a
@@ -145,7 +145,7 @@ excluded, rather than ignored unless included.
 **An allowlist inverts the default.** Anything you forget to add is silently exempt,
 and the report cannot tell you what it did not look at.
 
-## 10. The fix was published, the checker agreed, and half of it was still wrong
+## 9. The fix was published, the checker agreed, and half of it was still wrong
 
 The landing page said "under 3 MB" while the download had grown past three megabytes.
 Corrected through the site's API, published, and `surfaces.py` — the checker written
@@ -164,7 +164,7 @@ The visible headline said 3.12 MB. Every link preview, on every platform, still 
 a crawler reads are different strings, and a checker that reads the visible text has
 checked the half that somebody would have noticed anyway.
 
-## 11. The test that was written for the bug, and passed with the bug present
+## 10. The test that was written for the bug, and passed with the bug present
 
 A clone stamp must read the canvas as it was *before* the stroke started. Read the
 live canvas instead and dragging back across your own source turns the source into a
@@ -181,7 +181,7 @@ made was true for a reason that had nothing to do with the rule it was named aft
 **Break the code and watch the test fail, or you have not tested the code.** This is
 the same lesson as §1 and it was learned four days earlier, in writing, in this file.
 
-## 12. A screenshot of the new UI, perfectly present and perfectly invisible
+## 11. A screenshot of the new UI, perfectly present and perfectly invisible
 
 Tooltips gained a second line, so a test rendered every one of them to a PNG and
 asserted the size — new chrome nobody has looked at is chrome nobody has checked.
