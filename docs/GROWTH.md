@@ -214,7 +214,7 @@ slot rather than describe features.
 > On macOS the only thing in the gap is Markup, which cannot number the steps
 > of a bug report or redact a token.
 >
-> So: twelve tools, both colours and the palette on screen at once, ~5k lines
+> So: thirteen tools, both colours and the palette on screen at once, ~5k lines
 > of UI-free Swift engine underneath, no third-party dependencies, no network
 > code at all, MIT. The document format is a PNG with a JSON sidecar so it
 > opens in anything.

@@ -7,8 +7,11 @@ channel, not a replacement.
 
 ## Status
 
-**Apple ID 6796493980.** 0.11.0 and 0.12.0 are Ready for Sale. **0.13.0 is
-Waiting for Review** — build 5, submitted 2026-08-08.
+**Apple ID 6796493980.** Which version is on sale, and which is being prepared
+behind it, is not written down here: it moves every release and a transcribed
+version number is stale the day after it is typed. `GET
+/v1/apps/6796493980/appStoreVersions` answers it, and the release tooling prints
+it before every publication.
 
 Updating an existing app is a shorter loop than the first submission: the app
 record, privacy label, pricing, age rating, categories and review contact are
@@ -78,83 +81,45 @@ Screenshots regenerate with `scripts/appstore-screenshots.sh` into
 
 ## Listing
 
+The fields that do not change per release:
+
 | Field | Value |
 |---|---|
 | Name | ItsPaint |
-| Subtitle | Paste, mark up, and send. |
 | Primary category | Graphics & Design |
 | Secondary category | Productivity |
 | Price | Free |
 | Bundle ID | com.joshlin.itspaint |
 | SKU | itspaint |
-| Support URL | https://sites.fynesite.com/itspaint/ |
-| Marketing URL | https://github.com/joshlin2201/itspaint |
-| Privacy Policy URL | https://sites.fynesite.com/itspaint-privacy/ |
 | Copyright | Josh Lin |
+| Locales | `en-GB` only — writing to a locale the app does not have is a 404, not a create |
 
 The repository's voice is British English ("colours", "licence"); keep it in
 the listing rather than half-translating it.
 
-### Keywords (85 of 100 characters)
+**The listing copy itself is not transcribed here any more.** The subtitle, the
+promotional text, the keywords, the description and the support and marketing
+URLs are held as data in the release tooling, applied field by field, and
+verified by reading the listing back from Apple rather than by trusting the
+`200`.
 
-```
-paint,markup,screenshot,annotate,pixelate,redact,draw,image,editor,sketch,badge,arrow
-```
+That is a deliberate deletion, and this is what it cost to learn. This section
+held a second copy of all six on 2026-08-17, and every one of them disagreed
+with the listing it described: the subtitle was the one retired the day before,
+the support URL was the pre-domain host, the marketing URL was this repository
+rather than the site, the keyword string was two terms short of the one Apple
+was serving, and the description said **"Twelve tools"** while `ToolKind` had
+thirteen. What it had lost was Clone and Spotlight — and the 0.11.0 release
+note further down this same file says "Thirteen tools" correctly, so the file
+contradicted itself as well as the app.
 
-### Promotional text (137 of 170 characters)
+None of that was catchable. The repository's number-checker reads markdown and
+these were quotations inside a document; the listing lives at Apple, which it
+cannot see at all.
 
-> Number the steps, pixelate the token, knock out the background — the markup
-> jobs that usually take three apps, in one quick native window.
-
-### Description
-
-> ItsPaint is a focused paint app for the Mac. Open an image, make a quick
-> edit, and export it without setting up a workspace — the tools, colours, and
-> palette stay visible in one native window.
->
-> It covers the markup jobs that usually take three apps: number the steps of
-> a bug report with automatic step badges, pixelate a token before a
-> screenshot leaves your Mac, and knock a background out with Instant Alpha.
->
-> TOOLS
-> • Twelve tools: pencil, brush (round, square, soft, and spray tips),
-> highlighter, eraser, shape, text, step badge, fill, eyedropper, selection,
-> pixelate, and spotlight. Instant Alpha is one of four ways to select, alongside
-> rectangle, ellipse and lasso
-> • Fifteen shapes — lines, curves, arrows, rectangles, ellipses, triangles,
-> polygons, stars, and a speech bubble — with solid, dashed, or dotted
-> outlines and optional fills
-> • Step badges count up on their own: click 1, 2, 3 across a screenshot
-> • Pixelate for quick visual de-emphasis of the bits you'd rather not ship
-> • Instant Alpha removes a background deterministically, with a tolerance you
-> control — no model deciding for you
-> • Remove Background does the same job in one command, and declines rather
-> than guessing when the image is too flat to key safely
-> • Signature capture: sign with a trackpad, mouse or tablet, or import a photo
-> of a signature on paper — the ink is keyed to transparent and trimmed to
-> itself, so it lands on the artwork instead of on a white patch
->
-> CANVAS
-> • Pointer-centred zoom, pixel grid, and live tool footprints
-> • Paste without losing anything: the canvas grows to hold a larger image,
-> and the window follows
-> • Rotate by any angle, with the canvas growing to fit the corners
-> • Crop, canvas resize, and scale
->
-> FILES
-> • Editable .itspaint documents: a lossless PNG with a JSON sidecar, so the
-> file opens anywhere
-> • Export to PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF, and ICO, with
-> format and scale controls
-> • Opens PNG, JPEG, TIFF, BMP, GIF, and HEIC
->
-> PRIVATE BY CONSTRUCTION
-> • No account, no telemetry, no cloud — the app contains no network code at
-> all
-> • Sandboxed, and it reads only the files you choose
-> • Open source under the MIT licence
->
-> Requires macOS 14 Sonoma or later. Runs natively on Apple silicon and Intel.
+The count is now measured out of `ToolKind.swift` before the description can be
+written anywhere, so a tool added or removed fails the publication rather than
+quietly making the store page wrong.
 
 ### What's New
 
@@ -236,7 +201,7 @@ the app contains no third-party content.
 | Third-party dependencies | None |
 | Export compliance | `ITSAppUsesNonExemptEncryption` = false in Info.plist |
 | Category | `public.app-category.graphics-design` in Info.plist |
-| Version / build | 0.13.0 (5) — bump `CURRENT_PROJECT_VERSION` in project.yml for each re-upload of the same version |
+| Version / build | `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in project.yml, then `xcodegen generate` — the committed `.xcodeproj` is what `xcodebuild` reads, and a re-upload of the same version needs a new build number |
 | Upload toolchain | Xcode 26+ required by Apple since 2026-04-28; 26.6 installed |
 | Universal | arm64 + x86_64, asserted by the archive script |
 
