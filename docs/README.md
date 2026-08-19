@@ -11,7 +11,7 @@ Six documents about the app, in the order they are worth reading.
 | **[TESTING.md](TESTING.md)** | The testing protocol: what each suite is for, how to write a test that stays useful, the guard tests, and the three app-host failure modes that each cost a day. |
 | **[ROADMAP.md](ROADMAP.md)** | Path forward — now / next / later, what is explicitly not planned, and exactly how a release is cut. |
 
-Three about where it goes and who else is in the space:
+Four about where it goes and who else is in the space:
 
 | | |
 |---|---|
@@ -62,3 +62,8 @@ Contributor-facing material lives at the repository root:
    where the code goes.
 3. [TESTING](TESTING.md) § *What a new tool needs* — the four tests to write.
 4. [DESIGN](DESIGN.md) § *Tokens* — if it has a surface.
+
+The engine is a separate, UI-free package: `Packages/PaintKit` imports no AppKit and
+no third-party code, declares macOS 12, and `swift test` runs it in a fresh clone with
+no Xcode. It ships often while it is in beta. **Watch ▸ Custom ▸ Releases** is the
+quietest way to hear about a new build — it does not mail you issues or comments.
