@@ -195,6 +195,16 @@ The engine is also a dependency you can use without the app:
 .package(url: "https://github.com/joshlin2201/itspaint", from: "0.16.3")
 ```
 
+[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/joshlin2201/itspaint)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/joshlin2201/itspaint)
+
+Those two are served from the Swift Package Index's own API rather than written here,
+so they report what it built, on a machine that is not mine, and they go red without
+anybody having to notice. The same page records [zero data-race-safety
+errors](https://swiftpackageindex.com/joshlin2201/itspaint/builds) — every target in
+both manifests is `swiftLanguageMode(.v6)`, so strict concurrency is on and nothing is
+waived.
+
 The app needs macOS 14, but the engine does not and no longer says it does: PaintKit
 declares **macOS 12**. It had the app's floor by inheritance rather than by need, and
 that is not a warning a consumer can ignore — SwiftPM refuses to resolve at all when a
