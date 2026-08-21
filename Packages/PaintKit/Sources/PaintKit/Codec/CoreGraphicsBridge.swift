@@ -147,18 +147,9 @@ public extension Bitmap {
         let rowBytes = bytesPerRow
         let (byteCount, overflow) = rowBytes.multipliedReportingOverflow(by: height)
         guard !overflow else { return }
-        var scratch = [UInt8](repeating: 0, count: byteCount)
-
-        pixels.withUnsafeBytes { source in
-            scratch.withUnsafeMutableBytes { destination in
-                if let s = source.baseAddress, let d = destination.baseAddress {
-                    d.copyMemory(from: s, byteCount: byteCount)
-                }
-            }
-        }
-
-        let produced: [RGBA8]? = scratch.withUnsafeMutableBytes { raw -> [RGBA8]? in
-            guard let base = raw.baseAddress,
+        pixels.withUnsafeMutableBytes { raw in
+            guard raw.count == byteCount,
+                  let base = raw.baseAddress,
                   let context = CGContext(
                     data: base,
                     width: width,
@@ -168,18 +159,11 @@ public extension Bitmap {
                     space: Bitmap.colourSpace,
                     bitmapInfo: Bitmap.bitmapInfo.rawValue
                   )
-            else { return nil }
+            else { return }
 
             context.translateBy(x: 0, y: CGFloat(height))
             context.scaleBy(x: 1, y: -1)
             body(context)
-
-            let typed = raw.bindMemory(to: RGBA8.self)
-            return Array(typed)
-        }
-
-        if let produced, produced.count == pixels.count {
-            pixels = produced
         }
     }
 }

@@ -1,6 +1,27 @@
 import AppKit
 import PaintKit
 
+/// Writes one immutable canvas snapshot to the sandbox's temporary directory
+/// for the system share sheet. Keeping this at the file boundary lets the
+/// codec stream straight to disk instead of retaining encoded PNG data beside
+/// the bitmap in memory.
+enum ShareImageWriter {
+    static func write(_ canvas: Bitmap, displayName: String) throws -> URL {
+        let name = (displayName.isEmpty ? "Untitled" : displayName)
+            .replacingOccurrences(of: "/", with: "-")
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("Share-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true
+        )
+        let url = directory
+            .appendingPathComponent(name)
+            .appendingPathExtension("png")
+        try ImageCodec.write(canvas, to: url, as: .png)
+        return url
+    }
+}
+
 /// Menu command implementations.
 ///
 /// These live on the document because the document is in the responder chain
@@ -141,7 +162,7 @@ extension DrawingDocument {
 
         let items: [Any]
         do {
-            items = [try exportedImageURL()]
+            items = [try ShareImageWriter.write(model.canvas, displayName: displayName)]
         } catch {
             // Sharing is not worth failing over — fall back to the image
             // itself, which still reaches every service that takes one.
@@ -164,26 +185,6 @@ extension DrawingDocument {
             )
             picker.show(relativeTo: anchor, of: view, preferredEdge: .minY)
         }
-    }
-
-    /// Write the canvas to a uniquely-named temporary `.png` for sharing.
-    ///
-    /// Uniquely-named because sharing the same document twice in a session must
-    /// not have the second share silently hand out the first one's pixels.
-    private func exportedImageURL() throws -> URL {
-        let data = try ImageCodec.encode(model.canvas, as: .png)
-        let name = (displayName.isEmpty ? "Untitled" : displayName)
-            .replacingOccurrences(of: "/", with: "-")
-        let directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent("Share-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: directory, withIntermediateDirectories: true
-        )
-        let url = directory
-            .appendingPathComponent(name)
-            .appendingPathExtension("png")
-        try data.write(to: url, options: .atomic)
-        return url
     }
 
     @IBAction func showSettings(_ sender: Any?) {

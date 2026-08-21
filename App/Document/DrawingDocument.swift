@@ -551,20 +551,28 @@ final class DrawingDocument: NSDocument {
 
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
-            do {
-                let scaled = try options.scaled(self.model.canvas)
-                try ImageCodec.write(
-                    scaled,
-                    to: url,
-                    as: options.format,
-                    quality: options.quality,
-                    matte: self.model.background
-                )
-            } catch {
-                self.model.present(
-                    message: error.localizedDescription,
-                    recovery: (error as? ImageCodec.CodecError)?.recoverySuggestion
-                )
+            let job = options.job(
+                canvas: self.model.canvas,
+                matte: self.model.background
+            )
+            Task { @MainActor [weak self] in
+                let failure = await Task.detached(priority: .userInitiated) {
+                    do {
+                        try job.write(to: url)
+                        return nil as ExportFailure?
+                    } catch {
+                        return ExportFailure(
+                            message: error.localizedDescription,
+                            recovery: (error as? ImageCodec.CodecError)?.recoverySuggestion
+                        )
+                    }
+                }.value
+                if let failure {
+                    self?.model.present(
+                        message: failure.message,
+                        recovery: failure.recovery
+                    )
+                }
             }
         }
     }
@@ -616,6 +624,59 @@ struct DocumentMetadata: Codable {
     let palette: Palette
 }
 
+/// Everything an export needs, captured when the save panel closes.
+///
+/// Value semantics make this an immutable snapshot of the pixels and settings,
+/// so the encoder can leave the main actor without racing a later edit.
+struct ExportJob: Sendable {
+    let canvas: Bitmap
+    let format: ImageCodec.Format
+    let scale: Double
+    let quality: Double
+    let matte: PaintColour
+
+    func scaledCanvas() throws -> Bitmap {
+        guard scale != 1 else { return canvas }
+        let rawWidth = (Double(canvas.width) * scale).rounded()
+        let rawHeight = (Double(canvas.height) * scale).rounded()
+        guard rawWidth.isFinite, rawHeight.isFinite,
+              rawWidth >= 1, rawHeight >= 1,
+              rawWidth <= Double(Int.max), rawHeight <= Double(Int.max)
+        else {
+            throw ImageCodec.CodecError.imageTooLarge(
+                width: Bitmap.maximumDimension + 1,
+                height: Bitmap.maximumDimension + 1
+            )
+        }
+        let target = (width: Int(rawWidth), height: Int(rawHeight))
+        guard Bitmap.isSizeSupported(width: target.width, height: target.height) else {
+            throw ImageCodec.CodecError.imageTooLarge(
+                width: target.width,
+                height: target.height
+            )
+        }
+        guard let scaled = ImageTransform.scaled(canvas, to: target, using: .smooth) else {
+            throw ImageCodec.CodecError.encodeFailed(format)
+        }
+        return scaled
+    }
+
+    func write(to url: URL) throws {
+        try ImageCodec.write(
+            scaledCanvas(),
+            to: url,
+            as: format,
+            quality: quality,
+            matte: matte
+        )
+    }
+}
+
+private struct ExportFailure: Sendable {
+    let message: String
+    let recovery: String?
+}
+
 /// What the export panel collects.
 ///
 /// Observable so the accessory view can drive the panel's own file type as the
@@ -628,34 +689,19 @@ final class ExportOptions {
     var scale: Double = 1
     var quality: Double = 0.9
 
+    func job(canvas: Bitmap, matte: PaintColour) -> ExportJob {
+        ExportJob(
+            canvas: canvas,
+            format: format,
+            scale: scale,
+            quality: quality,
+            matte: matte
+        )
+    }
+
     /// The artwork at the chosen scale, resampled smoothly.
     func scaled(_ bitmap: Bitmap) throws -> Bitmap {
-        guard scale != 1 else { return bitmap }
-        let rawWidth = (Double(bitmap.width) * scale).rounded()
-        let rawHeight = (Double(bitmap.height) * scale).rounded()
-        guard rawWidth.isFinite, rawHeight.isFinite,
-              rawWidth >= 1, rawHeight >= 1,
-              rawWidth <= Double(Int.max), rawHeight <= Double(Int.max)
-        else {
-            throw ImageCodec.CodecError.imageTooLarge(
-                width: Bitmap.maximumDimension + 1,
-                height: Bitmap.maximumDimension + 1
-            )
-        }
-        let target = (
-            width: Int(rawWidth),
-            height: Int(rawHeight)
-        )
-        guard Bitmap.isSizeSupported(width: target.width, height: target.height) else {
-            throw ImageCodec.CodecError.imageTooLarge(
-                width: target.width,
-                height: target.height
-            )
-        }
-        guard let scaled = ImageTransform.scaled(bitmap, to: target, using: .smooth) else {
-            throw ImageCodec.CodecError.encodeFailed(format)
-        }
-        return scaled
+        try job(canvas: bitmap, matte: .white).scaledCanvas()
     }
 }
 

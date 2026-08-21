@@ -36,6 +36,12 @@ Use this description:
 >
 > Requires macOS 14 or later. Runs natively on Apple silicon and Intel.
 
+Use this What's New text:
+
+> Drawing on large images now uses less memory, and exports run in the
+> background so the app stays responsive while files are written. Sharing also
+> uses less memory.
+
 The listing and release notes must contain no references to AI, models, generated
 images, or competing products. They must contain no em dashes or double hyphens.
 The description should explain jobs and outcomes instead of cataloguing every
@@ -102,7 +108,7 @@ Bump the public source to 0.16.4 and increment the build number above every buil
 already uploaded to Apple. Update the changelog with user-facing release notes.
 Build and validate the Mac App Store archive, upload it, attach the processed build
 to the existing 0.16.4 version, apply the new listing copy, and read each field back.
-Submit the version for App Review with manual release enabled.
+Submit the version for App Review with automatic release after approval.
 
 Push the tested source commit and tag to the public remote. The private archive has
 a separate, older history and remains untouched in this release.

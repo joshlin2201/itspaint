@@ -124,4 +124,22 @@ struct PerformanceTests {
         // 20 frames of a 12 MB canvas.
         #expect(elapsed < 900, "20 image builds took \(Int(elapsed))ms")
     }
+
+    @Test("A small Core Graphics mark does not copy the whole canvas")
+    func coreGraphicsDrawingDoesNotCopyTheCanvas() {
+        // A single mark should cost what was drawn, not two extra copies of a
+        // 96 MB canvas. Eight passes make the old full-raster copy path visible
+        // while leaving ample headroom for context creation on a loaded runner.
+        var bitmap = Bitmap(width: 6000, height: 4000)
+        let elapsed = milliseconds {
+            for offset in 0..<8 {
+                bitmap.drawWithCoreGraphics { context in
+                    context.setFillColor(PaintColour.black.cgColor)
+                    context.fill(CGRect(x: offset, y: offset, width: 1, height: 1))
+                }
+            }
+        }
+
+        #expect(elapsed < 80, "eight tiny Core Graphics marks took \(Int(elapsed))ms")
+    }
 }
