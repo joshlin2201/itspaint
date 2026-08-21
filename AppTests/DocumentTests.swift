@@ -498,6 +498,21 @@ struct DrawingDocumentTests {
         #expect(restored == document.model.canvas)
     }
 
+    @Test("Sharing writes the current canvas to a safely named PNG")
+    func shareImageWritesNamedPNG() throws {
+        var canvas = Bitmap(width: 3, height: 2, fill: .white)
+        canvas.setPixel(.black, at: PixelPoint(x: 2, y: 1))
+
+        let url: URL = try ShareImageWriter.write(
+            canvas,
+            displayName: "Sketch/Final"
+        )
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        #expect(url.lastPathComponent == "Sketch-Final.png")
+        #expect(try ImageCodec.decode(contentsOf: url) == canvas)
+    }
+
     @Test("Opening an image adopts its dimensions")
     func openImage() throws {
         var source = Bitmap(width: 37, height: 21, fill: .white)
@@ -592,6 +607,28 @@ struct DrawingDocumentTests {
         #expect(throws: ImageCodec.CodecError.self) {
             try options.scaled(tall)
         }
+    }
+
+    @Test("Export writes the canvas snapshot captured when the panel closes")
+    func exportUsesCapturedSnapshot() throws {
+        var liveCanvas = Bitmap(width: 2, height: 2, fill: .white)
+        liveCanvas.setPixel(.black, at: PixelPoint(x: 0, y: 0))
+        let job = ExportJob(
+            canvas: liveCanvas,
+            format: .png,
+            scale: 1,
+            quality: 0.9,
+            matte: .white
+        )
+
+        liveCanvas.setPixel(.white, at: PixelPoint(x: 0, y: 0))
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("itspaint-export-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        try job.write(to: url)
+        let exported = try ImageCodec.decode(contentsOf: url)
+        #expect(exported.pixel(at: PixelPoint(x: 0, y: 0)) == .black)
     }
 
     private func makePackageWithDistinctState() throws -> (

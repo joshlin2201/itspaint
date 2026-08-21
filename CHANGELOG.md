@@ -5,6 +5,23 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## [0.16.4] — 2026-08-21
+
+### Changed
+- **Small Core Graphics marks no longer copy the entire canvas twice.** Vector
+  drawing now writes directly into the bitmap's copy-on-write storage. Eight
+  one-pixel marks on a 96 MB canvas fell from 286 ms to 11 ms in the release
+  throughput guard, while the existing orientation and snapshot tests remain
+  unchanged.
+- **Image export no longer encodes on the main thread.** Accepting the export
+  panel captures the canvas and settings as an immutable snapshot, then scales
+  and writes that snapshot on a user-initiated background task. Edits made
+  after export starts cannot leak into the file.
+- **Sharing writes straight to its temporary PNG.** The share path no longer
+  retains encoded image data beside the canvas before writing the file.
+- **The App Store listing is concise and task-focused.** It removes model and
+  competitor comparisons, repeated claims, and dash-heavy phrasing.
+
 ## [0.16.3] — 2026-08-13
 
 `v0.16.2` is a tag with no release behind it. Its build failed on a stale
@@ -693,7 +710,12 @@ First public beta.
   one would be a dependency this app does not have. AVIF covers the same need.
 - Text is pixels once committed; re-editing means undo and retype.
 
-[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.16.4...HEAD
+[0.16.4]: https://github.com/joshlin2201/itspaint/compare/v0.16.3...v0.16.4
+[0.16.3]: https://github.com/joshlin2201/itspaint/compare/v0.16.1...v0.16.3
+[0.16.1]: https://github.com/joshlin2201/itspaint/compare/v0.16.0...v0.16.1
+[0.16.0]: https://github.com/joshlin2201/itspaint/compare/v0.15.1...v0.16.0
+[0.15.1]: https://github.com/joshlin2201/itspaint/compare/v0.14.1...v0.15.1
 [0.14.1]: https://github.com/joshlin2201/itspaint/compare/v0.13.1...v0.14.1
 [0.13.1]: https://github.com/joshlin2201/itspaint/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/joshlin2201/itspaint/compare/v0.12.0...v0.13.0
