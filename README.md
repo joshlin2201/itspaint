@@ -43,11 +43,61 @@ brew install --cask joshlin2201/itspaint/itspaint
   [Thirty lines of code](docs/BACKGROUND_REMOVAL.md).
 - **The drawing engine has no UI.** `Packages/PaintKit` imports Foundation,
   CoreGraphics, ImageIO, CoreText and UniformTypeIdentifiers, and nothing else, so
-  `swift test` verifies most changes with no Xcode.
+  `swift test` verifies most changes with no Xcode. It is also
+  [a package you can depend on](#paintkit-as-a-dependency).
 - **Free, MIT, and it stays that way.** There is no account and no telemetry.
 
 Paste the screenshot, number the steps, crop it, drag it out, close the window.
 Nothing lands on your Desktop.
+
+## PaintKit as a dependency
+
+The engine is its own SwiftPM product, so you can draw, key out a background or encode
+a PNG with none of the app around it. No AppKit, no third-party dependency, **macOS 12
+and up**.
+
+```swift
+.package(url: "https://github.com/joshlin2201/itspaint", from: "0.16.3")
+```
+
+[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/joshlin2201/itspaint)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/joshlin2201/itspaint)
+
+Those two are served from the Swift Package Index's own API rather than written here,
+so they report what it built, on a machine that is not mine, and they go red without
+anybody having to notice. The same page records [zero data-race-safety
+errors](https://swiftpackageindex.com/joshlin2201/itspaint/builds) — every target in
+both manifests is `swiftLanguageMode(.v6)`, so strict concurrency is on and nothing is
+waived.
+
+The macOS 12 is deliberate. The app needs macOS 14; the engine does not and no longer
+says it does. It had the app's number by inheritance rather than by need, and a floor
+is not a warning a consumer can ignore — SwiftPM refuses to resolve at all when a
+dependency's deployment target is above yours.
+
+PaintKit gets you a product shot off its page in four lines, on device, with no model
+and no network:
+
+```swift
+import PaintKit
+
+let engine = PaintEngine(canvas: try ImageCodec.decode(contentsOf: input))
+guard engine.removeBackground() else { fatalError("no background to remove") }
+try ImageCodec.encode(engine.canvas, as: .png).write(to: output)
+```
+
+Those four lines are compiled on every push, by a CI job that builds them from a
+package outside this repository — the one that declares macOS 12, so the floor above
+cannot quietly rise. And the result is checked by counting transparent pixels rather
+than by whether the program exited quietly: on a 60px mark centred on a 400×400 page
+the count goes from 0 to 156,400, which is 160,000 minus the 3,600 pixels of subject,
+asserted for six subject sizes.
+
+If you do depend on it: it ships often while it is in beta, and until 1.0 a minor
+version may still carry a breaking change to the document format —
+[CHANGELOG.md](CHANGELOG.md) says so at the top. **Watch ▸ Custom ▸ Releases** is the
+notification for that one thing. Watching the repository outright also mails you every
+issue and every comment, which is why most people do not.
 
 ## What it does
 
@@ -159,12 +209,9 @@ developer is lying to you. It reports what the kernel will permit.
 
 ## Contributing, and the engine needs no Xcode
 
-`Packages/PaintKit` is a **UI-free Swift package**. No AppKit, no SwiftUI, no
-third-party dependency. It imports Foundation, CoreGraphics, ImageIO, CoreText and
-UniformTypeIdentifiers, and nothing else.
-
-So most changes to how ItsPaint *draws* can be made and checked with a text editor
-and a terminal. No simulator, no GUI session, no Xcode project:
+Because [PaintKit has no UI](#paintkit-as-a-dependency), most changes to how ItsPaint
+*draws* can be made and checked with a text editor and a terminal. No simulator, no
+GUI session, no Xcode project:
 
 ```bash
 git clone https://github.com/joshlin2201/itspaint.git
@@ -188,51 +235,6 @@ the app so you can pick whichever suits you:
 - [**#4** Make a selection from the alpha channel](https://github.com/joshlin2201/itspaint/issues/4)
 - [**#6** Flip and rotate the selection, not the whole image](https://github.com/joshlin2201/itspaint/issues/6)
 - [**#7** Add to and subtract from a selection](https://github.com/joshlin2201/itspaint/issues/7)
-
-The engine is also a dependency you can use without the app:
-
-```swift
-.package(url: "https://github.com/joshlin2201/itspaint", from: "0.16.3")
-```
-
-[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/joshlin2201/itspaint)
-[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/joshlin2201/itspaint)
-
-Those two are served from the Swift Package Index's own API rather than written here,
-so they report what it built, on a machine that is not mine, and they go red without
-anybody having to notice. The same page records [zero data-race-safety
-errors](https://swiftpackageindex.com/joshlin2201/itspaint/builds) — every target in
-both manifests is `swiftLanguageMode(.v6)`, so strict concurrency is on and nothing is
-waived.
-
-The app needs macOS 14, but the engine does not and no longer says it does: PaintKit
-declares **macOS 12**. It had the app's floor by inheritance rather than by need, and
-that is not a warning a consumer can ignore — SwiftPM refuses to resolve at all when a
-dependency's deployment target is above yours.
-
-That gets you a product shot off its page in four lines, on device, with no model and
-no network:
-
-```swift
-import PaintKit
-
-let engine = PaintEngine(canvas: try ImageCodec.decode(contentsOf: input))
-guard engine.removeBackground() else { fatalError("no background to remove") }
-try ImageCodec.encode(engine.canvas, as: .png).write(to: output)
-```
-
-Those four lines are compiled on every push, by a CI job that builds them from a
-package outside this repository — the one that declares macOS 12, so the floor above
-cannot quietly rise. And the result is checked by counting transparent pixels rather
-than by whether the program exited quietly: on a 60px mark centred on a 400×400 page
-the count goes from 0 to 156,400, which is 160,000 minus the 3,600 pixels of subject,
-asserted for six subject sizes.
-
-If you do depend on it: it ships often while it is in beta, and until 1.0 a minor
-version may still carry a breaking change to the document format —
-[CHANGELOG.md](CHANGELOG.md) says so at the top. **Watch ▸ Custom ▸ Releases** is the
-notification for that one thing. Watching the repository outright also mails you every
-issue and every comment, which is why most people do not.
 
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the structure, the design constraints, and
 what a change has to prove before it lands.
