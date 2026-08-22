@@ -260,7 +260,9 @@ struct ZoomReadout: View {
     let isActualSize: Bool
     let action: () -> Void
 
+    @Environment(TooltipController.self) private var tooltips
     @State private var isHovering = false
+    @State private var frame: CGRect = .zero
 
     var body: some View {
         Button(action: action) {
@@ -277,9 +279,23 @@ struct ZoomReadout: View {
         }
         .buttonStyle(.plain)
         .disabled(isActualSize)
-        .onHover { isHovering = $0 }
+        .trackedForTooltip($frame)
+        .onHover { hovering in
+            isHovering = hovering
+            // The same chip its neighbours use. Two glyphs with the fast tooltip
+            // and the control between them on the system's slow one is the kind
+            // of seam you notice without being able to name.
+            hovering
+                ? tooltips.hover(
+                    key: "header-zoom",
+                    title: isActualSize ? "Actual size" : "Back to actual size",
+                    shortcut: "⌘0",
+                    detail: isActualSize ? "Already at 100%" : nil,
+                    anchor: frame
+                )
+                : tooltips.endHover(key: "header-zoom")
+        }
         .animation(Tokens.Motion.micro, value: isHovering)
-        .help("Actual size (⌘0)")
         .accessibilityLabel("Zoom \(label), press for actual size")
     }
 }
