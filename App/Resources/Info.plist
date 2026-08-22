@@ -87,6 +87,26 @@
 			<key>NSDocumentClass</key>
 			<string>$(PRODUCT_MODULE_NAME).DrawingDocument</string>
 		</dict>
+		<dict>
+			<!--
+			  PDF is declared separately, and deliberately as Viewer-rank
+			  Alternate: opening a page turns it into pixels to draw on, which is
+			  right for signing a form and wrong for being the Mac's default PDF
+			  app. Preview keeps that job.
+			-->
+			<key>CFBundleTypeName</key>
+			<string>PDF Document</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+			</array>
+			<key>NSDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).DrawingDocument</string>
+		</dict>
 	</array>
 
 	<key>UTExportedTypeDeclarations</key>

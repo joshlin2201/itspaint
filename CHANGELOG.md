@@ -5,6 +5,69 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
+## [0.17.0] — 2026-08-22
+
+### Added
+- **A PDF opens as a page, and saves as a PDF.** ImageIO can write a PDF and
+  cannot read one, so opening a contract failed with *isn't an image ItsPaint can
+  read* — which made the signature tool a way to sign screenshots and nothing
+  else. Pages now come through Core Graphics' own PDF reader, rasterised at 144
+  dpi for editing, and saving writes the edited page back into the document it
+  came from: the page keeps the size it was printed at rather than becoming its
+  pixel count in points, and every page nobody touched is copied through with its
+  text still selectable.
+- **A page control, for documents that have pages.** It sits at the bottom of the
+  window with the paste bar, and only for PDFs. Turning a page folds the current
+  page back into the file first, so a signature on page four survives a look at
+  page five; the undo stack does not cross the boundary, because a replayed edit
+  belongs to the page it was made on.
+- **Signing has a button.** It lived only in Tools ▸ Signature… under ⌃⌘S, a
+  chord nothing else in the app uses — the one feature nobody would guess was the
+  one feature the window never mentioned. It is now in the header beside Share,
+  where the things you do to a finished document already are.
+- **ItsPaint appears under Open With for PDFs**, at `Alternate` rank. Opening a
+  page to draw on it is not the same job as reading a document, and Preview should
+  stay the Mac's PDF reader.
+
+### Changed
+- **A shape with no outline is filled with the colour you picked.** Fill used
+  Colour 2, which is the right answer for the inside of an outlined shape and the
+  wrong one when there is no outline to pair it with: choosing Fill on a fresh
+  document painted white on white paper, so the shape was invisible and the
+  colour in your hand did nothing. Outline still uses Colour 1, Outline and fill
+  still uses Colour 1 for the edge and Colour 2 for the inside, and right-dragging
+  still swaps the pair.
+
+### Fixed
+- **The size slider was unusable with the toolbar along the bottom.** The row
+  measures its own width down there, and a `GeometryReader` offers 10pt
+  intrinsically — so the slider was a stub you could not drag, while the same
+  control in the side rail was full width.
+- **The dashed and dotted line options showed a diagonal line.** Three glyphs
+  that all read as "a line" for three different stroke patterns; each segment now
+  shows the pattern it draws.
+- **Export could fail to write the file at all.** The encoder built its output in
+  a temporary file *beside* the destination, and a sandboxed app is granted the
+  path the save panel returned, not its folder — so the staged path was one the
+  app had no right to create. Core Graphics reported that as a destination it
+  could not make, and the alert read *Couldn't write the image as PDF*, followed
+  by advice to try PNG, which took the same denied route. The staging file now
+  lives in the app's own container and the finished bytes are moved onto the
+  granted path, with an in-place write as the fallback where even that is
+  refused. Present since 0.12.0, when writing moved off the in-memory route.
+- **Copy no longer goes dim when nothing is selected.** With a selection it
+  copies the selection; without one it copies the image, which is what ⌘C does in
+  every viewer people arrive from. A greyed-out Copy said "copying is
+  unavailable" while the obvious thing to copy was on screen.
+- **Duplicate asks first.** Two overlapping pages beside Share put a second
+  untitled window on screen with no warning, which is indistinguishable from
+  having lost your place in the one you were working in. The menu item still goes
+  straight through, because it says the word.
+- **The header's tooltips are the app's own chip.** The system's takes about a
+  second and shows no shortcut, which is why the paste clipboard and the drag-out
+  handle were reported as unidentifiable glyphs. They now name themselves in
+  300ms, with a line of explanation, exactly as the tool rail already did.
+
 ## [0.16.4] — 2026-08-21
 
 ### Changed

@@ -12,10 +12,10 @@ struct LassoTests {
         engine.settings.shapeKind = .rectangle
         engine.settings.shapeStyle = .filled
         engine.settings.brushSize = 1
-        engine.colours.background = PaintColour(hex: "FF0000")!
+        engine.colours.foreground = PaintColour(hex: "FF0000")!
         engine.beginStroke(at: PixelPoint(x: 19, y: 19))
         engine.endStroke(at: PixelPoint(x: 80, y: 80))
-        engine.colours.background = .white
+        engine.colours.foreground = .black
         return engine
     }
 
@@ -154,10 +154,10 @@ struct CropTests {
         engine.settings.shapeKind = .rectangle
         engine.settings.shapeStyle = .filled
         engine.settings.brushSize = 1
-        engine.colours.background = PaintColour(hex: "FF0000")!
+        engine.colours.foreground = PaintColour(hex: "FF0000")!
         engine.beginStroke(at: PixelPoint(x: 19, y: 19))
         engine.endStroke(at: PixelPoint(x: 60, y: 60))
-        engine.colours.background = .white
+        engine.colours.foreground = .black
         return engine
     }
 
@@ -221,7 +221,7 @@ struct TrimTests {
         engine.settings.shapeKind = .rectangle
         engine.settings.shapeStyle = .filled
         engine.settings.brushSize = 1
-        engine.colours.background = PaintColour(hex: "3366CC")!
+        engine.colours.foreground = PaintColour(hex: "3366CC")!
         engine.beginStroke(at: PixelPoint(x: 19, y: 14))
         engine.endStroke(at: PixelPoint(x: 80, y: 65))
         return engine
@@ -249,7 +249,7 @@ struct TrimTests {
         engine.settings.shapeKind = .rectangle
         engine.settings.shapeStyle = .filled
         engine.settings.brushSize = 1
-        engine.colours.background = .black
+        engine.colours.foreground = .black
         engine.beginStroke(at: PixelPoint(x: 19, y: 14))
         engine.endStroke(at: PixelPoint(x: 60, y: 45))
 

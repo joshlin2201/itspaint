@@ -1311,10 +1311,16 @@ public final class PaintEngine {
         guard let pending = pendingPolygon else { return .empty }
         canvas = pending.before
         let points = pending.points + (pending.points.last == preview ? [] : [preview])
+        let style = settings.shapeStyle
+        let stroke = colours.colour(for: button).rgba8
+        // The paired white is invisible on fresh white paper when no outline can reveal it.
+        let fill = (style.drawsOutline
+            ? colours.colour(for: button == .primary ? .secondary : .primary)
+            : colours.colour(for: button)).rgba8
         drawPolygonShape(
             points,
-            stroke: colours.colour(for: button).rgba8,
-            fill: colours.colour(for: button == .primary ? .secondary : .primary).rgba8,
+            stroke: stroke,
+            fill: fill,
             closed: points.count > 2
         )
         return canvas.bounds
@@ -1916,10 +1922,13 @@ public final class PaintEngine {
     // MARK: - Shapes
 
     private func drawShape(from origin: PixelPoint, to end: PixelPoint, button: PointerButton) -> PixelRect {
-        let stroke = colours.colour(for: button).rgba8
-        let fill = colours.colour(for: button == .primary ? .secondary : .primary).rgba8
-        let brush = activeBrush
         let style = settings.shapeStyle
+        let stroke = colours.colour(for: button).rgba8
+        // The paired white is invisible on fresh white paper when no outline can reveal it.
+        let fill = (style.drawsOutline
+            ? colours.colour(for: button == .primary ? .secondary : .primary)
+            : colours.colour(for: button)).rgba8
+        let brush = activeBrush
         var dirty = PixelRect.empty
 
         switch settings.shapeKind {

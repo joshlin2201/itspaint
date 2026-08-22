@@ -20,10 +20,10 @@ struct EssentialsTests {
         model.shapeKind = .rectangle
         model.shapeStyle = .filled
         model.brushSize = 1
-        model.background = PaintColour(hex: "FF0000")!
+        model.foreground = PaintColour(hex: "FF0000")!
         _ = model.engine.beginStroke(at: PixelPoint(x: 19, y: 19))
         model.noteChange(model.engine.endStroke(at: PixelPoint(x: 61, y: 61)))
-        model.background = .white
+        model.foreground = .black
         return model
     }
 

@@ -467,7 +467,7 @@ enum ChameleonScene {
         let engine = canvas.engine
         engine.settings.brushSize = 1
         engine.settings.shapeStyle = .filled
-        engine.colours.background = colour
+        engine.colours.foreground = colour
         engine.settings.tool = .shape
         engine.settings.shapeKind = .polygon
         for point in points {
@@ -486,7 +486,7 @@ enum ChameleonScene {
         let engine = canvas.engine
         engine.settings.brushSize = 1
         engine.settings.shapeStyle = .filled
-        engine.colours.background = colour
+        engine.colours.foreground = colour
         canvas.shape(
             .ellipse,
             from: point(centre.x - radius, centre.y - radius),

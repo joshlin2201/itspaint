@@ -28,7 +28,7 @@ enum IconGenerator {
         engine.settings.shapeStyle = .filled
         engine.settings.brushSize = 1
         engine.settings.cornerRadius = Int(Double(size) * 0.205)
-        engine.colours.background = colour("FDFDFE")
+        engine.colours.foreground = colour("FDFDFE")
         engine.beginStroke(at: PixelPoint(x: body.minX - 1, y: body.minY - 1))
         engine.endStroke(at: PixelPoint(x: body.maxX, y: body.maxY))
 

@@ -63,7 +63,7 @@ enum TransparencyScene {
         let engine = canvas.engine
         engine.settings.brushSize = 1
         engine.settings.shapeStyle = .filled
-        engine.colours.background = colour
+        engine.colours.foreground = colour
         polygon(on: canvas, points: points)
     }
 

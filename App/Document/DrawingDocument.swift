@@ -19,6 +19,17 @@ final class DrawingDocument: NSDocument {
     /// way instead of silently converting the user's PNG into something else.
     private var sourceFormat: ImageCodec.Format?
 
+    /// The PDF this document came from, when it came from one: the whole file,
+    /// which page of it is on the canvas, and the size that page is printed at.
+    /// Save writes the page back into it rather than replacing the document with
+    /// one flat picture.
+    private var pdfSource: PDFCodec.Source?
+
+    /// The export panel's own job is built outside `write(to:ofType:)`, so the
+    /// test that proves an exported page keeps its printed size needs the source
+    /// the same way the panel gets it.
+    var pdfSourceForTesting: PDFCodec.Source? { pdfSource }
+
     /// Kept so it can be torn down: without this, every document ever opened
     /// leaves an entry in the notification centre for the life of the process.
     ///
@@ -54,6 +65,9 @@ final class DrawingDocument: NSDocument {
         }
         model.onDuplicate = { [weak self] in
             _ = try? self?.duplicate()
+        }
+        model.onTurnToPage = { [weak self] index in
+            self?.turnToPage(index)
         }
         syncDocumentIdentity()
     }
@@ -255,17 +269,74 @@ final class DrawingDocument: NSDocument {
         // Decode first, off the model entirely: a failed read must leave the
         // open document untouched rather than half-replaced.
         let isPackage = typeName == Self.packageType || url.pathExtension.lowercased() == "itspaint"
+        let format = isPackage ? nil : ImageCodec.Format.inferred(from: url)
+
+        // A PDF arrives as a page and a way back to the file it came from. The
+        // whole file is kept, because saving has to put the other pages back —
+        // signing page four of a lease must not cost anyone pages one to three.
+        if format == .pdf {
+            let page = try PDFCodec.open(contentsOf: url)
+            MainActor.assumeIsolated {
+                sourceFormat = .pdf
+                pdfSource = page.source
+                model.pdfPage = (index: page.source.pageIndex, count: page.source.pageCount)
+                model.load(canvas: page.bitmap, metadata: nil)
+            }
+            return
+        }
+
         let contents = isPackage
             ? try Self.readPackage(at: url)
             : (canvas: try ImageCodec.decode(contentsOf: url), metadata: nil)
-        let format = isPackage ? nil : ImageCodec.Format.inferred(from: url)
 
         MainActor.assumeIsolated {
             sourceFormat = format
+            pdfSource = nil
+            model.pdfPage = nil
             // Loaded into the existing model rather than a fresh one: Revert to
             // Saved reads into a document whose window already captured this
             // object, so replacing it would leave the old pixels on screen.
             model.load(canvas: contents.canvas, metadata: contents.metadata)
+        }
+    }
+
+    // MARK: - Pages
+
+    /// Turn to another page of the PDF this document was opened from.
+    ///
+    /// The current page's edits are folded back into the in-memory file first,
+    /// so a signature on page four is still there when you come back from page
+    /// five. Undo does not cross the page boundary — the canvas is genuinely a
+    /// different image — which is why the fold happens here rather than at save
+    /// time: the alternative is losing the signature to a page turn.
+    private func turnToPage(_ index: Int) {
+        guard let source = pdfSource, index != source.pageIndex,
+              index >= 0, index < source.pageCount
+        else { return }
+
+        do {
+            let folded = try PDFCodec.encode(model.canvas, replacing: source)
+            let page = try PDFCodec.open(
+                data: folded,
+                page: index,
+                named: displayName.isEmpty ? "This document" : displayName
+            )
+            pdfSource = page.source
+            model.pdfPage = (index: page.source.pageIndex, count: page.source.pageCount)
+            model.load(canvas: page.bitmap, metadata: nil)
+            // **The history does not cross the page boundary.** Every registered
+            // undo replays a bitmap edit onto whatever canvas is loaded, so an
+            // undo left over from page four would paint page four's pixels onto
+            // page five. Revert to Saved clears the stack for the same reason.
+            undoManager?.removeAllActions()
+            // The fold is a real change to the file even though the visible
+            // page has only been swapped, so the document is dirty until saved.
+            updateChangeCount(.changeDone)
+        } catch {
+            model.present(
+                message: error.localizedDescription,
+                recovery: (error as? LocalizedError)?.recoverySuggestion
+            )
         }
     }
 
@@ -385,6 +456,7 @@ final class DrawingDocument: NSDocument {
         let background: PaintColour
         let palette: Palette
         let sourceFormat: ImageCodec.Format?
+        let pdfSource: PDFCodec.Source?
     }
 
     nonisolated private func makeWriteSnapshot() -> WriteSnapshot {
@@ -394,7 +466,8 @@ final class DrawingDocument: NSDocument {
                 foreground: model.foreground,
                 background: model.background,
                 palette: model.palette,
-                sourceFormat: sourceFormat
+                sourceFormat: sourceFormat,
+                pdfSource: pdfSource
             )
         }
     }
@@ -412,7 +485,12 @@ final class DrawingDocument: NSDocument {
             snapshot.canvas,
             to: url,
             as: format,
-            matte: snapshot.background
+            matte: snapshot.background,
+            // Saving a PDF puts the edited page back into the document it came
+            // from. Only when it *is* the same document: Save As to a different
+            // PDF gets the same treatment, which is what someone signing a copy
+            // of a contract means by "save as signed.pdf".
+            pdfSource: format == .pdf ? snapshot.pdfSource : nil
         )
     }
 
@@ -531,6 +609,11 @@ final class DrawingDocument: NSDocument {
         guard let window = windowControllers.first?.window else { return }
 
         let options = ExportOptions()
+        // A document that came from a PDF exports as one by default. Offering
+        // PNG first to someone who has just signed a contract is offering to
+        // throw the other pages away.
+        if pdfSource != nil { options.format = .pdf }
+
         let panel = NSSavePanel()
         panel.allowedContentTypes = [options.format.utType]
         panel.nameFieldStringValue = (displayName as NSString).deletingPathExtension
@@ -553,7 +636,8 @@ final class DrawingDocument: NSDocument {
             guard response == .OK, let url = panel.url, let self else { return }
             let job = options.job(
                 canvas: self.model.canvas,
-                matte: self.model.background
+                matte: self.model.background,
+                pdfSource: self.pdfSource
             )
             Task { @MainActor [weak self] in
                 let failure = await Task.detached(priority: .userInitiated) {
@@ -563,7 +647,10 @@ final class DrawingDocument: NSDocument {
                     } catch {
                         return ExportFailure(
                             message: error.localizedDescription,
-                            recovery: (error as? ImageCodec.CodecError)?.recoverySuggestion
+                            // Any `LocalizedError`, not just the image codec's:
+                            // PDF failures carry their own next step, and
+                            // dropping it left the alert as a dead end.
+                            recovery: (error as? LocalizedError)?.recoverySuggestion
                         )
                     }
                 }.value
@@ -634,6 +721,9 @@ struct ExportJob: Sendable {
     let scale: Double
     let quality: Double
     let matte: PaintColour
+    /// Set when the document was opened from a PDF, so exporting one keeps the
+    /// document's other pages and its page size.
+    var pdfSource: PDFCodec.Source?
 
     func scaledCanvas() throws -> Bitmap {
         guard scale != 1 else { return canvas }
@@ -667,7 +757,8 @@ struct ExportJob: Sendable {
             to: url,
             as: format,
             quality: quality,
-            matte: matte
+            matte: matte,
+            pdfSource: format == .pdf ? pdfSource?.resampled(by: scale) : nil
         )
     }
 }
@@ -689,13 +780,16 @@ final class ExportOptions {
     var scale: Double = 1
     var quality: Double = 0.9
 
-    func job(canvas: Bitmap, matte: PaintColour) -> ExportJob {
+    func job(
+        canvas: Bitmap, matte: PaintColour, pdfSource: PDFCodec.Source? = nil
+    ) -> ExportJob {
         ExportJob(
             canvas: canvas,
             format: format,
             scale: scale,
             quality: quality,
-            matte: matte
+            matte: matte,
+            pdfSource: pdfSource
         )
     }
 

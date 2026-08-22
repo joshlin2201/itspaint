@@ -455,6 +455,20 @@ struct EngineGestureTests {
         #expect(engine.canvas.pixel(at: PixelPoint(x: 20, y: 20)) == PaintColour(hex: "FF0000")!.rgba8)
     }
 
+    @Test("A filled shape uses the colour loaded by the button")
+    func filledShapeUsesButtonColour() {
+        let engine = PaintEngine(width: 40, height: 40)
+        engine.settings.tool = .shape
+        engine.settings.shapeKind = .rectangle
+        engine.settings.shapeStyle = .filled
+        engine.settings.brushSize = 1
+        engine.colours = ColourPair(foreground: .black, background: .white)
+        engine.beginStroke(at: PixelPoint(x: 5, y: 5))
+        engine.endStroke(at: PixelPoint(x: 34, y: 34))
+
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 20, y: 20)) == RGBA8.black)
+    }
+
     @Test("The eyedropper loads the sampled colour as foreground")
     func eyedropperSamples() {
         let engine = PaintEngine(width: 16, height: 16)
@@ -659,10 +673,10 @@ struct SelectionTests {
         engine.settings.shapeKind = .rectangle
         engine.settings.shapeStyle = .filled
         engine.settings.brushSize = 1
-        engine.colours.background = PaintColour(hex: "FF0000")!
+        engine.colours.foreground = PaintColour(hex: "FF0000")!
         engine.beginStroke(at: PixelPoint(x: 4, y: 4))
         engine.endStroke(at: PixelPoint(x: 21, y: 21))
-        engine.colours.background = .white
+        engine.colours.foreground = .black
         return engine
     }
 
@@ -1255,9 +1269,8 @@ struct MultiStepShapeTests {
 
         #expect(!engine.hasPendingShape)
         #expect(engine.undoStack.undoActionName == "Polygon")
-        // The interior is filled with the secondary colour, like every other
-        // closed shape.
-        #expect(engine.canvas.pixel(at: PixelPoint(x: 50, y: 40)) == PaintColour(hex: "FF0000")!.rgba8)
+        // With no outline, the loaded primary colour is the whole shape.
+        #expect(engine.canvas.pixel(at: PixelPoint(x: 50, y: 40)) == RGBA8.black)
     }
 
     @Test("A stray click or two leaves no polygon behind")

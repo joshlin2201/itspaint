@@ -34,6 +34,7 @@
 		71B8FC7E198B4F762F94C6A2 /* DocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F4A9F5632360B181403BDA /* DocumentTests.swift */; };
 		736B873DA05CA677039DB143 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 81D5AB95221C3E1A9DD3CFC7 /* Assets.xcassets */; };
 		762CD1BC00FE680EB32BD80B /* ColourPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83A429AB8B62EFEDC176D65 /* ColourPopover.swift */; };
+		7D7E217925BBD597F47772AE /* PDFDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D072F2FA0424641934102963 /* PDFDocumentTests.swift */; };
 		8CFB1C6C1779CAF721DD34EA /* FixedGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80562B1588560C2E61CCE65 /* FixedGrid.swift */; };
 		8DE72B90DE9FDDBCEA63C2FD /* ClipboardHotKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 951512EED8AAC0B1B7716D54 /* ClipboardHotKey.swift */; };
 		924C2B7A35DD5F3985A29406 /* EssentialsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06E4A12B57303E5FE405DFC /* EssentialsTests.swift */; };
@@ -97,6 +98,7 @@
 		C06E4A12B57303E5FE405DFC /* EssentialsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EssentialsTests.swift; sourceTree = "<group>"; };
 		C83A429AB8B62EFEDC176D65 /* ColourPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColourPopover.swift; sourceTree = "<group>"; };
 		CA3B7CF910C5BF4084044565 /* PaintKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PaintKit; path = Packages/PaintKit; sourceTree = SOURCE_ROOT; };
+		D072F2FA0424641934102963 /* PDFDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFDocumentTests.swift; sourceTree = "<group>"; };
 		E80562B1588560C2E61CCE65 /* FixedGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixedGrid.swift; sourceTree = "<group>"; };
 		EA6F6F30090979763C866F84 /* SignatureSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureSheet.swift; sourceTree = "<group>"; };
 		F2ACA876E800C1AB89C90365 /* SizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeSheet.swift; sourceTree = "<group>"; };
@@ -177,6 +179,7 @@
 				54F4A9F5632360B181403BDA /* DocumentTests.swift */,
 				C06E4A12B57303E5FE405DFC /* EssentialsTests.swift */,
 				B063B5E24D6EBB4CEB198E5B /* PasteGrowthTests.swift */,
+				D072F2FA0424641934102963 /* PDFDocumentTests.swift */,
 				073EFE49D21C2976F9D72BB4 /* ScreenshotWatcherTests.swift */,
 				605B317CA16CD2D068DF970B /* TextEditorLayoutTests.swift */,
 				F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */,
@@ -384,6 +387,7 @@
 				397D8480B03F1D4E483412F6 /* CanvasRenderingTests.swift in Sources */,
 				71B8FC7E198B4F762F94C6A2 /* DocumentTests.swift in Sources */,
 				924C2B7A35DD5F3985A29406 /* EssentialsTests.swift in Sources */,
+				7D7E217925BBD597F47772AE /* PDFDocumentTests.swift in Sources */,
 				1DE130CDBF4B6616B66BF5F1 /* PasteGrowthTests.swift in Sources */,
 				F0389C97B6274DF2552FE2B9 /* ScreenshotWatcherTests.swift in Sources */,
 				F4C7E8CF3B5107D648F3FC45 /* TextEditorLayoutTests.swift in Sources */,
@@ -443,7 +447,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
@@ -465,7 +469,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.16.4;
+				MARKETING_VERSION = 0.17.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -534,7 +538,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
@@ -550,7 +554,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.16.4;
+				MARKETING_VERSION = 0.17.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

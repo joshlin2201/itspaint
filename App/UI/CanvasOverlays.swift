@@ -63,14 +63,26 @@ struct HeaderGroup<Content: View>: View {
 }
 
 /// One button inside a header group.
+///
+/// **The tooltip is the app's own chip, not the system's.** The header is nine
+/// unlabelled glyphs, and `.help` waits about a second before naming any of
+/// them — long enough that people click one to find out what it does. Two of
+/// them, the paste clipboard and the drag-out handle, were reported as
+/// unidentifiable for exactly that reason. The rail already had the fast chip;
+/// this is the header joining it.
 struct HeaderButton: View {
     let symbol: String
     let title: String
     var shortcut: String?
+    /// One line under the title, for the buttons whose glyph cannot carry the
+    /// whole idea on its own.
+    var detail: String?
     var isEnabled: Bool = true
     let action: () -> Void
 
+    @Environment(TooltipController.self) private var tooltips
     @State private var isHovering = false
+    @State private var frame: CGRect = .zero
 
     var body: some View {
         Button(action: action) {
@@ -86,10 +98,41 @@ struct HeaderButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
-        .onHover { isHovering = $0 }
+        .trackedForTooltip($frame)
+        .onHover { hovering in
+            isHovering = hovering
+            // Named even while disabled. "Nothing to paste" is the most useful
+            // thing the button can say, and it is dim exactly when it needs to
+            // say it.
+            hovering
+                ? tooltips.hover(
+                    key: "header-\(title)", title: title,
+                    shortcut: shortcut, detail: detail, anchor: frame
+                )
+                : tooltips.endHover(key: "header-\(title)")
+        }
         .animation(Tokens.Motion.micro, value: isHovering)
-        .help(shortcut.map { "\(title) (\($0))" } ?? title)
         .accessibilityLabel(title)
+    }
+}
+
+/// Report a control's position on screen, so the one shared tooltip chip can sit
+/// under the control that asked for it.
+///
+/// Screen coordinates rather than a named space: the header lives in an overlay
+/// inside a `ZStack` that also holds the canvas, and the chip is drawn by a
+/// different branch of that stack.
+extension View {
+    func trackedForTooltip(_ frame: Binding<CGRect>) -> some View {
+        background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { frame.wrappedValue = proxy.frame(in: .global) }
+                    .onChange(of: proxy.frame(in: .global)) { _, new in
+                        frame.wrappedValue = new
+                    }
+            }
+        }
     }
 }
 
@@ -109,7 +152,9 @@ struct HeaderButton: View {
 struct DragOutHandle: View {
     @Bindable var model: EditorModel
 
+    @Environment(TooltipController.self) private var tooltips
     @State private var isHovering = false
+    @State private var frame: CGRect = .zero
 
     var body: some View {
         // Resolved before the gesture rather than inside it. `draggable` takes
@@ -134,17 +179,26 @@ struct DragOutHandle: View {
                     .fill(.primary.opacity(isHovering && payload != nil ? Tokens.Fill.hover : 0))
             }
             .contentShape(Rectangle())
+            .trackedForTooltip($frame)
             .onHover { hovering in
                 isHovering = hovering
+                // The chip names it in 300ms rather than the system's second,
+                // because this is the glyph people reported not recognising.
+                hovering
+                    ? tooltips.hover(
+                        key: "header-drag", title: "Drag image out",
+                        shortcut: nil,
+                        detail: "Pick the picture up and drop it into Slack, Mail or the Finder",
+                        anchor: frame
+                    )
+                    : tooltips.endHover(key: "header-drag")
                 guard payload != nil else { return }
-                // A grab cursor is the only thing that says "drag me" before
-                // anyone has tried. `.help` only appears after a hover delay, by
-                // which point they have usually clicked and given up.
+                // A grab cursor is the other half of the instruction: it says
+                // "drag me" before anyone has waited for any tooltip at all.
                 if hovering { NSCursor.openHand.push() } else { NSCursor.pop() }
             }
             .animation(Tokens.Motion.micro, value: isHovering)
             .modifier(DraggableIfAvailable(payload: payload))
-            .help("Drag the image into another app — Slack, Mail, the Finder")
             .accessibilityLabel("Drag image out")
     }
 }
@@ -206,7 +260,9 @@ struct ZoomReadout: View {
     let isActualSize: Bool
     let action: () -> Void
 
+    @Environment(TooltipController.self) private var tooltips
     @State private var isHovering = false
+    @State private var frame: CGRect = .zero
 
     var body: some View {
         Button(action: action) {
@@ -223,10 +279,62 @@ struct ZoomReadout: View {
         }
         .buttonStyle(.plain)
         .disabled(isActualSize)
-        .onHover { isHovering = $0 }
+        .trackedForTooltip($frame)
+        .onHover { hovering in
+            isHovering = hovering
+            // The same chip its neighbours use. Two glyphs with the fast tooltip
+            // and the control between them on the system's slow one is the kind
+            // of seam you notice without being able to name.
+            hovering
+                ? tooltips.hover(
+                    key: "header-zoom",
+                    title: isActualSize ? "Actual size" : "Back to actual size",
+                    shortcut: "⌘0",
+                    detail: isActualSize ? "Already at 100%" : nil,
+                    anchor: frame
+                )
+                : tooltips.endHover(key: "header-zoom")
+        }
         .animation(Tokens.Motion.micro, value: isHovering)
-        .help("Actual size (⌘0)")
         .accessibilityLabel("Zoom \(label), press for actual size")
+    }
+}
+
+/// Which page of a PDF is on the canvas, and the way to another one.
+///
+/// **Only for documents that have pages.** A screenshot does not, and telling
+/// someone they are on page one of one is noise in the one place the window is
+/// supposed to say what they are looking at.
+///
+/// Turning a page saves the current one back into the file first, so a signature
+/// is never lost by looking at the page after it. Undo does not follow — the
+/// canvas becomes a genuinely different image — and the chip below the title
+/// keeps saying "Edited" until the document is saved, which is the honest state.
+struct PageControl: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
+        if let page = model.pdfPage {
+            HeaderGroup {
+                HeaderButton(
+                    symbol: "chevron.left", title: "Previous page",
+                    isEnabled: page.index > 0
+                ) { model.turnToPage(page.index - 1) }
+
+                Text("Page \(page.index + 1) of \(page.count)")
+                    .font(.system(size: 11).monospacedDigit())
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
+                    .padding(.horizontal, Tokens.Space.tight)
+                    .fixedSize()
+
+                HeaderButton(
+                    symbol: "chevron.right", title: "Next page",
+                    isEnabled: page.index + 1 < page.count
+                ) { model.turnToPage(page.index + 1) }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Page \(page.index + 1) of \(page.count)")
+        }
     }
 }
 
@@ -296,17 +404,31 @@ struct WorkingActions: View {
                     symbol: "scissors", title: "Cut",
                     shortcut: "⌘X", isEnabled: model.hasSelection
                 ) { model.cutSelection() }
+                // **Copy always copies something.** It used to go dim with
+                // nothing selected, which reads as "copying is unavailable" when
+                // the obvious thing to copy — the whole picture — is right
+                // there. With a selection it copies the selection; without one it
+                // copies the image, which is what ⌘C means in every viewer
+                // people arrive from.
                 HeaderButton(
-                    symbol: "square.on.square", title: "Copy",
-                    shortcut: "⌘C", isEnabled: model.hasSelection
-                ) { model.copySelection() }
+                    symbol: "square.on.square",
+                    title: model.hasSelection ? "Copy selection" : "Copy image",
+                    shortcut: "⌘C",
+                    detail: "Puts it on the clipboard, ready to paste anywhere"
+                ) {
+                    model.hasSelection ? model.copySelection() : model.copyWholeImage()
+                }
                 HeaderButton(
                     // `clipboard` when there is something on it, and the same
                     // glyph without its page when there is not — so the button
                     // says *why* it is unavailable rather than just being dim.
                     symbol: model.canPaste ? "doc.on.clipboard" : "clipboard",
                     title: model.canPaste ? "Paste image" : "Nothing to paste",
-                    shortcut: "⌘V", isEnabled: model.canPaste
+                    shortcut: "⌘V",
+                    detail: model.canPaste
+                        ? "Drops the clipboard onto the canvas, still movable"
+                        : "Copy an image somewhere first",
+                    isEnabled: model.canPaste
                 ) { model.paste() }
                 DragOutHandle(model: model)
             }
@@ -364,14 +486,52 @@ struct WorkingActions: View {
 struct DocumentActions: View {
     @Bindable var model: EditorModel
 
+    @Environment(TooltipController.self) private var tooltips
+    @State private var shareFrame: CGRect = .zero
+
     var body: some View {
         HeaderGroup {
+            // **Signing has a button now.** It lived only in the Tools menu
+            // under ⌃⌘S — a chord nothing else in the app uses — which made the
+            // one feature nobody would guess at the one feature the window never
+            // mentioned. It sits with Share rather than in the rail because it
+            // is not a tool: you reach for it once per document, next to the
+            // other things you do to a finished document.
+            HeaderButton(
+                symbol: "signature", title: "Signature",
+                shortcut: "⌃⌘S",
+                detail: "Sign here, or drop in a signature you have already saved"
+            ) {
+                model.isSignatureSheetPresented = true
+            }
+
+            HeaderDivider()
+
             // Share is in the File menu, but a markup app's whole purpose is
             // getting the result to someone else — burying its most common last
             // step one menu down is the wrong emphasis.
+            //
+            // The chip is layered over the AppKit button rather than replacing
+            // its own `toolTip`: hover tracking across a representable is not
+            // guaranteed, and the system tooltip underneath is the floor if it
+            // does not fire.
             ShareButton()
-            HeaderButton(symbol: "doc.on.doc", title: "Duplicate", shortcut: "⇧⌘S") {
-                model.duplicateDocument()
+                .trackedForTooltip($shareFrame)
+                .onHover { hovering in
+                    hovering
+                        ? tooltips.hover(
+                            key: "header-share", title: "Share",
+                            shortcut: nil,
+                            detail: "AirDrop, Mail, Messages — as a named file, not \"Image\"",
+                            anchor: shareFrame
+                        )
+                        : tooltips.endHover(key: "header-share")
+                }
+            HeaderButton(
+                symbol: "doc.on.doc", title: "Duplicate", shortcut: "⇧⌘S",
+                detail: "Opens a copy in a new window"
+            ) {
+                model.isDuplicateConfirmationPresented = true
             }
         }
     }

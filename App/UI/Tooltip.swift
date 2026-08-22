@@ -78,12 +78,27 @@ final class TooltipController {
     private(set) var shortcut: String?
     private(set) var detail: String?
 
+    /// The hovered control's frame in screen coordinates, for the controls whose
+    /// chip cannot be positioned from the rail's own geometry.
+    ///
+    /// The rail knows where its cells are, so it leaves this nil and offsets the
+    /// chip itself. The header does not — its cluster slides with the window
+    /// width — so header buttons report where they actually are and the chip
+    /// follows the glyph rather than guessing at the middle of the row.
+    private(set) var anchor: CGRect?
+
     @ObservationIgnored private var pendingKey: String?
     @ObservationIgnored private var work: DispatchWorkItem?
 
     var isVisible: Bool { visibleKey != nil }
 
-    func hover(key: String, title: String, shortcut: String?, detail: String? = nil) {
+    func hover(
+        key: String,
+        title: String,
+        shortcut: String?,
+        detail: String? = nil,
+        anchor: CGRect? = nil
+    ) {
         guard pendingKey != key else { return }
         pendingKey = key
         work?.cancel()
@@ -94,6 +109,7 @@ final class TooltipController {
             self.title = title
             self.shortcut = shortcut
             self.detail = detail
+            self.anchor = anchor
             return
         }
 
@@ -104,6 +120,7 @@ final class TooltipController {
                 self.title = title
                 self.shortcut = shortcut
                 self.detail = detail
+                self.anchor = anchor
             }
         }
         work = item
@@ -121,6 +138,7 @@ final class TooltipController {
             MainActor.assumeIsolated {
                 guard let self, self.pendingKey == nil else { return }
                 self.visibleKey = nil
+                self.anchor = nil
             }
         }
         work = item
@@ -131,5 +149,6 @@ final class TooltipController {
         work?.cancel()
         pendingKey = nil
         visibleKey = nil
+        anchor = nil
     }
 }

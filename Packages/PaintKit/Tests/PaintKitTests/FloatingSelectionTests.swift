@@ -141,10 +141,10 @@ struct SelectionInteractionTests {
         engine.settings.shapeKind = .rectangle
         engine.settings.shapeStyle = .filled
         engine.settings.brushSize = 1
-        engine.colours.background = PaintColour(hex: "FF0000")!
+        engine.colours.foreground = PaintColour(hex: "FF0000")!
         engine.beginStroke(at: PixelPoint(x: 19, y: 19))
         engine.endStroke(at: PixelPoint(x: 71, y: 71))
-        engine.colours.background = .white
+        engine.colours.foreground = .black
         return engine
     }
 
