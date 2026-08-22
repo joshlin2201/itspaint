@@ -25,6 +25,8 @@ struct EditorView: View {
     /// The panel's measured length along the rail's axis, so it can be kept
     /// inside the window without guessing how tall its content is.
     @State private var panelSpan: CGFloat = 0
+    /// Width of the header's tooltip chip, so it can be kept inside the window.
+    @State private var headerTooltipWidth: CGFloat = 0
 
     var body: some View {
         ZStack {
@@ -49,6 +51,8 @@ struct EditorView: View {
 
             titleRow
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            headerTooltip
                 // **Above the tool chrome, which is drawn after it.** Share is
                 // the one control in this row that is an NSViewRepresentable
                 // rather than a SwiftUI Button — it hosts a real NSButton so its
@@ -62,6 +66,31 @@ struct EditorView: View {
 
             readOutRow
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+
+            // Which page of the PDF is on the canvas, in the same bottom-centre
+            // slot the paste bar uses.
+            //
+            // **Not in the header.** A letter page opens a window about 650pt
+            // wide, and at that width a fourth capsule in the title row pushed
+            // the filename out of it entirely — a document with no visible name
+            // is a worse trade than a page control that is not in the titlebar.
+            // Down here it has room, it is where Books and Preview put page
+            // navigation, and it is only ever on screen for documents that have
+            // pages at all. The paste bar wins the slot while something is
+            // floating, because turning the page is not what anyone is doing
+            // mid-paste.
+            if model.pdfPage != nil, !model.hasFloatingContent {
+                PageControl(model: model)
+                    .fixedSize()
+                    .padding(.bottom, model.chromeEdge.isVertical
+                        ? Tokens.Space.safeInset
+                        : Tokens.Space.safeInset + Tokens.Rail.thickness + Tokens.Space.base)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    // Out of the way of the stroke being drawn, exactly like the
+                    // paste bar: a signature often lands right where this sits.
+                    .opacity(model.isDragging ? 0 : 1)
+                    .animation(Tokens.Motion.micro, value: model.isDragging)
+            }
 
             // Bottom-centre, clear of the rail on either edge and of the
             // pointer read-out in the corner.
@@ -123,6 +152,15 @@ struct EditorView: View {
         }
         .sheet(isPresented: $model.isRotateSheetPresented) {
             RotateSheet(model: model)
+        }
+        .confirmationDialog(
+            "Duplicate this drawing?",
+            isPresented: $model.isDuplicateConfirmationPresented
+        ) {
+            Button("Duplicate") { model.duplicateDocument() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("A copy opens in a new window. This one is left exactly as it is.")
         }
         .alert(item: $model.presentedError) { error in
             Alert(
@@ -191,7 +229,10 @@ struct EditorView: View {
             }
         }
         .overlay(alignment: isVertical ? .topLeading : .bottomLeading) {
-            if tooltips.isVisible {
+            // Only for controls that have no anchor of their own — the rail's,
+            // whose geometry this offset already knows. A header button carries
+            // its position with it and is drawn by `headerTooltip` instead.
+            if tooltips.isVisible, tooltips.anchor == nil {
                 Tooltip(title: tooltips.title, shortcut: tooltips.shortcut, detail: tooltips.detail)
                     .offset(
                         x: isVertical ? Tokens.Rail.thickness + Tokens.Space.snug : 0,
@@ -379,6 +420,61 @@ struct EditorView: View {
     /// Traffic lights, a title worth reading, the cluster, and the document
     /// actions, with the gaps between them. Below this the cluster overlaps.
     private static let centredClusterMinimum: CGFloat = 940
+
+    /// The chip for a header control, under the control itself.
+    ///
+    /// The header's buttons cannot draw it themselves: their group clips to its
+    /// own capsule, so a chip inside one is a chip with its bottom half cut off.
+    /// They report where they are instead and it is drawn out here, still one
+    /// chip at a time — the rail's chip is suppressed while a header button owns
+    /// the tooltip, because two of them on screen is two answers to one question.
+    @ViewBuilder
+    private var headerTooltip: some View {
+        GeometryReader { proxy in
+            if tooltips.isVisible, let anchor = tooltips.anchor {
+                let container = proxy.frame(in: .global)
+                Tooltip(
+                    title: tooltips.title,
+                    shortcut: tooltips.shortcut,
+                    detail: tooltips.detail
+                )
+                .fixedSize()
+                .background {
+                    GeometryReader { chip in
+                        Color.clear
+                            .onAppear { headerTooltipWidth = chip.size.width }
+                            .onChange(of: chip.size.width) { _, new in
+                                headerTooltipWidth = new
+                            }
+                    }
+                }
+                .position(
+                    x: Self.tooltipCentre(
+                        under: anchor, in: container, chipWidth: headerTooltipWidth
+                    ),
+                    y: anchor.maxY - container.minY + Tokens.Space.comfortable
+                )
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    /// Where the header's chip is centred: under the control, unless that would
+    /// hang it off an edge of the window.
+    ///
+    /// The trailing group is three glyphs from the right edge and its chips carry
+    /// a line of explanation, so centring on the glyph alone puts half the
+    /// sentence outside the window — a tooltip you cannot read is worse than no
+    /// tooltip, because it also covers the artwork.
+    static func tooltipCentre(under anchor: CGRect, in container: CGRect, chipWidth: CGFloat) -> CGFloat {
+        let half = chipWidth / 2
+        let inset = half + Tokens.Space.base
+        let wanted = anchor.midX - container.minX
+        // A chip wider than the window cannot be kept inside it; centre it and
+        // let both ends run out rather than pinning it to one edge.
+        guard container.width > inset * 2 else { return container.width / 2 }
+        return min(max(wanted, inset), container.width - inset)
+    }
 
     private var readOutRow: some View {
         PointerReadout(model: model)

@@ -89,8 +89,17 @@ pixel art and nearest-neighbour scaling want. The pencil ignores the setting and
 always hard, because that is the promise of the pencil.
 
 **Every outline** can be solid, dashed or dotted, at any stroke weight; closed
-shapes can be outline, fill, or both. Fill uses Colour 2, outline uses Colour 1 —
-and right-dragging swaps that, like everywhere else.
+shapes can be outline, fill, or both.
+
+- **Outline** uses Colour 1.
+- **Outline and fill** uses Colour 1 for the edge and Colour 2 for the inside —
+  the pairing the two loaded colours exist for.
+- **Fill** uses Colour 1, because there is no edge to pair it with. It used to
+  use Colour 2, which meant choosing Fill on a fresh document drew a white
+  rectangle on white paper: the colour you had picked did nothing, and the shape
+  was invisible.
+
+Right-dragging swaps the pair, like everywhere else.
 
 Hold `⇧` while dragging to constrain: lines snap to 45°, boxes and ellipses to
 squares and circles.
@@ -168,10 +177,14 @@ selection (`⌘K`), trim borders (`⇧⌘T`).
 
 ## Signature
 
-`⌃⌘S` (`Tools ▸ Signature…`) opens the signing sheet. Sign in the box, or
-**Import Image…** a photo or scan of a signature on paper. Saved signatures
-appear as chips at the top of the sheet; clicking one inserts it, and
-right-clicking offers Delete.
+The signature button in the header — or `⌃⌘S`, or `Tools ▸ Signature…` — opens
+the signing sheet. Sign in the box, or **Import Image…** a photo or scan of a
+signature on paper. Saved signatures appear as chips at the top of the sheet;
+clicking one inserts it, and right-clicking offers Delete.
+
+The point of it is a PDF: open the contract, sign the page, save it back as a
+PDF. See **Files and export** below for what happens to the pages you did not
+touch.
 
 - **The ink is keyed to transparent**, so a signature lands on artwork without a
   white rectangle behind it. Alpha comes from how dark each pixel is relative to
@@ -207,12 +220,23 @@ only — an imported PNG is your file and is never re-encoded in the background.
 | PNG, TIFF, GIF | lossless, alpha preserved |
 | JPEG, BMP | no alpha — flattened onto Colour 2 first, rather than turning transparency black |
 | HEIC, AVIF | modern, lossy, quality slider |
-| PDF | the bitmap wrapped in a single-page PDF |
+| PDF | a page, not a picture — see below |
 | ICO | fitted and centred into the nearest legal icon square (16–256); a non-square ICO is not a large icon, it is an invalid file |
 
 The format list is filtered by what this machine's ImageIO can **actually
 encode**, so it never offers something that will fail at the last step. No WebP:
-macOS reads it but ships no encoder.
+macOS reads it but ships no encoder. PDF is the exception to that filter: Core
+Graphics' own PDF context writes it, not an ImageIO encoder.
+
+**PDF is paper.** Opening one rasterises the page at 144 dpi so it can be drawn
+on — a signature, a correction, a circle round the clause that matters — and
+keeps the file it came from. Saving writes the edited page back into that
+document at its original size in points, and copies every page nobody touched
+through as itself, text and all. Multi-page documents get a page control at the
+bottom of the window; turning a page folds the current one back into the file
+first, and clears the undo stack, because an undo belongs to the page it was made
+on. A canvas that never came from a PDF still exports as a single page, one point
+per pixel.
 
 ---
 

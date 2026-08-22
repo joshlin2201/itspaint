@@ -95,10 +95,15 @@ public enum ImageCodec {
         /// Whether this format only accepts a fixed set of square sizes.
         public var requiresIconSize: Bool { self == .ico }
 
-        /// Whether this machine's ImageIO can actually write it. Checked
-        /// against the installed encoders rather than assumed, so the export
-        /// list never offers a format that will fail at the last step.
-        public var isWritable: Bool { Self.writableIdentifiers.contains(utType.identifier) }
+        /// Whether this machine can actually write it. Checked against the
+        /// installed encoders rather than assumed, so the export list never
+        /// offers a format that will fail at the last step.
+        ///
+        /// PDF is exempt: it is written by Core Graphics' own PDF context rather
+        /// than by an ImageIO encoder, so the encoder list has no say in it.
+        public var isWritable: Bool {
+            self == .pdf || Self.writableIdentifiers.contains(utType.identifier)
+        }
 
         private static let writableIdentifiers: Set<String> = Set(
             (CGImageDestinationCopyTypeIdentifiers() as? [String]) ?? []
@@ -159,6 +164,12 @@ public enum ImageCodec {
     // MARK: - Decoding
 
     public static func decode(contentsOf url: URL) throws -> Bitmap {
+        // PDF is paper, not an image ImageIO can read — a page comes back
+        // through `PDFCodec`, which is also the only route that knows what size
+        // the page was printed at.
+        if Format.inferred(from: url) == .pdf {
+            return try PDFCodec.open(contentsOf: url).bitmap
+        }
         guard let source = CGImageSourceCreateWithURL(
             url as CFURL,
             decodingOptions
@@ -272,6 +283,11 @@ public enum ImageCodec {
         quality: Double = 0.9,
         matte: PaintColour = .white
     ) throws -> Data {
+        // One place decides what a PDF is, and it is not ImageIO.
+        if format == .pdf {
+            return try PDFCodec.encode(bitmap, replacing: nil)
+        }
+
         let output = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             output as CFMutableData,
@@ -294,45 +310,38 @@ public enum ImageCodec {
     /// its own output to the file descriptor instead, so a save costs the canvas
     /// and nothing else.
     ///
-    /// Still atomic: the bytes land in a sibling temporary file that replaces
-    /// `url` only once the encoder has finished, so a failure halfway through
-    /// cannot leave the user with a truncated version of their artwork.
+    /// Still atomic: the bytes are built under a staging path and replace `url`
+    /// only once the encoder has finished, so a failure halfway through cannot
+    /// leave the user with a truncated version of their artwork. That staging
+    /// path is in this app's container and emphatically *not* beside `url` —
+    /// see `FileStaging`, which is where the export bug lived.
     public static func write(
         _ bitmap: Bitmap,
         to url: URL,
         as format: Format? = nil,
         quality: Double = 0.9,
-        matte: PaintColour = .white
+        matte: PaintColour = .white,
+        pdfSource: PDFCodec.Source? = nil
     ) throws {
         let resolved = format ?? Format.inferred(from: url) ?? .png
-        let fileManager = FileManager.default
-        let temporary = url.deletingLastPathComponent()
-            .appendingPathComponent(".itspaint-\(UUID().uuidString).\(resolved.fileExtension)")
 
-        guard let destination = CGImageDestinationCreateWithURL(
-            temporary as CFURL,
-            resolved.utType.identifier as CFString,
-            1,
-            nil
-        ) else {
-            throw CodecError.encodeFailed(resolved)
-        }
-        do {
-            try encode(bitmap, as: resolved, quality: quality, matte: matte, into: destination)
-        } catch {
-            try? fileManager.removeItem(at: temporary)
-            throw error
+        // PDF goes to `PDFCodec`, which writes a page rather than an image: the
+        // right size in points, and the document's other pages still in it.
+        if resolved == .pdf {
+            try PDFCodec.write(bitmap, to: url, replacing: pdfSource)
+            return
         }
 
-        do {
-            if fileManager.fileExists(atPath: url.path) {
-                _ = try fileManager.replaceItemAt(url, withItemAt: temporary)
-            } else {
-                try fileManager.moveItem(at: temporary, to: url)
+        try FileStaging.replaceItem(at: url) { staged in
+            guard let destination = CGImageDestinationCreateWithURL(
+                staged as CFURL,
+                resolved.utType.identifier as CFString,
+                1,
+                nil
+            ) else {
+                throw CodecError.encodeFailed(resolved)
             }
-        } catch {
-            try? fileManager.removeItem(at: temporary)
-            throw error
+            try encode(bitmap, as: resolved, quality: quality, matte: matte, into: destination)
         }
     }
 

@@ -745,6 +745,27 @@ final class EditorModel {
 
     func duplicateDocument() { onDuplicate?() }
 
+    // MARK: - Paper
+
+    /// Which page of a PDF is on the canvas, when the document came from one.
+    ///
+    /// `nil` for everything else, which is what the chrome keys the page control
+    /// off: a screenshot has no pages and should not be told it is on page one
+    /// of one.
+    var pdfPage: (index: Int, count: Int)?
+
+    /// Hook the document installs so the header can turn a page. Zero-based, and
+    /// the document is the one that folds the current page's edits back into the
+    /// file before moving.
+    @ObservationIgnored var onTurnToPage: ((Int) -> Void)?
+
+    func turnToPage(_ index: Int) {
+        guard let page = pdfPage, index != page.index,
+              index >= 0, index < page.count
+        else { return }
+        onTurnToPage?(index)
+    }
+
     /// Live size of whatever region is being dragged, for the status bar.
     var activeRegionSize: (width: Int, height: Int)? { engine.activeRegionSize }
 
@@ -886,6 +907,15 @@ final class EditorModel {
 
     var isRotateSheetPresented: Bool = false
     var isSignatureSheetPresented: Bool = false
+
+    /// Duplicate asks first.
+    ///
+    /// The button is two overlapping pages beside Share, and pressing it used to
+    /// put a second untitled window on screen with no warning — indistinguishable
+    /// from having lost your place in the one you were working in. The menu item
+    /// says the word "Duplicate", so it still goes straight through; a glyph
+    /// cannot say it, so the glyph asks.
+    var isDuplicateConfirmationPresented: Bool = false
 
     func resizeCanvas(width: Int, height: Int) {
         guard Bitmap.isSizeSupported(width: width, height: height) else {

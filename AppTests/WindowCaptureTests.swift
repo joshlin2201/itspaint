@@ -63,6 +63,11 @@ struct WindowCaptureTests {
         if let grid = environment["ITSPAINT_CAPTURE_SNAP"], let spacing = Int(grid) {
             document.model.snapGrid = spacing
         }
+        // The bottom rail lays its options panel out along the other axis, so a
+        // control that only misbehaves down there needs a capture down there.
+        if environment["ITSPAINT_CAPTURE_EDGE"] == "bottom" {
+            document.model.chromeEdge = .bottom
+        }
         if environment["ITSPAINT_CAPTURE_SELECTION"] != nil {
             // Make the marquee with the select tool, then restore whichever tool
             // the capture asked for — otherwise this quietly overwrites it and

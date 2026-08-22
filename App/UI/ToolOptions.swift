@@ -248,7 +248,7 @@ struct ToolOptions: View {
             if strokes {
                 OptionRow("Line") {
                     OptionSegment(selection: $model.strokeDash, options: Raster.Dash.allCases.map {
-                        .init(value: $0, symbol: $0.symbolName, help: $0.displayName)
+                        .init(value: $0, label: $0.controlGlyph, help: $0.displayName)
                     })
                 }
             }
@@ -401,6 +401,7 @@ struct ToolOptions: View {
             readout: "\(model.brushSize)",
             normal: Double(max(allowed.lowerBound, 2))
         )
+        .frame(minWidth: isVertical ? nil : Tokens.Size.horizontalMarkMinimum)
     }
 
     // MARK: - Selection
@@ -485,6 +486,16 @@ struct ToolOptions: View {
             .buttonStyle(.plain)
             .help(title)
             .accessibilityLabel(title)
+        }
+    }
+}
+
+private extension Raster.Dash {
+    var controlGlyph: String {
+        switch self {
+        case .solid: "━━"
+        case .dashed: "━ ━"
+        case .dotted: "•••"
         }
     }
 }

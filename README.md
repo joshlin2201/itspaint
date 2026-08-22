@@ -119,7 +119,8 @@ issue and every comment, which is why most people do not.
 | **Drag straight out** | Into any app that takes an image. No save panel, and no `Screenshot 2026-08-07 at 11.42.13.png` left behind. |
 | **Paste onto anything** | It arrives floating. Bigger than the canvas and the canvas grows rather than cropping it. |
 | **Nine export formats** | PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF, ICO. Formats without alpha flatten onto Colour 2, not onto black. |
-| **Open With** | Registered for PNG, JPEG, TIFF, BMP, GIF and HEIC. |
+| **Sign a PDF** | Open a contract, sign the page, save it back as a PDF. The page stays the size it was printed at, and the pages you did not touch keep their text. |
+| **Open With** | Registered for PNG, JPEG, TIFF, BMP, GIF, HEIC and PDF. |
 
 ### Remove a background with no model and no network
 
@@ -297,8 +298,15 @@ corresponding encoder ships with the installed macOS version. The export panel h
 format and scale controls, and formats without alpha are flattened onto the second
 colour.
 
-ItsPaint registers as an editor for PNG, JPEG, TIFF, BMP, GIF and HEIC, so it appears
-under right-click ▸ **Open With**.
+A PDF opens as a page: ItsPaint rasterises the page you are working on at 144 dpi so
+you can draw on it, and keeps the file it came from. Saving writes a real PDF — the
+edited page at its original size in points, and every other page copied through with
+its text intact. Multi-page documents get a page control at the bottom of the window,
+and turning a page keeps what you drew on the last one.
+
+ItsPaint registers as an editor for PNG, JPEG, TIFF, BMP, GIF, HEIC and PDF, so it
+appears under right-click ▸ **Open With**. It asks for `Alternate` rank on PDF rather
+than owning the type, because Preview should stay the Mac's PDF reader.
 
 WebP export is not available, because macOS does not provide a WebP encoder. Text
 becomes pixels once it is committed.

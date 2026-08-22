@@ -48,6 +48,9 @@ enum Tokens {
         /// number is the difference between a panel and a stack of unrelated
         /// rows that happen to share a background.
         static let optionLabel: CGFloat = 42
+        /// `GeometryReader` offers only 10pt intrinsically, which is not enough
+        /// travel for a size mark when the bottom panel measures its own row.
+        static let horizontalMarkMinimum: CGFloat = 96
         /// An action button inside the options panel.
         static let pillAction: CGFloat = 26
         /// A tool cell in the rail.
