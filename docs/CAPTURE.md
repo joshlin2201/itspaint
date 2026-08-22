@@ -208,8 +208,9 @@ on 0.16.4 exactly as designed and the artifact it is about was already two relea
 stale. **A tripwire that is checked against a proxy is a tripwire for the proxy.**
 
 The card is therefore knowingly stale: it says `"3.15 MB"` against a measured 3.17.
-Nobody is misled by 0.02 MB in a number whose whole job is "this is small", so it is
-not worth a hand-composed replacement that would not match the original's type. It
+Nobody is misled by a two-hundredths-of-a-megabyte error in a number whose whole job is
+"this is small", so it is not worth a hand-composed replacement that would not match
+the original's type. It
 gets redrawn the next time the generator runs. The size is in quotes above because it
 is a *quotation of the artifact*, which is the one thing this line can be honest
 about; comparing it to the release was never a check on the card at all.
