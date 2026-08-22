@@ -5,7 +5,7 @@ Notable changes, newest first. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0 the minor
 version may still carry breaking changes to the document format.
 
-## [0.17.0] — 2026-08-21
+## [0.17.0] — 2026-08-22
 
 ### Added
 - **A PDF opens as a page, and saves as a PDF.** ImageIO can write a PDF and
