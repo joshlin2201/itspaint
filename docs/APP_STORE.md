@@ -225,7 +225,12 @@ is left is the part that is a legal declaration rather than an API call:
    a practical USPTO knock-out search, and that counsel-led clearance was named
    the gate for an App Store launch. That gate has not been closed.
 
-Release is set to **manual**, so an approval does not put a version on the
-store until it is released deliberately. Nothing in this app touches the usual
-Mac rejection reasons — no updater, no broad file access, no private API, no
-undeclared data collection.
+Release is **`AFTER_APPROVAL`**, so an approval puts the version on the store by
+itself. This document said "manual" until 0.17.0, when the API was actually
+read: `asc.py create_version` has always sent `releaseType: AFTER_APPROVAL`, and
+every shipped 0.16.x version carries it. Pass `MANUAL` there, or PATCH the
+version, if a release ever needs to be held behind an approval — and check the
+field rather than this sentence.
+
+Nothing in this app touches the usual Mac rejection reasons — no updater, no
+broad file access, no private API, no undeclared data collection.

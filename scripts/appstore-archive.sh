@@ -43,13 +43,25 @@ EXPORT=dist/appstore/export
 MODE=distribution
 UPLOAD=false
 EXTRA=(-allowProvisioningUpdates)
-case "${1:-}" in
-  --allow-provisioning) ;;
-  --upload) UPLOAD=true ;;
-  --validate-only) MODE=validate; EXTRA=() ;;
-  "") ;;
-  *) echo "Unknown option: $1" >&2; exit 2 ;;
-esac
+# Every argument, not just the first.
+#
+# This used to `case "${1:-}"`, so the documented-looking
+# `--allow-provisioning --upload` matched the first flag, dropped the second,
+# and exported a pkg while reporting "Re-run with --upload". A release step that
+# silently does less than it was asked is worse than one that refuses: the run
+# went green and nothing had been delivered.
+for arg in "$@"; do
+  case "$arg" in
+    --allow-provisioning) ;;
+    --upload) UPLOAD=true ;;
+    --validate-only) MODE=validate; EXTRA=() ;;
+    *) echo "Unknown option: $arg" >&2; exit 2 ;;
+  esac
+done
+if [[ "$MODE" == "validate" && "$UPLOAD" == "true" ]]; then
+  echo "--validate-only skips the distribution export, so there is nothing to upload." >&2
+  exit 2
+fi
 
 # CODE_SIGN_IDENTITY has to be overridden explicitly: project.yml pins it to "-"
 # for local builds, and that pin outranks CODE_SIGN_STYLE=Automatic, so without
