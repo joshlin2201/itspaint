@@ -188,17 +188,36 @@ demonstrably cannot phone home, and the source is right there.
 
 `docs/images/social-preview.png` is what renders on X, Slack, Discord and LinkedIn,
 and as the landing page's `og:image`. It is generated, and it carries text: the app
-name, the job, and **3.16 MB**.
+name, the job, and a download size.
 
 No checker can read a PNG. `claims.py` catches a stale number in prose and
 `surfaces.py` catches one on the landing page, and both would sail past a share card
 that had been wrong for six releases — which is exactly how the card came to be
 advertising a chameleon and three measured-dead hooks for a fortnight.
 
-So the size the card was drawn with is written here, in a file `claims.py` reads. When
-the download grows, this line fails, and regenerating the card is the fix rather than
-editing the number.
+So the size the card was drawn with was written here, in a file `claims.py` reads, on
+the theory that when the download grows this line fails and regenerating the card is
+the fix rather than editing the number.
 
-Regenerate: capture a window with `WindowCaptureTests`, then compose. The script lives
-with the promo tooling; the card is 1280×640 and the window shot is bled off the right
-edge.
+**That did not hold, and the way it failed is worth more than the mechanism was.**
+Read on 2026-08-21, the card renders `"3.15 MB"`. This paragraph claimed `3.16`. So the
+line meant to mirror the card had drifted from the card, and nothing noticed, because
+`claims.py` was comparing this number to *the release* — a comparison that goes red
+every time a release ships, for a reason that has nothing to do with the PNG. It fired
+on 0.16.4 exactly as designed and the artifact it is about was already two releases
+stale. **A tripwire that is checked against a proxy is a tripwire for the proxy.**
+
+The card is therefore knowingly stale: it says `"3.15 MB"` against a measured 3.17.
+Nobody is misled by 0.02 MB in a number whose whole job is "this is small", so it is
+not worth a hand-composed replacement that would not match the original's type. It
+gets redrawn the next time the generator runs. The size is in quotes above because it
+is a *quotation of the artifact*, which is the one thing this line can be honest
+about; comparing it to the release was never a check on the card at all.
+
+Regenerate: capture a window with `WindowCaptureTests` — that part is real, it is in
+`AppTests/WindowCaptureTests.swift` — then compose. The card is 1280×640 and the window
+shot is bled off the right edge. **There is no compose script.** This paragraph said it
+"lives with the promo tooling" and it does not live there or anywhere else in this
+repository, which is the practical reason the card has not been redrawn in six
+releases: the instruction named a tool that was never written. Whoever redraws it
+writes that tool first, and should put it somewhere a path can point at.
