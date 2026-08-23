@@ -57,6 +57,13 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
         // is off until someone turns it on, and it stays off if the folder it was
         // given has since moved.
         _ = ScreenshotWatcher.shared
+
+        // The Info.plist entry puts "Edit in ItsPaint" in the Services menu; this
+        // is what makes choosing it do something. `NSUpdateDynamicServices` is
+        // for development — the system caches service definitions per app
+        // version, so without it a freshly built app shows yesterday's menu.
+        NSApp.servicesProvider = ImageService.shared
+        NSUpdateDynamicServices()
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { true }

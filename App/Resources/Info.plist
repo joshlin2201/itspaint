@@ -109,6 +109,44 @@
 		</dict>
 	</array>
 
+	<!--
+	  "Edit in ItsPaint" in the Services menu, everywhere macOS offers one: the
+	  Finder, Mail, Safari, Preview. NSMessage must match the selector on
+	  ImageService, and the provider has to be assigned at launch or the item
+	  appears and does nothing.
+	-->
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Edit in ItsPaint</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>openImageFromService</string>
+			<key>NSPortName</key>
+			<string>ItsPaint</string>
+			<!--
+			  Files go in NSSendFileTypes, not NSSendTypes. Every Finder selection
+			  offers public.file-url, so advertising that here would put "Edit in
+			  ItsPaint" on folders, archives and sound files, and the menu item
+			  would then do nothing. NSSendTypes stays for the pixels an app puts
+			  on the pasteboard directly.
+			-->
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.image</string>
+				<string>com.adobe.pdf</string>
+			</array>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.png</string>
+				<string>public.tiff</string>
+			</array>
+		</dict>
+	</array>
+
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

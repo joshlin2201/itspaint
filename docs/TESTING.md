@@ -1,6 +1,6 @@
 # Testing protocol
 
-476 tests cover the engine and the Mac app. This document explains what each
+487 tests cover the engine and the Mac app. This document explains what each
 suite is for, how to write a test that will still be useful in a year, and the
 three failure modes that have already cost a day each.
 
