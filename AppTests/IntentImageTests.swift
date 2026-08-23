@@ -19,12 +19,12 @@ struct IntentImageTests {
     func fileBeatsBytes() throws {
         let url = URL(fileURLWithPath: "/tmp/shot.png")
 
-        #expect(try IntentImage.source(fileURL: url, data: Self.onePixelPNG, type: .png) == .file(url))
+        #expect(try IntentImage.source(fileURL: url, type: .png, data: Self.onePixelPNG) == .file(url))
     }
 
     @Test("Bytes are used when there is no file")
     func bytesWithoutFile() throws {
-        #expect(try IntentImage.source(fileURL: nil, data: Self.onePixelPNG, type: .png)
+        #expect(try IntentImage.source(fileURL: nil, type: .png, data: Self.onePixelPNG)
             == .bytes(Self.onePixelPNG))
     }
 
@@ -34,7 +34,7 @@ struct IntentImageTests {
     func remoteURLIsNotAFile() throws {
         let remote = URL(string: "https://example.com/shot.png")!
 
-        #expect(try IntentImage.source(fileURL: remote, data: Self.onePixelPNG, type: nil)
+        #expect(try IntentImage.source(fileURL: remote, type: nil, data: Self.onePixelPNG)
             == .bytes(Self.onePixelPNG))
     }
 
@@ -44,10 +44,10 @@ struct IntentImageTests {
     @Test("Neither a file nor bytes is an error")
     func nothingIsAnError() {
         #expect(throws: IntentImageError.self) {
-            try IntentImage.source(fileURL: nil, data: nil, type: nil)
+            try IntentImage.source(fileURL: nil, type: nil, data: nil)
         }
         #expect(throws: IntentImageError.self) {
-            try IntentImage.source(fileURL: nil, data: Data(), type: nil)
+            try IntentImage.source(fileURL: nil, type: nil, data: Data())
         }
     }
 
@@ -58,7 +58,7 @@ struct IntentImageTests {
     func refusesOtherTypes() {
         #expect(throws: IntentImageError.self) {
             try IntentImage.source(fileURL: URL(fileURLWithPath: "/tmp/notes.txt"),
-                                   data: nil, type: .plainText)
+                                   type: .plainText, data: nil)
         }
     }
 
@@ -67,6 +67,25 @@ struct IntentImageTests {
     func admitsPDF() throws {
         let url = URL(fileURLWithPath: "/tmp/contract.pdf")
 
-        #expect(try IntentImage.source(fileURL: url, data: nil, type: .pdf) == .file(url))
+        #expect(try IntentImage.source(fileURL: url, type: .pdf, data: nil) == .file(url))
+    }
+
+    /// The bytes must not be touched when a file URL is going to win.
+    ///
+    /// `IntentFile.data` maps the file, and for an external file that read only
+    /// succeeds inside a security scope this function's caller has not opened
+    /// yet. A plain parameter would be evaluated at the call site — this asserts
+    /// the autoclosure is not.
+    @Test("The bytes are not read when a file wins")
+    func fileBranchNeverReadsBytes() throws {
+        nonisolated(unsafe) var reads = 0
+        let url = URL(fileURLWithPath: "/tmp/shot.png")
+
+        _ = try IntentImage.source(fileURL: url, type: .png, data: {
+            reads += 1
+            return Self.onePixelPNG
+        }())
+
+        #expect(reads == 0)
     }
 }

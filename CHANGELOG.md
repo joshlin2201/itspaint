@@ -11,7 +11,11 @@ version may still carry breaking changes to the document format.
 - **Edit in ItsPaint, from the Services menu.** Select an image in the Finder, in
   Mail, in a web page — anywhere macOS offers Services — and it opens here. The
   pasteboard the system hands over is the entire grant, so this needs no new
-  entitlement and asks for no permission. **Ten files at a time, in name order:**
+  entitlement and asks for no permission. The supported types are declared under
+  `NSSendFileTypes` rather than `NSSendTypes`: every Finder selection offers
+  `public.file-url`, so the generic route would have put the item on folders,
+  archives and sound files and then done nothing when it was chosen. **Ten files
+  at a time, in name order:**
   choosing a service with a folder of screenshots selected is one gesture, and
   without a ceiling it is one gesture that opens two hundred windows. The order
   matters because pasteboard order is whatever the sending app used, so "the
@@ -20,10 +24,15 @@ version may still carry breaking changes to the document format.
   inside a shortcut somebody already runs, which is a door into the app that does
   not require remembering it exists. It takes an image or a PDF page and prefers
   a file on disk over the bytes beside it — a document tied to a real path saves
-  back where the image came from, and an untitled one sends you to a panel. The
-  type check lives in the app rather than on the parameter because
-  `supportedContentTypes:` is macOS 15 and this app runs on 14; putting it in code
-  also put it under test.
+  back where the image came from, and an untitled one sends you to a panel, and
+  the wrong branch there still opens a window, so nothing would catch it until a
+  save went missing. The Shortcuts picker filters by type
+  (`supportedTypeIdentifiers`, because `supportedContentTypes` is macOS 15 and
+  this app runs on 14) and the action checks again on the way in, because
+  Shortcuts can hand an action a file its picker never offered. The bytes are read
+  through an autoclosure so the file branch never maps them: `IntentFile.data`
+  reads the file, and for an external file that read has to happen inside the
+  security scope the caller has not opened yet.
 
 ### Changed
 - **The clipboard shortcut and the Services entry now open a window the same
