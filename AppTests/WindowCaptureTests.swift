@@ -14,18 +14,27 @@ import Testing
 ///
 /// Inert without the environment variables, so it costs CI nothing:
 ///
-///     ITSPAINT_CAPTURE_IMAGE=/path/to/artwork.png \
-///     ITSPAINT_CAPTURE_OUT=/path/to/window.png \
+///     TEST_RUNNER_ITSPAINT_CAPTURE_IMAGE=/path/to/artwork.png \
+///     TEST_RUNNER_ITSPAINT_CAPTURE_OUT=/path/to/window.png \
 ///     xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
 ///       -destination 'platform=macOS' \
 ///       test -only-testing:ItsPaintTests/WindowCaptureTests
 ///
-/// The Remove Background reel is ITSPAINT_ALPHA_REEL_DIR=<dir> plus
-/// ITSPAINT_ALPHA_REEL_SUBJECT=<subject.png with alpha>. The app is
+/// **The `TEST_RUNNER_` prefix is load-bearing.** `xcodebuild` does not pass a
+/// bare variable through to the process the tests run in; it forwards the ones
+/// prefixed this way, with the prefix stripped. Without it the guard at the top
+/// of each test returns immediately and the run prints `** TEST SUCCEEDED **`
+/// having written nothing — a green result for work that did not happen, which
+/// is the worst shape a check can have. Whatever drives this should count the
+/// files afterwards and fail on none, because the test itself cannot tell the
+/// difference between "not asked to render" and "asked, and the ask was lost".
+///
+/// The Remove Background reel is TEST_RUNNER_ITSPAINT_ALPHA_REEL_DIR=<dir> plus
+/// TEST_RUNNER_ITSPAINT_ALPHA_REEL_SUBJECT=<subject.png with alpha>. The app is
 /// sandboxed, so <dir> has to be inside its container — the tmp directory
 /// under ~/Library/Containers/com.joshlin.itspaint/Data works.
 ///
-/// The README reel works the same way with ITSPAINT_REEL_DIR=<dir>, and the
+/// The README reel works the same way with TEST_RUNNER_ITSPAINT_REEL_DIR=<dir>, and the
 /// frames assemble into docs/images/markup-reel.gif with ffmpeg:
 ///
 ///     ffmpeg -f concat -i durations.txt -vf "scale=1012:-1:flags=lanczos, \
