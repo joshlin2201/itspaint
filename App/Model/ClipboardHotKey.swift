@@ -143,22 +143,9 @@ final class ClipboardHotKey {
         }
 
         do {
-            let bitmap = try Bitmap(pasteboard: board)
-            let controller = NSDocumentController.shared
-            guard let document = try controller.openUntitledDocumentAndDisplay(false)
-                    as? DrawingDocument
-            else {
-                present("That image could not be opened.", nil)
-                return
-            }
-            // `load` rather than `replaceCanvas`: this is the document's initial
-            // content, not an edit to it. Going through the undo-recording path
-            // would open a window already dirty, offering to save a file that
-            // never existed, with a stack whose bottom entry is a blank canvas
-            // nobody asked for.
-            document.model.load(canvas: bitmap, metadata: nil)
-            document.makeWindowControllers()
-            document.showWindows()
+            // Shared with the Services entry, which arrives the same way: an
+            // image from another app, no document to put it in.
+            try NewDocument.open(with: Bitmap(pasteboard: board))
         } catch {
             present("That image could not be opened.", error.localizedDescription)
         }

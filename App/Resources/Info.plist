@@ -109,6 +109,33 @@
 		</dict>
 	</array>
 
+	<!--
+	  "Edit in ItsPaint" in the Services menu, everywhere macOS offers one: the
+	  Finder, Mail, Safari, Preview. NSMessage must match the selector on
+	  ImageService, and the provider has to be assigned at launch or the item
+	  appears and does nothing.
+	-->
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Edit in ItsPaint</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>openImageFromService</string>
+			<key>NSPortName</key>
+			<string>ItsPaint</string>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.file-url</string>
+				<string>public.png</string>
+				<string>public.tiff</string>
+			</array>
+		</dict>
+	</array>
+
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
