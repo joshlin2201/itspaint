@@ -232,8 +232,6 @@ private struct DragOutSurface: NSViewRepresentable {
 
     final class DragSurfaceView: NSView, NSDraggingSource {
         var payload: DraggedImage?
-        /// The payload as it was when the drag started. See the delegate below.
-        fileprivate var promised: DraggedImage?
         /// Shared: one promise is written at a time and the work is a single
         /// `Data.write`.
         fileprivate static let promiseQueue = OperationQueue()
@@ -257,7 +255,6 @@ private struct DragOutSurface: NSViewRepresentable {
         override func mouseDragged(with event: NSEvent) {
             guard let payload else { return }
             guard let image = NSImage(data: payload.data) else { return }
-            promised = payload
 
             // A **file promise**, which is what carries the name across a
             // sandbox boundary. Writing a temp file and dragging its URL is
@@ -266,6 +263,14 @@ private struct DragOutSurface: NSViewRepresentable {
             // arrives in Mail as "Image". A promise lets the receiver nominate
             // the destination and asks us to write into it.
             let provider = NSFilePromiseProvider(fileType: UTType.png.identifier, delegate: self)
+            // **The bytes travel on the provider, not on this view.** The promise
+            // is fulfilled whenever the receiver gets round to it, on a background
+            // queue, and the delegate methods are nonisolated — reading a property
+            // of a `@MainActor` view from them does not compile under Swift 6
+            // strict concurrency, and would be the wrong answer anyway: by then
+            // the canvas may have moved on, and what lands in Mail should be the
+            // picture that was picked up.
+            provider.userInfo = [Self.nameKey: payload.name, Self.dataKey: payload.data] as [String: any Sendable]
             let dragItem = NSDraggingItem(pasteboardWriter: provider)
             // The drag image is the picture, at a size that reads as a proxy
             // rather than as a second window: big enough to recognise, small
@@ -288,29 +293,40 @@ private struct DragOutSurface: NSViewRepresentable {
         ) -> NSDragOperation {
             .copy
         }
+
+        fileprivate static let nameKey = "itspaint.name"
+        fileprivate static let dataKey = "itspaint.data"
     }
 }
 
-/// Writing the promised file, off the main thread, from bytes captured before
-/// the drag began.
+/// Writing the promised file, off the main thread, from the bytes the drag was
+/// started with.
 ///
-/// The bytes are read once in `mouseDragged` and held by the closure rather than
-/// re-read here: the promise is fulfilled whenever the receiver gets round to it,
-/// and by then the canvas may have moved on. What lands in Mail should be the
-/// picture that was picked up.
+/// Everything these methods need is on the provider's `userInfo`, put there when
+/// the drag began. They are nonisolated and run on a background queue, so they
+/// cannot read the view's own state — and should not: the promise is fulfilled
+/// whenever the receiver gets round to it, and what lands in Mail should be the
+/// picture that was picked up rather than whatever the canvas holds by then.
 extension DragOutSurface.DragSurfaceView: NSFilePromiseProviderDelegate {
-    func filePromiseProvider(
+    // Read inline, not through a shared helper. A helper returning
+    // `[String: Any]` is a non-Sendable value crossing an isolation boundary,
+    // which Swift 6 refuses — and it is refusing something real: the dictionary
+    // would be reachable from both queues at once. Pulling the one Sendable
+    // value out on the spot leaves nothing to share.
+    nonisolated func filePromiseProvider(
         _ provider: NSFilePromiseProvider, fileNameForType fileType: String
     ) -> String {
-        promised?.name ?? "Image.png"
+        let info = provider.userInfo as? [String: any Sendable]
+        return info?[Self.nameKey] as? String ?? "Image.png"
     }
 
-    func filePromiseProvider(
+    nonisolated func filePromiseProvider(
         _ provider: NSFilePromiseProvider,
         writePromiseTo url: URL,
         completionHandler: @escaping (Error?) -> Void
     ) {
-        guard let data = promised?.data else {
+        let info = provider.userInfo as? [String: any Sendable]
+        guard let data = info?[Self.dataKey] as? Data else {
             completionHandler(CocoaError(.fileNoSuchFile)); return
         }
         do {
@@ -321,7 +337,7 @@ extension DragOutSurface.DragSurfaceView: NSFilePromiseProviderDelegate {
         }
     }
 
-    func operationQueue(for provider: NSFilePromiseProvider) -> OperationQueue {
+    nonisolated func operationQueue(for provider: NSFilePromiseProvider) -> OperationQueue {
         Self.promiseQueue
     }
 }
@@ -677,6 +693,7 @@ struct DocumentActions: View {
 /// where every other command lives. A SwiftUI `Button` has no sender to route
 /// with, so it asks the application delegate directly — the same delegate the
 /// chain would have reached, and the same URL.
+@MainActor
 enum AppCommandsBridge {
     static func openGuide() {
         NSApp.sendAction(#selector(AppCommands.openHelp(_:)), to: nil, from: nil)
