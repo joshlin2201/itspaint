@@ -151,7 +151,11 @@ struct EssentialsTests {
         _ = model.engine.beginStroke(at: PixelPoint(x: 25, y: 25))
         _ = model.engine.continueStroke(to: PixelPoint(x: 58, y: 25))
         _ = model.engine.continueStroke(to: PixelPoint(x: 58, y: 58))
-        _ = model.engine.endStroke(at: PixelPoint(x: 25, y: 25))
+        // Reported, the way `CanvasNSView` reports it. `hasSelection` is a
+        // mirror of the engine rather than a passthrough — the engine is
+        // deliberately not observable — so a stroke nobody reports leaves the
+        // flag, and the selection bar with it, exactly where they were.
+        model.noteVisualChange(model.engine.endStroke(at: PixelPoint(x: 25, y: 25)))
         #expect(model.hasSelection)
 
         // Through the real key handler, not `deselect()` — the binding is the

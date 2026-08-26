@@ -365,7 +365,7 @@ enum MainMenuBuilder {
     private static func helpMenu() -> NSMenuItem {
         let item = NSMenuItem()
         let menu = NSMenu(title: "Help")
-        add(to: menu, "ItsPaint Help", #selector(AppCommands.openHelp(_:)), "?")
+        add(to: menu, "ItsPaint Guide", #selector(AppCommands.openHelp(_:)), "?")
         menu.addItem(.separator())
         add(to: menu, "Keyboard Shortcuts", #selector(AppCommands.openShortcuts(_:)), "")
         add(to: menu, "Report an Issue", #selector(AppCommands.openIssues(_:)), "")

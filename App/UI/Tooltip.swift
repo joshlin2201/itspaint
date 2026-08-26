@@ -18,58 +18,78 @@ struct Tooltip: View {
     var detail: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        // **One surface, both lines.** The detail used to be printed outside the
+        // chip, straight onto the artwork: grey text at 60% on whatever colour
+        // the picture happened to be, with no background at all. It was the
+        // least legible text in the app and it was the text doing the teaching.
+        VStack(alignment: .leading, spacing: 4) {
             heading
             if let detail {
                 Text(detail)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
+                    .font(.system(size: 11))
+                    // A tooltip is read once, quickly, at a glance. `muted` is
+                    // the value-beside-a-label step and it is too quiet for a
+                    // sentence somebody has stopped to read.
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 210, alignment: .leading)
             }
         }
+        .padding(.horizontal, Tokens.Space.base + 1)
+        .padding(.vertical, Tokens.Space.tight + 1)
+        .background {
+            let shape = RoundedRectangle(cornerRadius: Tokens.Radius.panel, style: .continuous)
+            // Not `.chromeSurface`. That material is tuned for chrome sitting
+            // over artwork it wants to let through; a tooltip has to be opaque
+            // enough to read a sentence against a photograph. This is the same
+            // grammar — material, tint floor, luminous hairline — with the floor
+            // raised until the text wins.
+            shape
+                .fill(.regularMaterial)
+                .overlay { shape.fill(Color(nsColor: .textBackgroundColor).opacity(0.55)) }
+                .overlay { shape.strokeBorder(.primary.opacity(0.14), lineWidth: 0.5) }
+                .compositingGroup()
+                .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.panel, style: .continuous))
+        .fixedSize()
+        .transition(.opacity.combined(with: .offset(y: 3)))
     }
 
     private var heading: some View {
         HStack(spacing: Tokens.Space.tight + 1) {
             Text(title)
-                .font(.system(size: 11.5, weight: .medium))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.primary)
 
             if let shortcut {
                 Text(shortcut)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.strong))
                     .frame(minWidth: 15)
                     .padding(.vertical, 1.5)
                     .padding(.horizontal, 4)
                     .background {
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(.primary.opacity(Tokens.Fill.separator))
+                            .fill(.primary.opacity(Tokens.Fill.track))
                     }
                     .overlay {
                         // A keycap reads as a key. Writing "(P)" in the label
                         // makes the reader parse a sentence instead.
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .strokeBorder(.primary.opacity(0.10), lineWidth: 0.5)
+                            .strokeBorder(.primary.opacity(0.14), lineWidth: 0.5)
                     }
             }
         }
-        .padding(.horizontal, Tokens.Space.base)
-        .padding(.vertical, Tokens.Space.tight + 1)
-        .chromeSurface(cornerRadius: Tokens.Radius.chip + 1)
-        .fixedSize()
-        .transition(.opacity.combined(with: .offset(y: 3)))
     }
 }
 
 /// Tracks which control is hovered and after how long, so one owner can show a
 /// single tooltip for a whole row.
 ///
-/// The delay is deliberately short (300ms, versus the system's ~1s) and the
-/// *re-entry* delay is zero: once a tooltip is up, moving along the row swaps
-/// it instantly. Waiting again at every cell is what makes system tooltips
-/// useless for scanning a toolbar.
+/// The delay is deliberately short and the *re-entry* delay is zero: once a
+/// tooltip is up, moving along the row swaps it instantly. Waiting again at
+/// every cell is what makes system tooltips useless for scanning a toolbar.
 @MainActor
 @Observable
 final class TooltipController {
@@ -89,6 +109,19 @@ final class TooltipController {
 
     @ObservationIgnored private var pendingKey: String?
     @ObservationIgnored private var work: DispatchWorkItem?
+
+    /// How long the pointer has to rest before the first chip appears.
+    ///
+    /// The system waits about a second. This was 300ms, which is still long
+    /// enough to feel like a wait rather than an answer — you notice yourself
+    /// pausing. 110ms is under the threshold where a delay reads as a delay,
+    /// and it is still far enough above zero that sweeping the pointer across
+    /// the header on the way somewhere else does not flash a chip.
+    static let delay: TimeInterval = 0.11
+
+    /// And how long a chip lingers after the pointer leaves, so travelling
+    /// between two adjacent cells does not blink it off and on.
+    static let grace: TimeInterval = 0.08
 
     var isVisible: Bool { visibleKey != nil }
 
@@ -124,7 +157,7 @@ final class TooltipController {
             }
         }
         work = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.30, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.delay, execute: item)
     }
 
     func endHover(key: String) {
@@ -142,7 +175,7 @@ final class TooltipController {
             }
         }
         work = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.grace, execute: item)
     }
 
     func dismiss() {

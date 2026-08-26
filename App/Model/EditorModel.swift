@@ -374,10 +374,27 @@ final class EditorModel {
     /// The traced lasso outline, for drawing its ants along the real shape.
     var lassoPath: [PixelPoint] { engine.lassoPath }
     var floating: FloatingSelection? { engine.floating }
-    var hasSelection: Bool { engine.hasSelection }
+    /// Whether there is a marquee, **mirrored rather than forwarded**.
+    ///
+    /// This used to be `engine.hasSelection`, and `PaintEngine` is deliberately
+    /// UI-free and so not `@Observable` — a computed passthrough is invisible to
+    /// SwiftUI. Nothing in the editor was invalidated by making or clearing a
+    /// selection, so the selection bar was never asked to draw and was invisible
+    /// for the whole session.
+    ///
+    /// Reading `revision` in the view instead is the obvious fix and the wrong
+    /// one, for the reason `nextBadgeNumber` records above it: `revision` bumps
+    /// on every dirty rect, which during a freehand stroke is every mouse-moved
+    /// event, so the whole editor would re-render sixty times a second to track
+    /// a flag that changes twice a minute. A mirror synced only when the value
+    /// genuinely differs makes the notification exact.
+    private(set) var hasSelection: Bool = false
 
     func noteChange(_ dirty: PixelRect) {
-        guard !dirty.isEmpty else { return }
+        // Flags first, for the reason spelled out in `noteVisualChange`: a
+        // command that changes the selection without dirtying a pixel still has
+        // to take the selection bar with it.
+        guard !dirty.isEmpty else { syncFloatingState(); return }
         noteVisualChange(dirty)
         syncBadgeNumber()
         noteCanvasSizeIfChanged()
@@ -399,9 +416,14 @@ final class EditorModel {
     /// save. Keeping that distinction here prevents a read-only marquee from
     /// lighting the document's dirty dot.
     func noteVisualChange(_ dirty: PixelRect) {
+        // **The mirrors sync even when nothing is dirty.** They are *flags*, not
+        // pixels: a selection that changes without marking any area — deselecting
+        // an empty marquee, a tool that clears one on the way in — still has to
+        // take the selection bar with it. The `revision` bump stays behind the
+        // guard, because that one is about repainting.
+        syncFloatingState()
         guard !dirty.isEmpty else { return }
         revision &+= 1
-        syncFloatingState()
     }
 
     @ObservationIgnored private var lastKnownUndoCount: Int = 0
@@ -696,6 +718,8 @@ final class EditorModel {
     private func syncFloatingState() {
         let floats = engine.floating.map { !$0.frame.isEmpty } ?? false
         if hasFloatingContent != floats { hasFloatingContent = floats }
+        let selected = engine.hasSelection
+        if hasSelection != selected { hasSelection = selected }
     }
 
     /// Write the floating content down where it sits.

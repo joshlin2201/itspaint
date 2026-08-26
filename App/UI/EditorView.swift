@@ -94,6 +94,25 @@ struct EditorView: View {
 
             // Bottom-centre, clear of the rail on either edge and of the
             // pointer read-out in the corner.
+            //
+            // **One bar owns this slot.** A floating paste is itself a selection,
+            // so both bars are eligible at once and showing both would be two
+            // answers to one question. The paste bar wins because placing or
+            // discarding is the decision actually in front of you.
+            if !model.hasFloatingContent, model.hasSelection {
+                SelectionActions(model: model)
+                    .fixedSize()
+                    .padding(.bottom, model.chromeEdge.isVertical
+                        ? Tokens.Space.safeInset
+                        : Tokens.Space.safeInset + Tokens.Rail.thickness + Tokens.Space.base)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    // Out of the way while the marquee is being dragged: the bar
+                    // is about the selection you have finished making, and its
+                    // own size read-out is the one thing that would flicker.
+                    .opacity(model.isDragging ? 0 : 1)
+                    .animation(Tokens.Motion.micro, value: model.isDragging)
+            }
+
             if model.hasFloatingContent {
                 FloatingActions(model: model)
                     .fixedSize()
@@ -108,8 +127,9 @@ struct EditorView: View {
 
             chrome
         }
-        // The bar appears and disappears with the content it acts on.
+        // The bars appear and disappear with the thing they act on.
         .animation(Tokens.Motion.pillResize, value: model.hasFloatingContent)
+        .animation(Tokens.Motion.pillResize, value: model.hasSelection)
         // The whole layout spans the window, titlebar included.
         //
         // `.fullSizeContentView` lets the content view extend under the
@@ -421,13 +441,20 @@ struct EditorView: View {
     /// actions, with the gaps between them. Below this the cluster overlaps.
     private static let centredClusterMinimum: CGFloat = 940
 
-    /// The chip for a header control, under the control itself.
+    /// The chip for a header control, on one fixed line under the header.
     ///
     /// The header's buttons cannot draw it themselves: their group clips to its
     /// own capsule, so a chip inside one is a chip with its bottom half cut off.
     /// They report where they are instead and it is drawn out here, still one
     /// chip at a time — the rail's chip is suppressed while a header button owns
     /// the tooltip, because two of them on screen is two answers to one question.
+    ///
+    /// **The chip's top edge does not move.** It used to be positioned from each
+    /// control's own frame, so a chip with a second line grew *downwards from a
+    /// different y* than a one-line chip beside it, and reading along the header
+    /// meant re-finding the text on every cell. Every header control is on one
+    /// row and the answer belongs on one line under it. Only the horizontal
+    /// centre follows the glyph, so the chip still points at what it names.
     @ViewBuilder
     private var headerTooltip: some View {
         GeometryReader { proxy in
@@ -448,32 +475,47 @@ struct EditorView: View {
                             }
                     }
                 }
-                .position(
-                    x: Self.tooltipCentre(
+                // `.topLeading`, not `.position`: `position` centres on a point,
+                // so a two-line chip and a one-line chip pinned to the same y
+                // still start at different heights. Pinning the top edge is what
+                // "one fixed line" actually means.
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .offset(
+                    x: Self.tooltipLeading(
                         under: anchor, in: container, chipWidth: headerTooltipWidth
                     ),
-                    y: anchor.maxY - container.minY + Tokens.Space.comfortable
+                    y: Self.tooltipTop
                 )
                 .allowsHitTesting(false)
             }
         }
     }
 
-    /// Where the header's chip is centred: under the control, unless that would
-    /// hang it off an edge of the window.
+    /// The one line every header chip hangs from: clear of the header row, with
+    /// the same gap the header itself keeps from the top of the window.
+    static let tooltipTop: CGFloat = Tokens.Chrome.titleReserve - Tokens.Space.tight
+
+    /// Where the header's chip starts: centred under the control, unless that
+    /// would hang it off an edge of the window.
     ///
     /// The trailing group is three glyphs from the right edge and its chips carry
     /// a line of explanation, so centring on the glyph alone puts half the
     /// sentence outside the window — a tooltip you cannot read is worse than no
     /// tooltip, because it also covers the artwork.
-    static func tooltipCentre(under anchor: CGRect, in container: CGRect, chipWidth: CGFloat) -> CGFloat {
+    ///
+    /// Returns a leading edge rather than a centre because the chip is pinned by
+    /// its top-left corner, so that its top edge can stay on one line whatever
+    /// height it happens to be.
+    static func tooltipLeading(under anchor: CGRect, in container: CGRect, chipWidth: CGFloat) -> CGFloat {
         let half = chipWidth / 2
         let inset = half + Tokens.Space.base
         let wanted = anchor.midX - container.minX
         // A chip wider than the window cannot be kept inside it; centre it and
         // let both ends run out rather than pinning it to one edge.
-        guard container.width > inset * 2 else { return container.width / 2 }
-        return min(max(wanted, inset), container.width - inset)
+        let centre = container.width > inset * 2
+            ? min(max(wanted, inset), container.width - inset)
+            : container.width / 2
+        return centre - half
     }
 
     private var readOutRow: some View {

@@ -38,6 +38,12 @@ final class DrawingDocument: NSDocument {
     /// main-actor state, which is the correct complaint. `close()` is the
     /// documented teardown point and it runs on the main actor.
     private var clipboardObserver: NSObjectProtocol?
+    /// The share sheet's delegate, kept alive while the sheet is open.
+    ///
+    /// `NSSharingServicePicker.delegate` is weak, so a delegate created inside
+    /// `shareImage(_:)` is gone before the picker asks it for anything and the
+    /// Copy to Clipboard item silently never appears.
+    var shareDelegate: ClipboardSharing?
 
     static let defaultCanvasSize = (width: 1280, height: 800)
 

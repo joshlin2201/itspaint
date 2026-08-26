@@ -58,35 +58,47 @@ struct TooltipRenderTests {
     /// The header's chip is positioned by hand, because its buttons sit in a
     /// capsule that clips anything drawn inside it. Whatever the arithmetic does,
     /// it must never leave the chip hanging off the window.
+    ///
+    /// It returns a LEADING edge, not a centre, because the chip is pinned by its
+    /// top-left corner so its top edge stays on one line whatever height it is.
     @Test("The header chip stays inside the window at either end of the row")
     func headerChipIsClamped() {
         let window = CGRect(x: 0, y: 0, width: 900, height: 600)
         let chip = CGFloat(220)
+        let centre = { (anchor: CGRect, container: CGRect) in
+            EditorView.tooltipLeading(under: anchor, in: container, chipWidth: chip) + chip / 2
+        }
 
         // Under a button in the middle: centred on the button.
         let middle = CGRect(x: 440, y: 8, width: 26, height: 26)
-        #expect(
-            EditorView.tooltipCentre(under: middle, in: window, chipWidth: chip) == middle.midX
-        )
+        #expect(centre(middle, window) == middle.midX)
 
         // Under the last button before the right edge: pulled back inside.
         let trailing = CGRect(x: 870, y: 8, width: 26, height: 26)
-        let clamped = EditorView.tooltipCentre(under: trailing, in: window, chipWidth: chip)
-        #expect(clamped + chip / 2 <= window.width)
-        #expect(clamped < trailing.midX)
+        #expect(centre(trailing, window) + chip / 2 <= window.width)
+        #expect(centre(trailing, window) < trailing.midX)
+        // The leading edge itself is what gets used, so assert on it directly.
+        #expect(EditorView.tooltipLeading(under: trailing, in: window, chipWidth: chip) >= 0)
 
         // And at the leading edge, the same in reverse.
         let leading = CGRect(x: 2, y: 8, width: 26, height: 26)
-        let pushed = EditorView.tooltipCentre(under: leading, in: window, chipWidth: chip)
-        #expect(pushed - chip / 2 >= 0)
-        #expect(pushed > leading.midX)
+        #expect(EditorView.tooltipLeading(under: leading, in: window, chipWidth: chip) >= 0)
+        #expect(centre(leading, window) > leading.midX)
 
         // A window narrower than the chip cannot contain it; centre it rather
         // than pinning it to one side and cutting the whole sentence off.
         let narrow = CGRect(x: 0, y: 0, width: 120, height: 600)
-        #expect(
-            EditorView.tooltipCentre(under: leading, in: narrow, chipWidth: chip) == 60
-        )
+        #expect(centre(leading, narrow) == 60)
+    }
+
+    /// Every header chip hangs from one line, whatever height it is. That is the
+    /// property the fixed offset buys, and the reason the chip is pinned by its
+    /// top-left corner rather than positioned by its centre.
+    @Test("The chip's top edge is clear of the header row")
+    func headerChipSitsUnderTheHeader() {
+        #expect(EditorView.tooltipTop > 0)
+        // Below the row it explains, or it covers the buttons it is naming.
+        #expect(EditorView.tooltipTop >= Tokens.Chrome.titleReserve - Tokens.Space.snug)
     }
 
     /// The header's own chips carry a line of explanation, and the buttons they
