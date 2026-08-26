@@ -111,8 +111,8 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
     /// tool do" is two thirds of the way down a very long document. The guide is
     /// written for somebody who has the app open beside it and a question about
     /// one tool.
-    @IBAction func openHelp(_ sender: Any?) { Self.openSite("/guide/") }
-    @IBAction func openShortcuts(_ sender: Any?) { Self.openSite("/guide/#shortcuts") }
+    @IBAction func openHelp(_ sender: Any?) { Self.openGuide("") }
+    @IBAction func openShortcuts(_ sender: Any?) { Self.openGuide("#shortcuts") }
     @IBAction func openIssues(_ sender: Any?) { Self.open("/issues") }
 
     private static func open(_ path: String) {
@@ -120,8 +120,15 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.open(url)
     }
 
-    private static func openSite(_ path: String) {
-        guard let url = URL(string: "https://itspaintmac.com" + path) else { return }
+    /// The guide lives on its own page rather than under itspaintmac.com.
+    ///
+    /// The site is one document served at the custom domain's root and has no
+    /// path routing — `itspaintmac.com/guide/` is a 404, checked rather than
+    /// assumed. The landing page links here, and so does this.
+    private static let guide = "https://sites.fynesite.com/itspaint-guide/"
+
+    private static func openGuide(_ fragment: String) {
+        guard let url = URL(string: guide + fragment) else { return }
         NSWorkspace.shared.open(url)
     }
 }
