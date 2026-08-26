@@ -7,6 +7,49 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-08-26
+
+### Added
+- **A selection bar.** Make a marquee and the four things people actually do
+  next appear at the bottom of the window with their keys printed on them: Crop
+  ⌘K, Copy ⌘C, Cut ⌘X, Delete ⌫. They were a menu bar nobody opens mid-gesture
+  and three shortcuts you had to already know — people selected a region, found
+  Crop to Selection greyed out earlier in the session, and never went back to it.
+  It takes the slot the paste bar already owns, so it is never over the work, and
+  the paste bar still wins that slot because placing or discarding is the
+  decision actually in front of you. Crop and Delete came *out* of the Select
+  panel, where they were unlabelled glyphs behind an expander.
+- **Image and View menus in the header.** Flip, rotate, resize, invert, remove
+  background, trim, the pixel grid, snapping and the toolbar edge. The menu bar
+  is the right home for a complete list and the wrong one for something you reach
+  for with the pointer on the canvas — on a second display it is on the other
+  screen.
+- **Copy to Clipboard in the share sheet**, first in the list. macOS does not
+  offer one, and pasting into the window already open is the most common thing
+  anyone does with a marked-up screenshot.
+- **A Guide button in the header**, and a guide for it to open: every tool, what
+  it is for, the drag that makes it work, and every shortcut, at
+  [sites.fynesite.com/itspaint-guide](https://sites.fynesite.com/itspaint-guide/).
+
+### Fixed
+- **Dragging the image out no longer drags the window with it.** The header sits
+  inside the titlebar band of a full-size-content window, and macOS moves the
+  window for a drag beginning on any view that allows it — which SwiftUI's does.
+  Refusing needs a real AppKit view at that spot, and that view then has to start
+  the drag itself, so it does: the picture leaves as a file promise, which is what
+  carries the filename across the sandbox boundary instead of arriving as "Image".
+- **The tooltip is legible.** Its second line — the line doing the teaching — was
+  drawn outside the chip, straight onto the artwork, grey on whatever colour the
+  picture happened to be. One surface holds both lines now, it appears in 110ms
+  rather than 300, and every header chip hangs from one fixed line under the
+  header instead of moving with each control, so reading along the row no longer
+  means re-finding the text.
+- **The selection bar could not have appeared at all.** `hasSelection` forwarded
+  to the engine, which is deliberately not observable, so nothing in the window
+  was invalidated when a marquee was made. Found by writing the test, not by
+  using the app.
+
+
 ## [0.18.0] — 2026-08-25
 
 ### Added
@@ -820,7 +863,8 @@ First public beta.
   one would be a dependency this app does not have. AVIF covers the same need.
 - Text is pixels once committed; re-editing means undo and retype.
 
-[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/joshlin2201/itspaint/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/joshlin2201/itspaint/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/joshlin2201/itspaint/compare/v0.16.4...v0.17.0
 [0.16.4]: https://github.com/joshlin2201/itspaint/compare/v0.16.3...v0.16.4
