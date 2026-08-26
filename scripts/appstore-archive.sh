@@ -82,6 +82,17 @@ if [[ "$MODE" == "validate" ]]; then
   SIGNING=(CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_IDENTITY=-)
 fi
 
+# A build number the caller can raise without moving a tag.
+#
+# Apple refuses a build number it has already seen for a marketing version, and
+# the tag that pins the marketing version cannot be moved or deleted. Without
+# this, correcting a rejected upload costs a whole version number.
+BUILD_OVERRIDE=()
+if [[ -n "${ITSPAINT_BUILD_NUMBER:-}" ]]; then
+  BUILD_OVERRIDE=(CURRENT_PROJECT_VERSION="$ITSPAINT_BUILD_NUMBER")
+  echo "Build number overridden to $ITSPAINT_BUILD_NUMBER" >&2
+fi
+
 rm -rf dist/appstore
 mkdir -p dist/appstore
 
@@ -89,7 +100,7 @@ xcodebuild archive \
   -project ItsPaint.xcodeproj -scheme ItsPaint -configuration Release \
   -destination 'generic/platform=macOS' -archivePath "$ARCHIVE" \
   ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
-  "${SIGNING[@]}" ${EXTRA[@]+"${EXTRA[@]}"}
+  "${SIGNING[@]}" ${BUILD_OVERRIDE[@]+"${BUILD_OVERRIDE[@]}"} ${EXTRA[@]+"${EXTRA[@]}"}
 
 # The asserts that App Store validation would otherwise fail remotely.
 APP="$ARCHIVE/Products/Applications/ItsPaint.app"
