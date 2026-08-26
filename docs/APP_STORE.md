@@ -26,6 +26,45 @@ Then either the web UI — **+** beside "macOS App" → the new version number �
 paste What's New → attach the build once Apple finishes processing it → Add
 for Review — or the API, which does the same thing without a browser.
 
+## Signing without an Xcode account
+
+The header above says Xcode must be signed in to the team account. That is one
+way and it is not the only one, which matters because a machine where Xcode has
+never been signed in fails **after a successful archive**, on the export, with
+`No signing certificate "Mac App Distribution" found` and `No Accounts`. That
+reads like a build problem and is an account problem.
+
+Mac App Store signing needs two certificates and a profile that the Developer ID
+release path does not:
+
+| | |
+|---|---|
+| `MAC_APP_DISTRIBUTION` | *3rd Party Mac Developer Application* — signs the app |
+| `MAC_INSTALLER_DISTRIBUTION` | *3rd Party Mac Developer Installer* — signs the pkg |
+| `MAC_APP_STORE` profile | ties the app certificate to the bundle id |
+
+All three can be made from the App Store Connect API with nothing but `openssl`,
+no Xcode session anywhere in it:
+
+1. `openssl req -new -newkey rsa:2048 -nodes -keyout k.key -out k.csr -subj "/CN=…"`
+2. `POST /v1/certificates` with `certificateType` and `csrContent`; base64-decode
+   `certificateContent` into a `.cer`. Once per type.
+3. `openssl x509 -inform DER` → PEM, `openssl pkcs12 -export -legacy` with the
+   key, then `security import … -T /usr/bin/codesign -T /usr/bin/productbuild
+   -T /usr/bin/productsign`.
+4. `POST /v1/profiles` with `profileType: MAC_APP_STORE`, the bundle id and the
+   app certificate; write `profileContent` to
+   `~/Library/MobileDevice/Provisioning Profiles/<uuid>.provisionprofile`.
+
+`scripts/appstore-archive.sh` picks the identities up from the keychain and
+switches the export to **manual** signing when both are present, so after step 4
+it just works. Automatic signing is still the fallback when they are not.
+
+**Uploading takes an API key too.** `destination: upload` authenticates as
+whichever account Xcode is signed in to — nothing, here. The script prefers
+`xcrun altool --upload-app --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"`,
+which reads the same `.p8` the rest of the release tooling uses.
+
 ## Submitting from the command line
 
 The whole update loop is App Store Connect API calls with an ES256 JWT signed
