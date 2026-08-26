@@ -7,6 +7,8 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-08-25
+
 ### Added
 - **Edit in ItsPaint, from the Services menu.** Select an image in the Finder, in
   Mail, in a web page — anywhere macOS offers Services — and it opens here. The
@@ -818,7 +820,9 @@ First public beta.
   one would be a dependency this app does not have. AVIF covers the same need.
 - Text is pixels once committed; re-editing means undo and retype.
 
-[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.16.4...HEAD
+[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/joshlin2201/itspaint/compare/v0.17.0...v0.18.0
+[0.17.0]: https://github.com/joshlin2201/itspaint/compare/v0.16.4...v0.17.0
 [0.16.4]: https://github.com/joshlin2201/itspaint/compare/v0.16.3...v0.16.4
 [0.16.3]: https://github.com/joshlin2201/itspaint/compare/v0.16.1...v0.16.3
 [0.16.1]: https://github.com/joshlin2201/itspaint/compare/v0.16.0...v0.16.1
