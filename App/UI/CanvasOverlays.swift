@@ -1,5 +1,6 @@
 import PaintKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The filename, and beneath it what the file currently is.
 ///
@@ -198,22 +199,130 @@ struct DragOutHandle: View {
                 if hovering { NSCursor.openHand.push() } else { NSCursor.pop() }
             }
             .animation(Tokens.Motion.micro, value: isHovering)
-            .modifier(DraggableIfAvailable(payload: payload))
+            .overlay { DragOutSurface(payload: payload) }
             .accessibilityLabel("Drag image out")
     }
 }
 
-/// `draggable` with nothing to drag still starts a drag, so it is applied
-/// conditionally rather than handed a placeholder.
-private struct DraggableIfAvailable: ViewModifier {
+/// The mouse half of the drag handle, in AppKit, so the window stops coming
+/// with the picture.
+///
+/// **The bug this fixes.** The header sits inside the titlebar band of a
+/// `.fullSizeContentView` window, and AppKit lets a drag that begins on any view
+/// whose `mouseDownCanMoveWindow` is true move the whole window. SwiftUI's
+/// hosting view says true, so dragging the handle did both things at once: the
+/// image came out *and* the window slid across the desk under it. The window was
+/// already `isMovableByWindowBackground = false`; that flag governs the
+/// background, not the titlebar band, which is why it looked like it should
+/// already be handled.
+///
+/// `mouseDownCanMoveWindow` is asked of the view that the click actually lands
+/// on, and SwiftUI's drawn content is not a view — so saying no requires a real
+/// `NSView` at that spot, which then has to be the thing that starts the drag as
+/// well. That is this. The glyph, the hover fill and the cursor stay in SwiftUI
+/// underneath; this is a pane of glass over them that owns the mouse.
+private struct DragOutSurface: NSViewRepresentable {
     let payload: DraggedImage?
 
-    func body(content: Content) -> some View {
-        if let payload {
-            content.draggable(payload)
-        } else {
-            content
+    func makeNSView(context: Context) -> DragSurfaceView { DragSurfaceView() }
+
+    func updateNSView(_ view: DragSurfaceView, context: Context) {
+        view.payload = payload
+    }
+
+    final class DragSurfaceView: NSView, NSDraggingSource {
+        var payload: DraggedImage?
+        /// The payload as it was when the drag started. See the delegate below.
+        fileprivate var promised: DraggedImage?
+        /// Shared: one promise is written at a time and the work is a single
+        /// `Data.write`.
+        fileprivate static let promiseQueue = OperationQueue()
+
+        /// The whole point of the file.
+        override var mouseDownCanMoveWindow: Bool { false }
+
+        /// Nothing to drag means nothing to intercept: the click should fall
+        /// through to whatever is underneath rather than being swallowed by an
+        /// invisible pane that cannot do anything with it.
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            payload == nil ? nil : super.hitTest(point)
         }
+
+        override func mouseDown(with event: NSEvent) {
+            // Swallowed deliberately. AppKit only offers `mouseDragged` to a
+            // view that accepted the `mouseDown`, and passing this one on is
+            // what let the titlebar claim the gesture in the first place.
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let payload else { return }
+            guard let image = NSImage(data: payload.data) else { return }
+            promised = payload
+
+            // A **file promise**, which is what carries the name across a
+            // sandbox boundary. Writing a temp file and dragging its URL is
+            // shorter and lands the receiver a path it has no permission to
+            // read; putting raw PNG bytes on the pasteboard loses the name and
+            // arrives in Mail as "Image". A promise lets the receiver nominate
+            // the destination and asks us to write into it.
+            let provider = NSFilePromiseProvider(fileType: UTType.png.identifier, delegate: self)
+            let dragItem = NSDraggingItem(pasteboardWriter: provider)
+            // The drag image is the picture, at a size that reads as a proxy
+            // rather than as a second window: big enough to recognise, small
+            // enough to see the drop target under it.
+            let side: CGFloat = 128
+            let scale = min(side / max(image.size.width, 1), side / max(image.size.height, 1), 1)
+            let dragged = NSSize(width: image.size.width * scale, height: image.size.height * scale)
+            let origin = NSPoint(
+                x: bounds.midX - dragged.width / 2,
+                y: bounds.midY - dragged.height / 2
+            )
+            dragItem.setDraggingFrame(NSRect(origin: origin, size: dragged), contents: image)
+
+            beginDraggingSession(with: [dragItem], event: event, source: self)
+        }
+
+        func draggingSession(
+            _ session: NSDraggingSession,
+            sourceOperationMaskFor context: NSDraggingContext
+        ) -> NSDragOperation {
+            .copy
+        }
+    }
+}
+
+/// Writing the promised file, off the main thread, from bytes captured before
+/// the drag began.
+///
+/// The bytes are read once in `mouseDragged` and held by the closure rather than
+/// re-read here: the promise is fulfilled whenever the receiver gets round to it,
+/// and by then the canvas may have moved on. What lands in Mail should be the
+/// picture that was picked up.
+extension DragOutSurface.DragSurfaceView: NSFilePromiseProviderDelegate {
+    func filePromiseProvider(
+        _ provider: NSFilePromiseProvider, fileNameForType fileType: String
+    ) -> String {
+        promised?.name ?? "Image.png"
+    }
+
+    func filePromiseProvider(
+        _ provider: NSFilePromiseProvider,
+        writePromiseTo url: URL,
+        completionHandler: @escaping (Error?) -> Void
+    ) {
+        guard let data = promised?.data else {
+            completionHandler(CocoaError(.fileNoSuchFile)); return
+        }
+        do {
+            try data.write(to: url)
+            completionHandler(nil)
+        } catch {
+            completionHandler(error)
+        }
+    }
+
+    func operationQueue(for provider: NSFilePromiseProvider) -> OperationQueue {
+        Self.promiseQueue
     }
 }
 
@@ -444,6 +553,14 @@ struct WorkingActions: View {
                 ) { model.redo() }
             }
 
+            // What the picture is, and how you are looking at it. Between the
+            // clipboard and the history because that is the order of the work:
+            // get something in, change it, look at it, undo it.
+            HeaderGroup {
+                ImageMenu(model: model)
+                ViewMenu(model: model)
+            }
+
             HeaderGroup {
                 HeaderButton(
                     symbol: "minus", title: "Zoom out", shortcut: "⌘−",
@@ -533,7 +650,36 @@ struct DocumentActions: View {
             ) {
                 model.isDuplicateConfirmationPresented = true
             }
+
+            HeaderDivider()
+
+            // **A question mark in the window, not only in the menu bar.**
+            //
+            // The chrome is thirteen unlabelled glyphs by design, and the answer
+            // to "what does this one do" lived under Help ▸ ItsPaint Help — at
+            // the top of the screen, in the menu somebody has already decided is
+            // not for them. It opens the guide, which is written to be read by
+            // someone who has the app open beside it.
+            HeaderButton(
+                symbol: "questionmark.circle", title: "Guide",
+                shortcut: "⌘?",
+                detail: "Every tool, what it is for, and the drag that makes it work"
+            ) {
+                AppCommandsBridge.openGuide()
+            }
         }
+    }
+}
+
+/// Opening the guide from a SwiftUI button.
+///
+/// The menu bar routes through the responder chain to the document, which is
+/// where every other command lives. A SwiftUI `Button` has no sender to route
+/// with, so it asks the application delegate directly — the same delegate the
+/// chain would have reached, and the same URL.
+enum AppCommandsBridge {
+    static func openGuide() {
+        NSApp.sendAction(#selector(AppCommands.openHelp(_:)), to: nil, from: nil)
     }
 }
 
@@ -625,6 +771,273 @@ struct FloatingActions: View {
         // tonal cell as Crop is enough to break the tie.
         case .destructive: AnyShapeStyle(Color.red)
         case .neutral: AnyShapeStyle(.primary.opacity(Tokens.Ink.regular))
+        }
+    }
+
+    private func background(_ role: Role) -> AnyShapeStyle {
+        switch role {
+        case .primary: AnyShapeStyle(Color.accentColor)
+        case .destructive, .neutral: AnyShapeStyle(.primary.opacity(Tokens.Fill.track))
+        }
+    }
+}
+
+/// A header button that opens a menu instead of doing something.
+///
+/// Same cell, same hover fill, same chip as every other header control — the
+/// chevron is the only difference, because a control that opens a menu should
+/// say so before you press it. `Menu` with `.borderlessButtonStyle` draws its
+/// own chrome and its own arrow, both of which fight the header, so the label is
+/// built by hand and the style is stripped back to nothing.
+struct HeaderMenu<Content: View>: View {
+    let symbol: String
+    let title: String
+    var detail: String?
+    @ViewBuilder let content: Content
+
+    @Environment(TooltipController.self) private var tooltips
+    @State private var isHovering = false
+    @State private var frame: CGRect = .zero
+
+    var body: some View {
+        Menu {
+            content
+        } label: {
+            HStack(spacing: 1) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .medium))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
+            }
+            .frame(width: 34, height: 26)
+            .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
+            .background {
+                RoundedRectangle(cornerRadius: Tokens.Radius.control, style: .continuous)
+                    .fill(.primary.opacity(isHovering ? Tokens.Fill.hover : 0))
+            }
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .trackedForTooltip($frame)
+        .onHover { hovering in
+            isHovering = hovering
+            hovering
+                ? tooltips.hover(
+                    key: "header-menu-\(title)", title: title,
+                    shortcut: nil, detail: detail, anchor: frame
+                )
+                : tooltips.endHover(key: "header-menu-\(title)")
+        }
+        .animation(Tokens.Motion.micro, value: isHovering)
+        .accessibilityLabel(title)
+    }
+}
+
+/// Everything you can do *to the picture*, and how you are looking at it.
+///
+/// **Why this is in the header at all.** Flip, Rotate, Invert, Remove Background,
+/// Image Size, the pixel grid and snapping were menu-bar-only. The menu bar is
+/// the right home for a complete list and the wrong one for a thing you reach for
+/// mid-edit: the pointer is on the canvas, the menu is at the top of the screen,
+/// and on a second display it is on the *other screen*. Everything here is one
+/// press from where your hand already is, and every item still says its key, so
+/// the menu teaches its way out of being needed.
+///
+/// Two menus rather than one long one, matching the two menu-bar menus people
+/// already know: what the picture *is*, and how you are *looking* at it.
+struct ImageMenu: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
+        let _ = model.revision
+
+        HeaderMenu(
+            symbol: "photo", title: "Image",
+            detail: "Rotate, flip, resize, invert, or knock the background out"
+        ) {
+            Button("Image Size…") { model.isSizeSheetPresented = true }
+                .keyboardShortcut("r")
+            Divider()
+            Button("Rotate 90° Right") { model.rotate(.clockwise90) }
+                .keyboardShortcut("]")
+            Button("Rotate 90° Left") { model.rotate(.counterClockwise90) }
+                .keyboardShortcut("[")
+            Button("Rotate 180°") { model.rotate(.half) }
+            Button("Rotate…") { model.isRotateSheetPresented = true }
+            Divider()
+            Button("Flip Horizontal") { model.flipHorizontally() }
+            Button("Flip Vertical") { model.flipVertically() }
+            Divider()
+            Button("Invert Colours") { model.invertColours() }
+                .keyboardShortcut("i")
+            // The one item here that can decline. It says so itself when the
+            // image is too flat to key safely, rather than guessing.
+            Button("Remove Background") { model.removeBackground() }
+            Button("Trim Borders") { model.trimBorders() }
+        }
+    }
+}
+
+/// How you are looking at the picture, as opposed to what it is.
+struct ViewMenu: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
+        let _ = model.revision
+
+        HeaderMenu(
+            symbol: "slider.horizontal.3", title: "View",
+            detail: "The pixel grid, snapping, and which edge the toolbar is on"
+        ) {
+            // A checkmark, not a verb. "Show Pixel Grid" next to "Hide Pixel
+            // Grid" is the same item wearing two labels, and you have to read it
+            // to find out which state you are in.
+            Toggle("Pixel Grid", isOn: Binding(
+                get: { model.showsGrid },
+                set: { model.showsGrid = $0 }
+            ))
+            // The grid is meaningless until a pixel is comfortably bigger than
+            // the line that would draw it — the same floor the menu bar applies.
+            .disabled(model.zoom < 4)
+
+            Toggle("Snap to Grid", isOn: Binding(
+                get: { model.snapGrid != 0 },
+                set: { model.snapGrid = $0 ? ViewMenu.defaultSnap : 0 }
+            ))
+
+            if model.snapGrid != 0 {
+                Picker("Grid Spacing", selection: Binding(
+                    get: { model.snapGrid },
+                    set: { model.snapGrid = $0 }
+                )) {
+                    ForEach(ToolSettings.snapGrids, id: \.self) { size in
+                        Text("\(size) px").tag(size)
+                    }
+                }
+            }
+
+            Divider()
+            Button(model.chromeEdge.isVertical ? "Toolbar Along the Bottom" : "Toolbar Down the Side") {
+                model.chromeEdge = model.chromeEdge.toggled
+            }
+            Divider()
+            Button("Colours…") { model.isColourPopoverRequested = true }
+        }
+    }
+
+    /// The spacing snapping returns to. Matches the menu bar's own default so
+    /// the two switches cannot disagree about what "on" means.
+    static let defaultSnap = 8
+}
+
+/// What you can do with a selection, once there is one.
+///
+/// **The problem this solves.** Marquee out a region and the useful next moves —
+/// crop the picture to it, copy it, cut it — are in a menu bar nobody looks at
+/// mid-gesture, or behind shortcuts you have to already know. People selected a
+/// region, found Crop to Selection greyed out earlier in the session, and never
+/// went back to it. The capability was there; the affordance was not.
+///
+/// **Why here and not beside the selection.** A bar that follows the marquee
+/// covers the thing you just framed, and moves every time you adjust a handle —
+/// so you end up dragging the selection to see the buttons for it. This is the
+/// slot the paste bar already owns: bottom-centre, clear of the rail on either
+/// edge and of the pointer read-out in the corner, always in the same place. One
+/// slot, one grammar, and it appears and disappears with the selection.
+///
+/// The paste bar wins the slot when something is floating, because a floating
+/// paste *is* a selection and offering two bars for one state is two answers.
+struct SelectionActions: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
+        // Revision, so the size read-out follows the marquee as it is dragged.
+        let _ = model.revision
+
+        HStack(spacing: Tokens.Space.tight) {
+            Image(systemName: "square.dashed")
+                .font(.system(size: 11))
+                .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
+
+            if let size = model.selectionSize {
+                Text("\(size.width) × \(size.height)")
+                    .font(Tokens.Text.pillValue)
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
+            }
+
+            HeaderDivider()
+
+            // Crop first and filled: it is the move this bar exists for, the one
+            // people could not find, and the only one of the four that is not
+            // already a shortcut every Mac user knows.
+            action("Crop", symbol: "crop", shortcut: "⌘K", role: .primary) {
+                model.cropToSelection()
+            }
+            action("Copy", symbol: "square.on.square", shortcut: "⌘C") { model.copySelection() }
+            action("Cut", symbol: "scissors", shortcut: "⌘X") { model.cutSelection() }
+            action("Delete", symbol: "trash", shortcut: "⌫", role: .destructive) {
+                model.deleteSelection()
+            }
+        }
+        .padding(.horizontal, Tokens.Space.base)
+        .frame(height: Tokens.Size.headerControl)
+        .chromeSurface(cornerRadius: Tokens.Radius.chip)
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Selection. Crop to it, copy, cut, or delete.")
+    }
+
+    private enum Role { case primary, neutral, destructive }
+
+    /// One action, with its key printed on it.
+    ///
+    /// The shortcut is *on the button* rather than in a tooltip: this bar is on
+    /// screen for a few seconds at a time while somebody's hand is on the mouse,
+    /// and the whole reason it is worth showing is to teach the three chords that
+    /// make it unnecessary.
+    private func action(
+        _ title: String, symbol: String, shortcut: String,
+        role: Role = .neutral, perform: @escaping () -> Void
+    ) -> some View {
+        Button(action: perform) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
+                Text(title).font(.system(size: 11.5))
+                Text(shortcut)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(shortcutInk(role))
+            }
+            .foregroundStyle(foreground(role))
+            .padding(.horizontal, Tokens.Space.base)
+            .frame(height: 22)
+            .background {
+                RoundedRectangle(cornerRadius: Tokens.Radius.control, style: .continuous)
+                    .fill(background(role))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+
+    private func foreground(_ role: Role) -> AnyShapeStyle {
+        switch role {
+        case .primary: AnyShapeStyle(Color.white)
+        case .destructive: AnyShapeStyle(Color.red)
+        case .neutral: AnyShapeStyle(.primary.opacity(Tokens.Ink.regular))
+        }
+    }
+
+    /// The key is a hint, not a label: quieter than the word it belongs to, in
+    /// every role, or four buttons read as eight things.
+    private func shortcutInk(_ role: Role) -> AnyShapeStyle {
+        switch role {
+        case .primary: AnyShapeStyle(Color.white.opacity(0.65))
+        case .destructive: AnyShapeStyle(Color.red.opacity(0.6))
+        case .neutral: AnyShapeStyle(.primary.opacity(Tokens.Ink.faint))
         }
     }
 

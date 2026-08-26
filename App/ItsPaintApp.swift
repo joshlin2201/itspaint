@@ -104,12 +104,24 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
     // Help, opened in the browser. `NSWorkspace.open` hands the URL to whichever app
     // is registered for it; nothing here opens a socket, and the sandbox still
     // declares no network entitlement.
-    @IBAction func openHelp(_ sender: Any?) { Self.open("#readme") }
-    @IBAction func openShortcuts(_ sender: Any?) { Self.open("/blob/main/docs/FEATURES.md") }
+    /// The guide, on the site rather than in the README.
+    ///
+    /// A README is a page about a repository: it opens with badges, an install
+    /// command and a licence, and the part that answers "what does the clone
+    /// tool do" is two thirds of the way down a very long document. The guide is
+    /// written for somebody who has the app open beside it and a question about
+    /// one tool.
+    @IBAction func openHelp(_ sender: Any?) { Self.openSite("/guide/") }
+    @IBAction func openShortcuts(_ sender: Any?) { Self.openSite("/guide/#shortcuts") }
     @IBAction func openIssues(_ sender: Any?) { Self.open("/issues") }
 
     private static func open(_ path: String) {
         guard let url = URL(string: "https://github.com/joshlin2201/itspaint" + path) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    private static func openSite(_ path: String) {
+        guard let url = URL(string: "https://itspaintmac.com" + path) else { return }
         NSWorkspace.shared.open(url)
     }
 }

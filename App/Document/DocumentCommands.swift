@@ -173,6 +173,19 @@ extension DrawingDocument {
         }
 
         let picker = NSSharingServicePicker(items: items)
+        // **Copy to Clipboard, at the top of the sheet.**
+        //
+        // macOS does not offer it: the share sheet lists AirDrop, Mail, Messages,
+        // Photos and whatever extensions are installed, and the single most
+        // common thing anyone does with a marked-up screenshot — paste it into
+        // the chat window already open — is not in the list. It is the one
+        // destination that needs no app at all, so it goes first.
+        //
+        // A delegate rather than a menu item because `NSSharingServicePicker`
+        // owns its own list; `sharingServicePicker(_:sharingServicesForItems:proposedSharingServices:)`
+        // is the supported way to add to it.
+        shareDelegate = ClipboardSharing(canvas: model.canvas)
+        picker.delegate = shareDelegate
         // Anchored to the control that invoked it where there is one, so the
         // popover points at the button rather than at the window's corner.
         if let button = sender as? NSView {
@@ -268,5 +281,47 @@ extension DrawingDocument {
         default:
             return super.validateMenuItem(menuItem)
         }
+    }
+}
+
+/// The Copy to Clipboard entry in the share sheet, and the thing that performs it.
+///
+/// **Held by the document, not created inline.** `NSSharingServicePicker` keeps
+/// only a weak reference to its delegate, so a delegate that lives for the length
+/// of the `show(...)` call is deallocated before the sheet has finished asking it
+/// anything — the item simply never appears, with no error and nothing to debug.
+final class ClipboardSharing: NSObject, NSSharingServicePickerDelegate {
+    private let canvas: Bitmap
+
+    init(canvas: Bitmap) {
+        self.canvas = canvas
+    }
+
+    func sharingServicePicker(
+        _ picker: NSSharingServicePicker,
+        sharingServicesForItems items: [Any],
+        proposedSharingServices proposed: [NSSharingService]
+    ) -> [NSSharingService] {
+        let copy = NSSharingService(
+            title: "Copy to Clipboard",
+            // `doc.on.clipboard` is the glyph the header's own Paste button uses,
+            // so the two ends of the same round trip look like each other.
+            image: NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
+                ?? NSImage(),
+            alternateImage: nil
+        ) { [canvas] in
+            guard let data = try? ImageCodec.encode(canvas, as: .png),
+                  let image = NSImage(data: data)
+            else { return }
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            // Both, deliberately: `NSImage` is what a text field or a chat window
+            // pastes, and the raw PNG is what an app that wants the file format
+            // reads. Writing only the image loses the alpha channel in some
+            // receivers.
+            pasteboard.writeObjects([image])
+            pasteboard.setData(data, forType: .png)
+        }
+        return [copy] + proposed
     }
 }

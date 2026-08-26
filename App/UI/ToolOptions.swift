@@ -428,9 +428,16 @@ struct ToolOptions: View {
             // "Selec…" in the label column, which this file already knows is
             // worse than no label at all — it looks broken rather than
             // deliberate. Four letters fit.
-            OptionRow("Area") { sizeReadout }
-            OptionRow(nil) {
-                SegmentTrack { selectionActionButtons }
+            // One row, not two. With Crop and Delete moved to the selection bar
+            // this track is usually a single button, and a lone segment stretched
+            // across the panel's whole width reads as a control that has lost its
+            // other halves rather than as one action.
+            OptionRow("Area") {
+                HStack(spacing: Tokens.Space.tight) {
+                    sizeReadout
+                    SegmentTrack { selectionActionButtons }
+                        .fixedSize()
+                }
             }
         } else {
             HStack(spacing: Tokens.Space.tight) {
@@ -455,11 +462,23 @@ struct ToolOptions: View {
         }
     }
 
+    /// What is left in the panel once the selection bar exists.
+    ///
+    /// Crop and Delete used to be here too, as unlabelled glyphs, in a panel you
+    /// have to have expanded to see. `SelectionActions` now puts Crop, Copy, Cut
+    /// and Delete on screen with their names and their keys whenever there is a
+    /// selection at all, so keeping a second, quieter copy of two of them is two
+    /// answers to one question — and the worse-labelled answer at that.
+    ///
+    /// These two stay because the bar deliberately does not carry them: Invert is
+    /// a selection operation rather than something you do *to* the picture, and
+    /// Make transparent only exists for an Instant Alpha selection. A bar that
+    /// changes shape depending on how the marquee was made is a bar you have to
+    /// read every time.
     @ViewBuilder
     private var selectionActionButtons: some View {
         let actions: [(String, String, () -> Void)] = {
             var list: [(String, String, () -> Void)] = [
-                ("Crop", "crop", { model.cropToSelection() }),
                 ("Invert", "square.righthalf.filled", { model.invertSelection() }),
             ]
             if model.selectionKind == .instantAlpha {
@@ -467,7 +486,6 @@ struct ToolOptions: View {
                     ("Make transparent", "eraser.line.dashed", { model.makeSelectionTransparent() })
                 )
             }
-            list.append(("Delete", "trash", { model.deleteSelection() }))
             return list
         }()
 
