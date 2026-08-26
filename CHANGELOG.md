@@ -35,6 +35,16 @@ version may still carry breaking changes to the document format.
   security scope the caller has not opened yet.
 
 ### Changed
+- **Reduce Motion is honoured everywhere, from one place.** The app has
+  twenty-six animations and every one of them is one of three tokens, but the
+  setting was being checked at the call site: two calls asked, twenty-four did
+  not, which is the arithmetic a per-caller guard always ends up with. The
+  question moved into `Tokens.Motion`, whose three values are now `Animation?`
+  and are `nil` when the system asks for less movement — `nil` is SwiftUI's
+  "apply it instantly", so honouring the setting is the same shape as not
+  animating, and no call site changed. The two that were asking by hand stopped
+  needing to. This is a setting people turn on because movement makes them ill,
+  not because they dislike it.
 - **The clipboard shortcut and the Services entry now open a window the same
   way.** Both arrive with an image from somewhere else and no document to put it
   in, and both were about to grow their own copy of the "make an untitled

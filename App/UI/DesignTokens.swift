@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The surface grammar for **Direction C — Canvas-first**.
@@ -170,13 +171,41 @@ enum Tokens {
     /// Motion explains a state change, never decorates. The pill's width
     /// animates on tool change because its *content* changes; nothing else
     /// moves.
+    /// Every animation in the app is one of these three, which is why Reduce Motion
+    /// is honoured here and not at the call sites. There are twenty-six of those.
+    /// Two of them checked `accessibilityReduceMotion` and twenty-four did not,
+    /// which is the arithmetic a per-caller guard always ends up with — and the
+    /// setting is not a preference about taste. It is turned on by people for whom
+    /// movement causes nausea or seizures.
     enum Motion {
+        /// `nil` is SwiftUI's "apply it instantly", so honouring the setting has
+        /// the same shape as not animating, and every `.animation(_:value:)` call
+        /// already takes an optional.
+        static func honouring(_ animation: Animation, reduceMotion: Bool) -> Animation? {
+            reduceMotion ? nil : animation
+        }
+
+        /// Read from AppKit rather than `@Environment(\.accessibilityReduceMotion)`
+        /// because these are static and an environment value needs a view to read
+        /// it in. The cost is that flipping the setting does not invalidate a view
+        /// already on screen; the next interaction picks it up, which for a setting
+        /// nobody toggles mid-gesture is the right trade.
+        static var systemReduceMotion: Bool {
+            NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        }
+
         /// The options panel resizing as its content genuinely changes.
-        static let pillResize = Animation.smooth(duration: 0.22, extraBounce: 0.05)
-        static let micro = Animation.easeOut(duration: 0.12)
+        static var pillResize: Animation? {
+            honouring(.smooth(duration: 0.22, extraBounce: 0.05), reduceMotion: systemReduceMotion)
+        }
+        static var micro: Animation? {
+            honouring(.easeOut(duration: 0.12), reduceMotion: systemReduceMotion)
+        }
         /// A press answering under the pointer. Short enough to read as
         /// contact rather than animation.
-        static let press = Animation.easeOut(duration: 0.07)
+        static var press: Animation? {
+            honouring(.easeOut(duration: 0.07), reduceMotion: systemReduceMotion)
+        }
     }
 
     // MARK: - The rail
