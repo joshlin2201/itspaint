@@ -12,7 +12,7 @@
 
 Preview markup has no step badges, no pixelate and no drag-out.
 
-**3.28 MB** · free on the App Store · MIT ·
+**3.35 MB** · free on the App Store · MIT ·
 **no network entitlement, so the kernel refuses a socket**
 
 [![Release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&style=flat-square&label=release&color=2563eb)](https://github.com/joshlin2201/itspaint/releases)
@@ -32,7 +32,7 @@ brew install --cask joshlin2201/itspaint/itspaint
 
 ## What makes it different
 
-- **3.28 MB, and a window on screen in half a second.** Krita is a gigabyte and
+- **3.35 MB, and a window on screen in half a second.** Krita is a gigabyte and
   built for painters. CleanShot X is $29 plus a cloud subscription. Preview is
   already on your Mac and will not number a step or pixelate a token.
 - **No network entitlement.** `com.apple.security.network.client` is not requested,
@@ -57,7 +57,7 @@ a PNG with none of the app around it. No AppKit, no third-party dependency, **ma
 and up**.
 
 ```swift
-.package(url: "https://github.com/joshlin2201/itspaint", from: "0.17.0")
+.package(url: "https://github.com/joshlin2201/itspaint", from: "0.18.0")
 ```
 
 [![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/joshlin2201/itspaint)
@@ -175,7 +175,7 @@ to hear about a new build.
 | **Requires** | macOS 14 Sonoma or later |
 | **Architecture** | universal, one build for Apple silicon and Intel |
 | **Signing** | Developer ID, notarised, ticket stapled to the image *and* the app, so the check needs no network and there is nothing to clear from the Terminal |
-| **Download** | 3.28 MB for the disk image, with a SHA-256 in `checksums.txt` |
+| **Download** | 3.35 MB for the disk image, with a SHA-256 in `checksums.txt` |
 
 ```bash
 shasum -a 256 -c checksums.txt
