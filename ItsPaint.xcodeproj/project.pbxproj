@@ -43,6 +43,7 @@
 		930F1913FD1187A5A7007258 /* ItsPaintIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B939C1CD497C7F8334FFD0B /* ItsPaintIntents.swift */; };
 		95E1D3A13CB44069D1DAE0AC /* DocumentCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFEF09B51CF5FC0B71765BA1 /* DocumentCommands.swift */; };
 		970A38652FFECA2910FFAAFF /* CanvasOverlays.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8468DB5919B3A21F63903298 /* CanvasOverlays.swift */; };
+		9726B1CCB8E749B46B08CFF6 /* ReduceMotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7360C126943F6A4289FC4B7 /* ReduceMotionTests.swift */; };
 		979898D93E97297A55E27038 /* ScreenshotWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0EAC5ED7B22052E9BBBE8C9 /* ScreenshotWatcher.swift */; };
 		A75FAC3C0CD78F3C12737311 /* Tooltip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D10B48F97C15A6294B5737E /* Tooltip.swift */; };
 		A8567364BE05578FC20DCD4C /* IntentImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34D68AE3B45C7E5A426262AB /* IntentImageTests.swift */; };
@@ -107,6 +108,7 @@
 		CA3B7CF910C5BF4084044565 /* PaintKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PaintKit; path = Packages/PaintKit; sourceTree = SOURCE_ROOT; };
 		CCB01892F8CC5C23F9945754 /* ImageServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageServiceTests.swift; sourceTree = "<group>"; };
 		D072F2FA0424641934102963 /* PDFDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFDocumentTests.swift; sourceTree = "<group>"; };
+		E7360C126943F6A4289FC4B7 /* ReduceMotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReduceMotionTests.swift; sourceTree = "<group>"; };
 		E80562B1588560C2E61CCE65 /* FixedGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixedGrid.swift; sourceTree = "<group>"; };
 		EA6F6F30090979763C866F84 /* SignatureSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureSheet.swift; sourceTree = "<group>"; };
 		F2ACA876E800C1AB89C90365 /* SizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeSheet.swift; sourceTree = "<group>"; };
@@ -190,6 +192,7 @@
 				34D68AE3B45C7E5A426262AB /* IntentImageTests.swift */,
 				B063B5E24D6EBB4CEB198E5B /* PasteGrowthTests.swift */,
 				D072F2FA0424641934102963 /* PDFDocumentTests.swift */,
+				E7360C126943F6A4289FC4B7 /* ReduceMotionTests.swift */,
 				073EFE49D21C2976F9D72BB4 /* ScreenshotWatcherTests.swift */,
 				605B317CA16CD2D068DF970B /* TextEditorLayoutTests.swift */,
 				F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */,
@@ -405,6 +408,7 @@
 				A8567364BE05578FC20DCD4C /* IntentImageTests.swift in Sources */,
 				7D7E217925BBD597F47772AE /* PDFDocumentTests.swift in Sources */,
 				1DE130CDBF4B6616B66BF5F1 /* PasteGrowthTests.swift in Sources */,
+				9726B1CCB8E749B46B08CFF6 /* ReduceMotionTests.swift in Sources */,
 				F0389C97B6274DF2552FE2B9 /* ScreenshotWatcherTests.swift in Sources */,
 				F4C7E8CF3B5107D648F3FC45 /* TextEditorLayoutTests.swift in Sources */,
 				340D38B0D4130488E64D853C /* ToolSizeFloorTests.swift in Sources */,

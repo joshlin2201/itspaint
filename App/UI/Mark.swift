@@ -40,7 +40,6 @@ struct Mark: View {
 
     @State private var isHovering = false
     @State private var isDragging = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var contrast
 
     private let trackHeight: CGFloat = 8
@@ -73,7 +72,7 @@ struct Mark: View {
                 .font(.system(size: 11, weight: .medium).monospacedDigit())
                 .foregroundStyle(.primary.opacity(isDragging ? Tokens.Ink.strong : Tokens.Ink.regular))
                 .frame(height: 14)
-                .animation(reduceMotion ? nil : Tokens.Motion.micro, value: isDragging)
+                .animation(Tokens.Motion.micro, value: isDragging)
             track
         }
         .accessibilityElement()
@@ -173,7 +172,7 @@ struct Mark: View {
             .fill(.primary.opacity(isHovering || isDragging ? Tokens.Ink.strong : Tokens.Ink.regular))
             .frame(width: 1.5, height: 14)
             .offset(x: max(0, min(width - 1.5, width * t - 0.75)))
-            .animation(reduceMotion ? nil : Tokens.Motion.micro, value: isHovering)
+            .animation(Tokens.Motion.micro, value: isHovering)
     }
 
     /// A stop, drawn on the trough rather than as a second row of capsules below it.
