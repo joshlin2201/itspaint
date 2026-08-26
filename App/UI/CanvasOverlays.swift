@@ -234,7 +234,13 @@ private struct DragOutSurface: NSViewRepresentable {
         var payload: DraggedImage?
         /// Shared: one promise is written at a time and the work is a single
         /// `Data.write`.
-        fileprivate static let promiseQueue = OperationQueue()
+        ///
+        /// `nonisolated`, along with the two keys below, because they are read
+        /// from the promise delegate — which runs on that queue, not on the main
+        /// actor. A `static let` inside a `@MainActor` type is main-actor
+        /// isolated by inheritance, and constants are exactly the case where that
+        /// buys nothing: there is no mutation to protect.
+        fileprivate nonisolated static let promiseQueue = OperationQueue()
 
         /// The whole point of the file.
         override var mouseDownCanMoveWindow: Bool { false }
@@ -294,8 +300,8 @@ private struct DragOutSurface: NSViewRepresentable {
             .copy
         }
 
-        fileprivate static let nameKey = "itspaint.name"
-        fileprivate static let dataKey = "itspaint.data"
+        fileprivate nonisolated static let nameKey = "itspaint.name"
+        fileprivate nonisolated static let dataKey = "itspaint.data"
     }
 }
 
