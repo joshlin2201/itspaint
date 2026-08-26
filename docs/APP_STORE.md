@@ -35,9 +35,9 @@ by an API key. No Xcode GUI step, no web portal step, no password. The order:
    related to the app.
 2. `PATCH /v1/appStoreVersions/{id}/relationships/build` — attach the build
    once it reports `VALID`.
-3. `PATCH /v1/appStoreVersionLocalizations/{id}` — `whatsNew`. **Check which
-   locales the app actually has.** This one has `en-GB` only, and writing to a
-   locale that does not exist is a 404 rather than a create.
+3. `PATCH /v1/appStoreVersionLocalizations/{id}` — `whatsNew`, **once per
+   locale**. Writing to a locale the app does not have is a 404 rather than a
+   create, so read the list back rather than assuming it.
 4. `PATCH /v1/builds/{id}` — `usesNonExemptEncryption: false`, if the build
    predates the Info.plist key below.
 5. `POST /v1/reviewSubmissions`, then `POST /v1/reviewSubmissionItems` to put
@@ -92,10 +92,25 @@ The fields that do not change per release:
 | Bundle ID | com.joshlin.itspaint |
 | SKU | itspaint |
 | Copyright | Josh Lin |
-| Locales | `en-GB` only — writing to a locale the app does not have is a 404, not a create |
+| Locales | `en-GB` (primary), `en-US`, `zh-Hans`, `ja`, `de-DE`, `fr-FR`, `ru` |
 
 The repository's voice is British English ("colours", "licence"); keep it in
-the listing rather than half-translating it.
+the `en-GB` listing rather than half-translating it. `en-US` is the same copy
+with American spelling, and exists because Apple indexes **name, subtitle and
+keywords per locale**: a second storefront is a second hundred characters, not
+a translation exercise.
+
+**A localisation can only be created while a version is in
+`PREPARE_FOR_SUBMISSION`.** Apple answers 409 `Cannot create localization after
+the app version has been submitted for review`, so a language missed in one
+release waits for the next. Screenshots and the App Preview hang off the
+*localisation* as well, not the version, and a language with copy and no media
+fails at submission — which arrives at release time looking like a build
+problem. Writing to a locale that does not exist is a 404, not a create.
+
+The listing was `en-GB` alone until 2026-08-25, when Apple's own analytics said
+China mainland was the second-largest storefront and Russia the third, both
+reading an English page.
 
 **The listing copy itself is not transcribed here any more.** The subtitle, the
 promotional text, the keywords, the description and the support and marketing
@@ -120,6 +135,33 @@ cannot see at all.
 The count is now measured out of `ToolKind.swift` before the description can be
 written anywhere, so a tool added or removed fails the publication rather than
 quietly making the store page wrong.
+
+### The accessibility label
+
+`/v1/accessibilityDeclarations` — undocumented, and it exists. Apple returns
+`[]` until something is declared, and the product page then says the developer
+"hasn't indicated" anything, which is one of the seven things an editor scores.
+The schema, recovered by posting wrong values and reading the 409s:
+
+- `deviceFamily` is required at creation and is the only attribute that can be.
+  Everything else is a `PATCH`.
+- The nine features are `supportsVoiceover`, `supportsVoiceControl`,
+  `supportsCaptions`, `supportsAudioDescriptions`, `supportsDarkInterface`,
+  `supportsDifferentiateWithoutColorAlone`, `supportsLargerText`,
+  `supportsReducedMotion`, `supportsSufficientContrast`.
+- **`supportsLargerText` cannot be set for `MAC`** — it answers 409 saying so.
+  There is no Dynamic Type on the Mac, and the field knows it.
+- `state` is read-only (`DRAFT`), and cannot be included in an update. A
+  declaration publishes with the next review submission, in the same window
+  everything else does.
+
+Apple's bar is that a user can complete **all common tasks** with the feature
+on. The common task here is drawing, so VoiceOver is declared `false` on the
+strength of the app being drawable, not on the strength of having labels.
+`supportsDarkInterface` is `true` and grounded in `DesignTokens.swift`, which
+resolves every value to a system semantic colour and carries explicit dark
+branches. `supportsReducedMotion` was `false` until every animation started
+routing through one guard.
 
 ### What's New
 
