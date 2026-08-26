@@ -127,7 +127,22 @@ if [[ "$SIGNATURE" == *"Signature=adhoc"* || "$SIGNATURE" != *"TeamIdentifier=$T
 fi
 echo "Archive signed by team $TEAM; the export re-signs it for distribution."
 
-cat > dist/appstore/ExportOptions.plist <<'PLIST'
+# Manual signing when the distribution identities are in the keychain.
+#
+# Automatic signing asks Xcode's account for anything it is missing, and on a
+# machine where Xcode has never been signed in that is every certificate: the
+# export fails with `No signing certificate "Mac App Distribution" found` and
+# `No Accounts`, after a successful archive, which reads like a build problem
+# and is an account problem. Naming the identities and the profile needs no
+# account at all. Both certificates can be created from the App Store Connect
+# API with nothing but openssl — see docs/APP_STORE.md.
+APP_ID_NAME="3rd Party Mac Developer Application: "
+INSTALLER_NAME="3rd Party Mac Developer Installer: "
+APP_CERT="$(security find-identity -v | sed -n "s/.*\"\(${APP_ID_NAME}[^\"]*\)\".*/\1/p" | head -1)"
+INSTALLER_CERT="$(security find-identity -v | sed -n "s/.*\"\(${INSTALLER_NAME}[^\"]*\)\".*/\1/p" | head -1)"
+
+{
+  cat <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -136,9 +151,19 @@ cat > dist/appstore/ExportOptions.plist <<'PLIST'
 	<string>app-store-connect</string>
 	<key>destination</key>
 	<string>export</string>
-</dict>
-</plist>
 PLIST
+  if [[ -n "$APP_CERT" && -n "$INSTALLER_CERT" ]]; then
+    echo "Signing manually as: $APP_CERT" >&2
+    printf '\t<key>teamID</key>\n\t<string>%s</string>\n' "$TEAM"
+    printf '\t<key>signingStyle</key>\n\t<string>manual</string>\n'
+    printf '\t<key>signingCertificate</key>\n\t<string>%s</string>\n' "$APP_CERT"
+    printf '\t<key>installerSigningCertificate</key>\n\t<string>%s</string>\n' "$INSTALLER_CERT"
+    printf '\t<key>provisioningProfiles</key>\n\t<dict>\n\t\t<key>com.joshlin.itspaint</key>\n\t\t<string>ItsPaint Mac App Store</string>\n\t</dict>\n'
+  else
+    echo "No Mac distribution identities in the keychain; falling back to automatic signing, which needs Xcode signed in." >&2
+  fi
+  printf '</dict>\n</plist>\n'
+} > dist/appstore/ExportOptions.plist
 
 xcodebuild -exportArchive -archivePath "$ARCHIVE" \
   -exportOptionsPlist dist/appstore/ExportOptions.plist \
@@ -156,15 +181,24 @@ if [[ "$UPLOAD" != "true" ]]; then
   exit 0
 fi
 
-# Uploading needs no API key: `destination: upload` authenticates as whichever
-# account Xcode is signed in to. A second export rather than `altool` on the
-# pkg above, because altool is the path that wants its own credentials.
-sed 's|<string>export</string>|<string>upload</string>|' \
-  dist/appstore/ExportOptions.plist > dist/appstore/UploadOptions.plist
-
-xcodebuild -exportArchive -archivePath "$ARCHIVE" \
-  -exportOptionsPlist dist/appstore/UploadOptions.plist \
-  -exportPath dist/appstore/upload ${EXTRA[@]+"${EXTRA[@]}"}
+# Two routes, and the one that used to be the only one needs an account.
+#
+# `destination: upload` authenticates as whichever account Xcode is signed in
+# to, which is nothing on a machine where it has never been signed in. altool
+# takes an App Store Connect API key instead, reading the .p8 from
+# ~/.appstoreconnect/private_keys, and is preferred here for exactly that
+# reason. The key is the same one the rest of the release tooling uses.
+if [[ -n "${ASC_KEY_ID:-}" && -n "${ASC_ISSUER_ID:-}" ]]; then
+  xcrun altool --upload-app -f "$PKG" -t macos \
+    --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+else
+  echo "ASC_KEY_ID/ASC_ISSUER_ID unset; uploading as the account Xcode is signed in to." >&2
+  sed 's|<string>export</string>|<string>upload</string>|' \
+    dist/appstore/ExportOptions.plist > dist/appstore/UploadOptions.plist
+  xcodebuild -exportArchive -archivePath "$ARCHIVE" \
+    -exportOptionsPlist dist/appstore/UploadOptions.plist \
+    -exportPath dist/appstore/upload ${EXTRA[@]+"${EXTRA[@]}"}
+fi
 
 echo
 echo "Uploaded. The build appears in App Store Connect once Apple finishes"
