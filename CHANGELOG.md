@@ -7,6 +7,80 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-08-27
+
+### Added
+- **A transparent colour actually paints now — and it rubs paint out.** The app
+  has carried alpha end to end since the beginning: the picker offers it, the
+  file format keeps it, the bucket has always meant "knock a hole in this". Every
+  other tool disagreed silently. Source-over compositing with a fully transparent
+  source is arithmetically `out = dst`, so the pencil, the brush, the shapes, the
+  text and the **eraser** did precisely nothing and said nothing about it — and
+  the eraser paints Colour 2, which is exactly what somebody loads when they want
+  a hole. All five compositors take a destination-out branch now: the brush stamp,
+  the antialiased stroke the default round brush actually uses, the shape fill, the
+  airbrush, and the text, which needs a blend mode because Core Graphics cannot say
+  "erase" with a colour. A soft brush erases softly for free.
+- **A filled shape drawn with a transparent Colour 2 cuts its interior out**, for
+  the same reason. Worth knowing before you load a clear Colour 2 to get the
+  eraser working and then draw a filled callout over something you wanted to keep.
+  It is one ⌘Z, and the default shape style is outline.
+- **A More colours button, in the toolbar where you can see it.** The full
+  palette, custom colours and *opacity* were behind ⇧⌘C and a menu item three
+  levels down. It sits beside Swap, in the run that button used to hold alone, so
+  the rail is not a pixel thicker and the palette does not lose a column to it.
+- **Chips say when a colour is see-through.** The same checkerboard the canvas
+  draws under transparent pixels, at half its tile, behind any chip or swatch
+  whose colour is not solid — and only then, because a texture that is always
+  there is a texture people stop seeing. Its arrival is the signal and how
+  strongly it shows through is the reading; the exact percentage is in the
+  tooltip and in what VoiceOver says.
+
+### Changed
+- **The header sheds controls instead of running off the edge.** The window can
+  be dragged to 560pt and the header needed 647pt to draw itself with no filename
+  in it — so the zoom controls, Share, Duplicate and the Guide were simply outside
+  the window, unreachable, with nothing to say they were there. It now steps down
+  a ladder as the window narrows, and every rung drops a run whose commands have
+  another door. Nothing that is the *only* way to do something is ever shed: the
+  drag-out handle has no chord and no menu item, the zoom read-out is the only
+  place the window states its zoom, and Share is what the app is for.
+- **The tool options panel draws its own controls, all of them.** Six of them
+  were still a stock AppKit slider — blue track, chrome knob — sitting in a panel
+  whose every other control was drawn by hand. Flow, Corner, Text size, Match,
+  Block and the Instant-Alpha tolerance are marks now, each with its name at the
+  head of its own line and its value at the end of it, and every track in the
+  panel starting and ending at the same x.
+- **One tooltip, one rule.** The chip's near edge sits on a fixed line beside the
+  chrome it explains and slides *along* that line to follow the control. The rail
+  used to offset its chip by a constant, so hovering the ninth tool put the answer
+  up beside the first.
+- **The colour popover is gone.** It was a weaker copy of the system Colors
+  panel, which has an opacity slider, an eyedropper, saved swatches and a recents
+  row that survives quitting. ⇧⌘C, the View menu and the new button all open that
+  instead. The app's own list of recent colours went with it.
+
+### Fixed
+- **Tooltips no longer cut their own text in half.** The chip measured itself for
+  one line and drew three, then clipped the rest away with its own rounded
+  rectangle. Every size check in the test file bounded the chip from *above*, so
+  each line that went missing made them pass more comfortably; what replaced them
+  is a check that a longer sentence makes a taller chip.
+- **A short window no longer hides the colour block.** The whole rail sat in one
+  scroller with its indicators hidden, so the loaded pair and the edge toggle went
+  below the fold with nothing to say they had. The palette gives up columns first,
+  and then only the tool run scrolls — with a real scroller, and cut at a real
+  cell boundary so the last glyph is never sliced through the middle.
+- **The bottom bar sheds too.** It was handed all fourteen palette columns
+  whatever the window was, so a narrow one ran the colour block off the right-hand
+  end. Both edges use one ladder now.
+- **A long filename no longer prints over the zoom controls.** The title had a
+  layout priority but no ceiling, and the centred cluster is not in its stack — so
+  a long name was handed the whole row and drawn on top of the buttons.
+- **VoiceOver can reach every value again.** The options panel's step was
+  `max(range / 100, 1)`, which is one pixel on a size and the entire range on any
+  0-to-1 fraction: Ink, Opacity and Strength had exactly two reachable values.
+
 ## [0.19.0] — 2026-08-26
 
 ### Added
