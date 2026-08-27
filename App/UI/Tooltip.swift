@@ -1,3 +1,4 @@
+import AppKit
 import Observation
 import SwiftUI
 
@@ -26,13 +27,13 @@ struct Tooltip: View {
             heading
             if let detail {
                 Text(detail)
-                    .font(.system(size: 11))
+                    .font(.system(size: Self.detailPointSize))
                     // A tooltip is read once, quickly, at a glance. `muted` is
                     // the value-beside-a-label step and it is too quiet for a
                     // sentence somebody has stopped to read.
                     .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 210, alignment: .leading)
+                    .frame(width: Self.detailWidth(of: detail), alignment: .leading)
             }
         }
         .padding(.horizontal, Tokens.Space.base + 1)
@@ -56,11 +57,65 @@ struct Tooltip: View {
         .transition(.opacity.combined(with: .offset(y: 3)))
     }
 
+    /// The size the explanation is set at, in one place, because the layout has
+    /// to measure the same face it draws.
+    static let detailPointSize: CGFloat = 11
+
+    /// The widest a chip's explanation may get before it wraps.
+    static let maxDetailWidth: CGFloat = 210
+
+    /// A **concrete** width for the sentence, and that is the whole fix for a bug
+    /// worth naming.
+    ///
+    /// `.fixedSize(horizontal: false, vertical: true)` keeps the *proposed* width
+    /// and asks for the height that fits it. But the chip is `.fixedSize()`
+    /// overall, so the width proposed down to that text was `nil` — and under a
+    /// nil proposal `.frame(maxWidth: 210)` let the text report the height of one
+    /// unbroken line while drawing three. The chip then clipped the other two
+    /// away with its own rounded-rectangle mask.
+    ///
+    /// **The bug hid itself.** Every assertion in `TooltipRenderTests` bounded the
+    /// chip from *above* — "not taller than 66pt" — so each line that went missing
+    /// made the check pass more comfortably. What replaced them is a check that a
+    /// longer sentence makes a taller chip, which is the property the eye is
+    /// actually using. See `docs/CHECKS_THAT_MISS.md`.
+    ///
+    /// Measured rather than fixed at the cap so a three-word chip stays a
+    /// three-word chip: "Already at 100%" in a 210pt box is a chip mostly made of
+    /// nothing.
+    static func detailWidth(of detail: String) -> CGFloat {
+        // AppKit's metrics for the face SwiftUI resolves `.system(size: 11)` to,
+        // plus a point of slack so a sentence that measures exactly at the cap is
+        // not wrapped by a rounding difference between the two frameworks.
+        let ideal = (detail as NSString)
+            .size(withAttributes: [.font: NSFont.systemFont(ofSize: detailPointSize)])
+            .width
+        return min(ceil(ideal) + 1, maxDetailWidth)
+    }
+
+    /// The widest a chip's *title* may get.
+    ///
+    /// A backstop rather than a working limit. The detail line has been capped
+    /// since the clipping fix, and the heading had nothing at all — so a caller
+    /// that put three clauses and a live hex value in the title, which the colour
+    /// chips briefly did, produced a chip about 380pt wide with no test able to
+    /// see it. Titles are names; a name that needs 260pt is the bug.
+    static let maxTitleWidth: CGFloat = 260
+
     private var heading: some View {
         HStack(spacing: Tokens.Space.tight + 1) {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.primary)
+                .lineLimit(1)
+                .frame(
+                    width: min(
+                        ceil((title as NSString)
+                            .size(withAttributes: [.font: NSFont.boldSystemFont(ofSize: 12)]).width) + 2,
+                        Self.maxTitleWidth
+                    ),
+                    alignment: .leading
+                )
 
             if let shortcut {
                 Text(shortcut)
@@ -98,14 +153,15 @@ final class TooltipController {
     private(set) var shortcut: String?
     private(set) var detail: String?
 
-    /// The hovered control's frame in screen coordinates, for the controls whose
-    /// chip cannot be positioned from the rail's own geometry.
+    /// The hovered control's frame in screen coordinates.
     ///
-    /// The rail knows where its cells are, so it leaves this nil and offsets the
-    /// chip itself. The header does not — its cluster slides with the window
-    /// width — so header buttons report where they actually are and the chip
-    /// follows the glyph rather than guessing at the middle of the row.
-    private(set) var anchor: CGRect?
+    /// **Required, not optional.** It used to be optional because the rail drew
+    /// its own chip from a constant offset and only the header reported a
+    /// position. There is one chip now and it is placed from this, so a missing
+    /// anchor cannot mean "the other layer will handle it" — it can only mean the
+    /// chip goes somewhere wrong or nowhere at all. A defaulted `nil` on `hover`
+    /// was a trap set for whoever adds the eleventh call site.
+    private(set) var anchor: CGRect = .zero
 
     @ObservationIgnored private var pendingKey: String?
     @ObservationIgnored private var work: DispatchWorkItem?
@@ -130,7 +186,7 @@ final class TooltipController {
         title: String,
         shortcut: String?,
         detail: String? = nil,
-        anchor: CGRect? = nil
+        anchor: CGRect
     ) {
         guard pendingKey != key else { return }
         pendingKey = key
@@ -171,7 +227,7 @@ final class TooltipController {
             MainActor.assumeIsolated {
                 guard let self, self.pendingKey == nil else { return }
                 self.visibleKey = nil
-                self.anchor = nil
+                self.anchor = .zero
             }
         }
         work = item
@@ -182,6 +238,6 @@ final class TooltipController {
         work?.cancel()
         pendingKey = nil
         visibleKey = nil
-        anchor = nil
+        anchor = .zero
     }
 }

@@ -520,8 +520,78 @@ struct TitlebarScrim: View {
 /// not tools. The rail is a list of things that make marks; the clipboard acts on
 /// the document, like undo and zoom, and grouping it with them is what keeps the
 /// rail a short list you can scan.
+/// **What a window of a given width can carry, and what it drops first.**
+///
+/// The rail sheds palette columns before it scrolls, for the reason it states: a
+/// control below the fold of an indicator-less scroll view is a control nobody
+/// can tell is missing. The header had no ladder at all — it simply ran off the
+/// right edge — and `DrawingDocument.minimumContentSize` is 560pt against a row
+/// that needs 647pt with *no filename in it*. The app shipped a window its own
+/// header could not fit.
+///
+/// Every rung sheds a run whose commands have another door: a chord, a menu-bar
+/// item, or a bar this app already puts on screen. Nothing that is the *only* way
+/// to do something is ever shed — which inverts the obvious answer. Cut, copy and
+/// paste go before the drag-out handle, because ⌘X/⌘C/⌘V are three chords every
+/// Mac already has and `SelectionActions` restates two of them on screen the
+/// moment there is a selection, while the drag-out handle has no chord and no menu
+/// item anywhere. Undo and redo, the zoom read-out, Share and the filename are
+/// never shed.
+///
+/// Declaration order is the ladder, widest first, so a window that has grown
+/// climbs back to the rung it fell from.
+enum HeaderFit: CaseIterable {
+    /// `noMenus` is the rung *below* the window floor, and that is its whole job:
+    /// `dragOutOnly` fits 560pt with one point to spare, which is not a margin. It
+    /// is what the ladder falls to if the window floor ever drops or a group ever
+    /// gains a cell, so the failure mode is a shed control rather than a clipped
+    /// one.
+    case full, trailing, zoomReadoutOnly, shareOnly, dragOutOnly, noMenus
+
+    var showsZoomSteppers: Bool { self == .full || self == .trailing }
+    var showsLastActions: Bool { showsZoomSteppers || self == .zoomReadoutOnly }
+    var showsClipboardRun: Bool { self != .dragOutOnly && self != .noMenus }
+    var showsMenus: Bool { self != .noMenus }
+
+    var workingWidth: CGFloat {
+        let groups = [
+            showsClipboardRun ? Tokens.Header.clipboard : Tokens.Header.dragOnly,
+            Tokens.Header.history,
+            showsMenus ? Tokens.Header.menus : nil,
+            showsZoomSteppers ? Tokens.Header.zoom : Tokens.Header.zoomOnly,
+        ].compactMap { $0 }
+        return groups.reduce(0, +) + CGFloat(groups.count - 1) * Tokens.Space.tight
+    }
+
+    var documentWidth: CGFloat {
+        showsLastActions ? Tokens.Header.document : Tokens.Header.shareOnly
+    }
+
+    /// The narrowest window this arrangement fits, with the filename still
+    /// getting `Tokens.Header.titleRoom` of it.
+    var minimumWindow: CGFloat {
+        guard self == .full else {
+            return Tokens.Header.surround + workingWidth + documentWidth + Tokens.Header.titleRoom
+        }
+        // Measured about the window's midline, because the centred cluster is
+        // centred on the *window* rather than between its neighbours: everything
+        // the title needs on its side of the midline is doubled.
+        return (Tokens.Space.comfortable * 3 + Tokens.Chrome.trafficLightClearance
+            + Tokens.Header.titleRoom + Tokens.Space.base + workingWidth / 2) * 2
+    }
+
+    /// The widest arrangement a window of `width` can carry.
+    ///
+    /// The last rung is returned whether it fits or not: there is nothing below
+    /// it, and clipping is the one outcome this ladder exists to prevent.
+    static func fitting(_ width: CGFloat) -> HeaderFit {
+        allCases.first { width >= $0.minimumWindow } ?? .noMenus
+    }
+}
+
 struct WorkingActions: View {
     @Bindable var model: EditorModel
+    var fit: HeaderFit = .full
 
     var body: some View {
         // Undo lives in the UI-free engine, so its computed flags are not
@@ -531,6 +601,7 @@ struct WorkingActions: View {
 
         HStack(spacing: Tokens.Space.tight) {
             HeaderGroup {
+                if fit.showsClipboardRun {
                 HeaderButton(
                     symbol: "scissors", title: "Cut",
                     shortcut: "⌘X", isEnabled: model.hasSelection
@@ -561,6 +632,9 @@ struct WorkingActions: View {
                         : "Copy an image somewhere first",
                     isEnabled: model.canPaste
                 ) { model.paste() }
+                }
+                // Never shed: the one control in this row with no chord and no
+                // menu item. Everything above it is ⌘X/⌘C/⌘V.
                 DragOutHandle(model: model)
             }
 
@@ -578,16 +652,20 @@ struct WorkingActions: View {
             // What the picture is, and how you are looking at it. Between the
             // clipboard and the history because that is the order of the work:
             // get something in, change it, look at it, undo it.
-            HeaderGroup {
-                ImageMenu(model: model)
-                ViewMenu(model: model)
+            if fit.showsMenus {
+                HeaderGroup {
+                    ImageMenu(model: model)
+                    ViewMenu(model: model)
+                }
             }
 
             HeaderGroup {
+                if fit.showsZoomSteppers {
                 HeaderButton(
                     symbol: "minus", title: "Zoom out", shortcut: "⌘−",
                     isEnabled: model.zoom > (EditorModel.zoomSteps.first ?? 1)
                 ) { model.zoomOut() }
+                }
 
                 // **The percentage is the button.** There used to be a separate
                 // `arrow.up.left.and.arrow.down.right` cell for Actual Size,
@@ -597,15 +675,20 @@ struct WorkingActions: View {
                 // *full screen*, so the pair managed to be both redundant and
                 // misleading. What is left is a real button whose label is the
                 // current zoom and whose action is 100%.
+                // Never shed: the only place the window states its zoom, and the
+                // Actual Size button. The two steppers either side of it have
+                // ⌘+, ⌘−, pinch, ⌘-scroll and the View menu.
                 ZoomReadout(label: zoomLabel, isActualSize: model.zoom == 1) {
                     model.hasUserZoomed = true
                     model.zoom = 1
                 }
 
+                if fit.showsZoomSteppers {
                 HeaderButton(
                     symbol: "plus", title: "Zoom in", shortcut: "⌘+",
                     isEnabled: model.zoom < (EditorModel.zoomSteps.last ?? 1)
                 ) { model.zoomIn() }
+                }
             }
         }
     }
@@ -624,12 +707,14 @@ struct WorkingActions: View {
 /// press forty times an hour.
 struct DocumentActions: View {
     @Bindable var model: EditorModel
+    var fit: HeaderFit = .full
 
     @Environment(TooltipController.self) private var tooltips
     @State private var shareFrame: CGRect = .zero
 
     var body: some View {
         HeaderGroup {
+            if fit.showsLastActions {
             // **Signing has a button now.** It lived only in the Tools menu
             // under ⌃⌘S — a chord nothing else in the app uses — which made the
             // one feature nobody would guess at the one feature the window never
@@ -645,6 +730,7 @@ struct DocumentActions: View {
             }
 
             HeaderDivider()
+            }
 
             // Share is in the File menu, but a markup app's whole purpose is
             // getting the result to someone else — burying its most common last
@@ -666,6 +752,11 @@ struct DocumentActions: View {
                         )
                         : tooltips.endHover(key: "header-share")
                 }
+
+            // Everything after Share is the last two minutes of a session, and
+            // every one of them has a chord and a menu-bar item. Share does not
+            // go: getting the result to someone else is what this app is for.
+            if fit.showsLastActions {
             HeaderButton(
                 symbol: "doc.on.doc", title: "Duplicate", shortcut: "⇧⌘S",
                 detail: "Opens a copy in a new window"
@@ -688,6 +779,7 @@ struct DocumentActions: View {
                 detail: "Every tool, what it is for, and the drag that makes it work"
             ) {
                 AppCommandsBridge.openGuide()
+            }
             }
         }
     }
@@ -947,7 +1039,7 @@ struct ViewMenu: View {
                 model.chromeEdge = model.chromeEdge.toggled
             }
             Divider()
-            Button("Colours…") { model.isColourPopoverRequested = true }
+            Button("Colours…") { model.presentSystemColourPicker(for: .foreground) }
         }
     }
 

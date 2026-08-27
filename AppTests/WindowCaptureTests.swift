@@ -69,13 +69,26 @@ struct WindowCaptureTests {
            let tool = ToolKind(rawValue: toolName) {
             document.model.selectTool(tool)
         }
+        // A translucent Colour 1 and a fully clear Colour 2 — the state the rail's
+        // checkerboard exists for, and one there is no other way to reach from a
+        // capture: it needs the system colour panel and a pointer.
+        if environment["ITSPAINT_CAPTURE_ALPHA"] != nil {
+            document.model.applySwatch(
+                PaintColour(red: 0.85, green: 0.15, blue: 0.15, alpha: 0.35), to: .foreground
+            )
+            document.model.applySwatch(.clear, to: .background)
+        }
         if let grid = environment["ITSPAINT_CAPTURE_SNAP"], let spacing = Int(grid) {
             document.model.snapGrid = spacing
         }
         // The bottom rail lays its options panel out along the other axis, so a
         // control that only misbehaves down there needs a capture down there.
-        if environment["ITSPAINT_CAPTURE_EDGE"] == "bottom" {
-            document.model.chromeEdge = .bottom
+        // Named both ways: the edge is a saved preference, so a capture that only
+        // knows how to say "bottom" leaves the next run stuck down there.
+        switch environment["ITSPAINT_CAPTURE_EDGE"] {
+        case "bottom": document.model.chromeEdge = .bottom
+        case "side", "left": document.model.chromeEdge = .left
+        default: break
         }
         if environment["ITSPAINT_CAPTURE_SELECTION"] != nil {
             // Make the marquee with the select tool, then restore whichever tool
@@ -87,6 +100,15 @@ struct WindowCaptureTests {
             _ = document.model.engine.endStroke(at: PixelPoint(x: 354, y: 267))
             document.model.engine.settings.tool = wanted
             document.model.noteChange(.empty)
+        }
+
+        // A specific window size, because most of what goes wrong in chrome goes
+        // wrong at a size nobody opened it at. `WIDTHxHEIGHT`, in points.
+        if let size = environment["ITSPAINT_CAPTURE_SIZE"] {
+            let parts = size.split(separator: "x").compactMap { Double($0) }
+            if parts.count == 2 {
+                window.setContentSize(NSSize(width: parts[0], height: parts[1]))
+            }
         }
 
         // The traffic lights only take their colours once the app is active,

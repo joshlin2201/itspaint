@@ -25,8 +25,9 @@ struct EditorView: View {
     /// The panel's measured length along the rail's axis, so it can be kept
     /// inside the window without guessing how tall its content is.
     @State private var panelSpan: CGFloat = 0
-    /// Width of the header's tooltip chip, so it can be kept inside the window.
-    @State private var headerTooltipWidth: CGFloat = 0
+    /// The tooltip chip's measured size, so it can be kept inside the window on
+    /// both axes.
+    @State private var tooltipSize: CGSize = .zero
 
     var body: some View {
         ZStack {
@@ -52,7 +53,7 @@ struct EditorView: View {
             titleRow
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-            headerTooltip
+            tooltipLayer
                 // **Above the tool chrome, which is drawn after it.** Share is
                 // the one control in this row that is an NSViewRepresentable
                 // rather than a SwiftUI Button — it hosts a real NSButton so its
@@ -248,19 +249,6 @@ struct EditorView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
         }
-        .overlay(alignment: isVertical ? .topLeading : .bottomLeading) {
-            // Only for controls that have no anchor of their own — the rail's,
-            // whose geometry this offset already knows. A header button carries
-            // its position with it and is drawn by `headerTooltip` instead.
-            if tooltips.isVisible, tooltips.anchor == nil {
-                Tooltip(title: tooltips.title, shortcut: tooltips.shortcut, detail: tooltips.detail)
-                    .offset(
-                        x: isVertical ? Tokens.Rail.thickness + Tokens.Space.snug : 0,
-                        y: isVertical ? Tokens.Chrome.titleReserve : -Tokens.Rail.thickness
-                    )
-                    .allowsHitTesting(false)
-            }
-        }
         .animation(Tokens.Motion.pillResize, value: anchoredIndex)
         .animation(Tokens.Motion.pillResize, value: model.isOptionsExpanded)
         .animation(Tokens.Motion.micro, value: tooltips.visibleKey)
@@ -298,50 +286,41 @@ struct EditorView: View {
         max(0, min(panelOffset, available - panelSpan))
     }
 
-    /// The rail, shedding swatches before it ever scrolls.
+    /// The rail, shedding swatches before it ever scrolls — and scrolling only
+    /// the part that can afford to be scrolled.
     ///
-    /// A short window used to clip the rail: the colour block was cut in half
-    /// and the edge toggle was simply gone, below the fold of a scroll view
-    /// with hidden indicators — so there was no way to tell that anything was
-    /// missing, let alone reach it. **The tools and the loaded colours are the
-    /// part that must never be cut**, and the palette is the part that can give
-    /// ground, because every swatch it drops is still in the popover.
+    /// A short window used to clip the rail: the colour block was cut in half and
+    /// the edge toggle was simply gone, below the fold of a scroll view with
+    /// hidden indicators — so there was no way to tell anything was missing, let
+    /// alone reach it. **The tools and the loaded colours are the part that must
+    /// never be cut**, and the palette is the part that can give ground.
     ///
-    /// Only once the palette is gone entirely and the window is still too short
-    /// does it fall back to scrolling.
+    /// So there are two answers here, in order. The palette drops columns first,
+    /// because every swatch it drops is one press away in the system picker. Then,
+    /// if the tools *still* do not fit, the tool run alone scrolls — inside the
+    /// rail, with a real scroller — while the colour block and the edge toggle
+    /// keep their place at the end of it. Wrapping the whole rail was what put the
+    /// colours below the fold in the first place.
+    /// **Both edges, one rule.** The bottom bar used to be told it always had all
+    /// fourteen palette columns and never needed to scroll, which is true of a
+    /// 1400pt window and nonsense at 560 — the colour block ran straight off the
+    /// right-hand end. The side rail's shedding was already written; the bottom
+    /// bar simply never called it.
     @ViewBuilder
     private func scrollingRail(maxLength: CGFloat, isVertical: Bool) -> some View {
-        ScrollView(isVertical ? .vertical : .horizontal, showsIndicators: false) {
-            ToolRail(
-                model: model,
-                swatchPairs: isVertical ? Self.swatchPairs(fitting: maxLength) : Palette.columns
-            ) { model.selectTool($0) }
-                .fixedSize()
-        }
-        .frame(
-            maxWidth: isVertical ? Tokens.Rail.thickness : maxLength,
-            maxHeight: isVertical ? maxLength : Tokens.Rail.thickness + 2
-        )
-        .fixedSize(horizontal: isVertical, vertical: !isVertical)
-    }
+        let pairs = RailFit.swatchPairs(fitting: maxLength, isVertical: isVertical)
+        let room = RailFit.toolRoom(in: maxLength, pairs: pairs, isVertical: isVertical)
 
-    /// How many columns of the palette the side rail can show in `height`.
-    ///
-    /// Everything above the palette is fixed, so this is one subtraction rather
-    /// than a layout pass — which matters, because the answer feeds a view that
-    /// is being laid out.
-    private static func swatchPairs(fitting height: CGFloat) -> Int {
-        let cell = Tokens.Size.toolCell + Tokens.Space.hair
-        let tools = ToolKind.groups.reduce(CGFloat.zero) { $0 + CGFloat($1.count) * cell }
-        let separators = CGFloat(ToolKind.groups.count) * (1 + Tokens.Rail.sectionSpacing * 2)
-        let pair = Tokens.Size.colourWell * 1.42 + Tokens.Space.hair + Tokens.Size.colourSwap
-        let toggle = Tokens.Rail.sectionSpacing + Tokens.Size.toolCell
-        let fixed = Tokens.Rail.padding * 2 + tools + separators
-            + pair + Tokens.Space.tight + Tokens.Rail.colourInset * 2 + toggle
-
-        let forSwatches = height - fixed
-        let row = Tokens.Size.swatch + Tokens.Rail.swatchGap
-        return max(0, min(Tokens.Rail.swatchPairs, Int(forSwatches / row)))
+        ToolRail(
+            model: model,
+            swatchPairs: pairs,
+            toolsLength: room
+        ) { model.selectTool($0) }
+            .frame(
+                maxWidth: isVertical ? Tokens.Rail.thickness : maxLength,
+                maxHeight: isVertical ? maxLength : Tokens.Rail.thickness + 2,
+                alignment: isVertical ? .top : .leading
+            )
     }
 
     /// Distance from the rail's leading edge to the selected cell, so the panel
@@ -402,11 +381,11 @@ struct EditorView: View {
     /// the same trick the rail uses when it drops palette columns.
     private var titleRow: some View {
         GeometryReader { proxy in
-            let hasRoomToCentre = proxy.size.width >= Self.centredClusterMinimum
+            let fit = HeaderFit.fitting(proxy.size.width)
 
             ZStack {
-                if hasRoomToCentre {
-                    WorkingActions(model: model)
+                if fit == .full {
+                    WorkingActions(model: model, fit: fit)
                         .fixedSize()
                 }
 
@@ -422,13 +401,21 @@ struct EditorView: View {
                     // The title yields before the controls do. A long filename
                     // should truncate in the middle, not push Undo off the window.
                     .layoutPriority(-1)
+                    // **A ceiling, not just a priority.** Centred, the cluster is
+                    // not in this stack at all — so nothing stopped a long
+                    // filename being handed the whole row and drawn straight over
+                    // the zoom controls, since the `HStack` is painted after the
+                    // cluster. Priority decides who yields when the row is short;
+                    // this is what stops the title crossing the midline when it is
+                    // long.
+                    .frame(maxWidth: Self.titleCeiling(fit, in: proxy.size.width), alignment: .leading)
 
                     Spacer(minLength: Tokens.Space.base)
 
-                    if !hasRoomToCentre {
-                        WorkingActions(model: model).fixedSize()
+                    if fit != .full {
+                        WorkingActions(model: model, fit: fit).fixedSize()
                     }
-                    DocumentActions(model: model).fixedSize()
+                    DocumentActions(model: model, fit: fit).fixedSize()
                 }
             }
             .padding(.horizontal, Tokens.Space.comfortable)
@@ -437,29 +424,40 @@ struct EditorView: View {
         .frame(height: Tokens.Chrome.titleReserve)
     }
 
-    /// Traffic lights, a title worth reading, the cluster, and the document
-    /// actions, with the gaps between them. Below this the cluster overlaps.
-    private static let centredClusterMinimum: CGFloat = 940
+    /// How wide the filename may be before it reaches the centred cluster.
+    static func titleCeiling(_ fit: HeaderFit, in width: CGFloat) -> CGFloat {
+        guard fit == .full else { return .infinity }
+        return max(
+            Tokens.Header.titleRoom,
+            width / 2 - fit.workingWidth / 2
+                - Tokens.Chrome.trafficLightClearance
+                - Tokens.Space.comfortable * 3
+                - Tokens.Space.base
+        )
+    }
 
-    /// The chip for a header control, on one fixed line under the header.
+    /// **One chip, for every control in the window.**
     ///
-    /// The header's buttons cannot draw it themselves: their group clips to its
-    /// own capsule, so a chip inside one is a chip with its bottom half cut off.
-    /// They report where they are instead and it is drawn out here, still one
-    /// chip at a time — the rail's chip is suppressed while a header button owns
-    /// the tooltip, because two of them on screen is two answers to one question.
+    /// Nothing draws its own. A header button's group clips to its own capsule,
+    /// so a chip inside one is a chip with its bottom half cut off; a rail cell
+    /// sits inside a `ScrollView`, which is worse. Every control reports where it
+    /// is and the single chip is drawn out here, over everything, clipped by
+    /// nothing.
     ///
-    /// **The chip's top edge does not move.** It used to be positioned from each
-    /// control's own frame, so a chip with a second line grew *downwards from a
-    /// different y* than a one-line chip beside it, and reading along the header
-    /// meant re-finding the text on every cell. Every header control is on one
-    /// row and the answer belongs on one line under it. Only the horizontal
-    /// centre follows the glyph, so the chip still points at what it names.
+    /// It used to be two layers with two rules, and the rail's was not really a
+    /// rule: it offset the chip by a constant, so hovering the eyedropper — nine
+    /// cells down — put the answer up beside the pencil. A tooltip that does not
+    /// point at what it names is a tooltip you have to work out.
     @ViewBuilder
-    private var headerTooltip: some View {
+    private var tooltipLayer: some View {
         GeometryReader { proxy in
-            if tooltips.isVisible, let anchor = tooltips.anchor {
+            if tooltips.isVisible {
+                let anchor = tooltips.anchor
                 let container = proxy.frame(in: .global)
+                let origin = Self.tooltipOrigin(
+                    beside: anchor, in: container,
+                    chip: tooltipSize, rail: model.chromeEdge
+                )
                 Tooltip(
                     title: tooltips.title,
                     shortcut: tooltips.shortcut,
@@ -469,23 +467,24 @@ struct EditorView: View {
                 .background {
                     GeometryReader { chip in
                         Color.clear
-                            .onAppear { headerTooltipWidth = chip.size.width }
-                            .onChange(of: chip.size.width) { _, new in
-                                headerTooltipWidth = new
-                            }
+                            .onAppear { tooltipSize = chip.size }
+                            .onChange(of: chip.size) { _, new in tooltipSize = new }
                     }
                 }
                 // `.topLeading`, not `.position`: `position` centres on a point,
                 // so a two-line chip and a one-line chip pinned to the same y
-                // still start at different heights. Pinning the top edge is what
+                // still start at different heights. Pinning a corner is what
                 // "one fixed line" actually means.
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .offset(
-                    x: Self.tooltipLeading(
-                        under: anchor, in: container, chipWidth: headerTooltipWidth
-                    ),
-                    y: Self.tooltipTop
-                )
+                .offset(x: origin.x, y: origin.y)
+                // **Measured before it is seen.** `tooltipSize` starts at zero and
+                // now feeds the *y* axis too: above a bottom bar the origin is
+                // `height − chip.height`, so an unmeasured chip pinned its top-left
+                // to the top edge of the bar and then jumped its own height — about
+                // 60pt — the instant the measurement landed. It has to be laid out
+                // to be measured, so it is laid out invisibly for that one frame
+                // rather than skipped, which would measure nothing forever.
+                .opacity(tooltipSize == .zero ? 0 : 1)
                 .allowsHitTesting(false)
             }
         }
@@ -494,6 +493,49 @@ struct EditorView: View {
     /// The one line every header chip hangs from: clear of the header row, with
     /// the same gap the header itself keeps from the top of the window.
     static let tooltipTop: CGFloat = Tokens.Chrome.titleReserve - Tokens.Space.tight
+
+    /// The chip's top-left corner, given where the control is.
+    ///
+    /// **Two placements, one rule.** The chip's near edge sits on a fixed line
+    /// beside the chrome it explains — one line under the header, one column
+    /// clear of the rail — and it slides *along* that line to follow the control.
+    /// Reading across the header moves the answer sideways only; reading down the
+    /// rail moves it up and down only. The text is never somewhere new.
+    ///
+    /// Which line it hangs from is read off the anchor rather than passed in by
+    /// every call site: the header band is the only chrome above the artwork, so
+    /// a control inside it is a header control and everything else is the rail's.
+    static func tooltipOrigin(
+        beside anchor: CGRect, in container: CGRect,
+        chip: CGSize, rail edge: EditorModel.ChromeEdge
+    ) -> CGPoint {
+        let alongTop = tooltipLeading(under: anchor, in: container, chipWidth: chip.width)
+
+        guard anchor.midY - container.minY >= Tokens.Chrome.titleReserve else {
+            return CGPoint(x: alongTop, y: tooltipTop)
+        }
+
+        guard edge.isVertical else {
+            return CGPoint(
+                x: alongTop,
+                y: container.height - Tokens.Chrome.railInset
+                    - Tokens.Rail.thickness - Tokens.Space.snug - chip.height
+            )
+        }
+
+        return CGPoint(
+            x: Tokens.Chrome.railInset + Tokens.Rail.thickness + Tokens.Space.snug,
+            y: slid(
+                toward: anchor.midY - container.minY,
+                extent: chip.height,
+                within: container.height,
+                // Clear of the header at one end and of the window at the other:
+                // the two things a chip beside a tall rail can run into.
+                leading: Tokens.Chrome.titleReserve,
+                trailing: Tokens.Space.safeInset
+            )
+        )
+    }
 
     /// Where the header's chip starts: centred under the control, unless that
     /// would hang it off an edge of the window.
@@ -507,15 +549,32 @@ struct EditorView: View {
     /// its top-left corner, so that its top edge can stay on one line whatever
     /// height it happens to be.
     static func tooltipLeading(under anchor: CGRect, in container: CGRect, chipWidth: CGFloat) -> CGFloat {
-        let half = chipWidth / 2
-        let inset = half + Tokens.Space.base
-        let wanted = anchor.midX - container.minX
-        // A chip wider than the window cannot be kept inside it; centre it and
-        // let both ends run out rather than pinning it to one edge.
-        let centre = container.width > inset * 2
-            ? min(max(wanted, inset), container.width - inset)
-            : container.width / 2
-        return centre - half
+        slid(
+            toward: anchor.midX - container.minX,
+            extent: chipWidth,
+            within: container.width,
+            leading: Tokens.Space.base,
+            trailing: Tokens.Space.base
+        )
+    }
+
+    /// Centre `extent` on `wanted`, then pull it back inside the window.
+    ///
+    /// One function for both axes, because "point at the control, but stay on
+    /// screen" is one idea and it had drifted into being two — the rail's version
+    /// simply did not clamp, which is how a chip beside the last tool in a short
+    /// window ended up below the bottom of it.
+    private static func slid(
+        toward wanted: CGFloat, extent: CGFloat, within: CGFloat,
+        leading: CGFloat, trailing: CGFloat
+    ) -> CGFloat {
+        let low = leading
+        let high = within - trailing - extent
+        // Something larger than the room it has cannot be kept inside it; centre
+        // it and let both ends run out rather than pinning one edge and cutting
+        // the whole sentence off the other.
+        guard high > low else { return (within - extent) / 2 }
+        return min(max(wanted - extent / 2, low), high)
     }
 
     private var readOutRow: some View {

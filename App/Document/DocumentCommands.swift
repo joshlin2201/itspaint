@@ -120,9 +120,9 @@ extension DrawingDocument {
         set { UserDefaults.standard.set(newValue, forKey: snapGridDefaultsKey) }
     }
 
-    /// ⇧⌘C opens the swatch popover. In canvas-first there is no permanent
+    /// ⇧⌘C opens the system colour panel. In canvas-first there is no permanent
     /// colour surface, so the keystroke is the guaranteed way in.
-    @IBAction func showColours(_ sender: Any?) { model.isColourPopoverRequested = true }
+    @IBAction func showColours(_ sender: Any?) { model.presentSystemColourPicker(for: .foreground) }
 
     // MARK: - Image
 
