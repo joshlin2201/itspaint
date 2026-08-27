@@ -138,9 +138,37 @@ public enum TextRenderer {
         // hollow; drawing the filled text over it leaves the stroke showing on
         // the outside only, which is the whole point — a rim that ate the letter
         // it was meant to make legible would be worse than no rim.
-        let wantsHalo = style.haloColour != nil && style.haloWidth > 0
-        let passes = wantsHalo ? [frame(isHaloPass: true), frame(isHaloPass: false)]
-                               : [frame(isHaloPass: false)]
+        // **Text set in a transparent colour cuts the letters out of the picture.**
+        //
+        // Core Graphics cannot express that as a colour: source-over with a zero
+        // alpha source is a no-op, so typing in a clear colour changed nothing and
+        // said nothing — the same silence every other tool used to keep. The
+        // letterforms are drawn opaque and the blend mode does the erasing, which
+        // is what `destination-out` is: it takes the *source's* alpha away from
+        // the destination and ignores the source's colour entirely.
+        //
+        // The halo goes with it. A rim around a hole is a rim around nothing.
+        let erases = style.colour.alpha == 0
+        var opaque = style
+        if erases {
+            opaque.colour = PaintColour(red: 0, green: 0, blue: 0, alpha: 1)
+            opaque.haloColour = nil
+        }
+        func erasingFrame() -> CTFrame {
+            let attributed = attributedString(string, style: opaque, isHaloPass: false)
+            return CTFramesetterCreateFrame(
+                CTFramesetterCreateWithAttributedString(attributed), CFRangeMake(0, 0), path, nil
+            )
+        }
+
+        let wantsHalo = !erases && style.haloColour != nil && style.haloWidth > 0
+        let passes = if erases {
+            [erasingFrame()]
+        } else if wantsHalo {
+            [frame(isHaloPass: true), frame(isHaloPass: false)]
+        } else {
+            [frame(isHaloPass: false)]
+        }
 
         bitmap.drawWithCoreGraphics { context in
             // A bitmap `CGContext` does not turn these on for you, and without them
@@ -161,6 +189,7 @@ public enum TextRenderer {
             context.setShouldSubpixelPositionFonts(true)
             context.setAllowsFontSubpixelQuantization(false)
             context.setShouldSubpixelQuantizeFonts(false)
+            if erases { context.setBlendMode(.destinationOut) }
             for pass in passes {
                 context.saveGState()
                 // The surrounding context is flipped so canvas coordinates work;

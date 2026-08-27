@@ -60,6 +60,8 @@ public enum Raster {
         let maskWidth = extent.width
         let canvasWidth = bitmap.width
         let opaque = colour.a == 255
+        /// Fully transparent paint means "remove what is here", not "do nothing".
+        let erases = colour.a == 0
 
         brush.mask.withUnsafeBufferPointer { mask in
             bitmap.pixels.withUnsafeMutableBufferPointer { pixels in
@@ -72,6 +74,29 @@ public enum Raster {
                         let index = pixelRow + column
                         if coverage == 255 && opaque && !blend {
                             pixels[index] = colour
+                        } else if erases {
+                            // **A colour with no colour in it takes paint away.**
+                            //
+                            // Source-over cannot express this: `out = src + dst *
+                            // (1 - srcAlpha)` with `srcAlpha == 0` is `out = dst`,
+                            // so every stroke tool silently did nothing. That is
+                            // not a rounding case — it is the whole of what a
+                            // transparent colour was for, and the eraser is the
+                            // tool it broke worst, because the eraser *paints
+                            // Colour 2* and a transparent Colour 2 is exactly what
+                            // somebody reaches for when they want a hole.
+                            //
+                            // Destination-out instead, scaled by the brush's own
+                            // coverage — which is `withCoverage` on the
+                            // destination, because these pixels are premultiplied
+                            // and scaling all four channels *is* destination-out.
+                            // A soft brush therefore erases softly, for free.
+                            //
+                            // The bucket has meant this by a transparent colour
+                            // since the first build (`SelectionMask.fill` assigns
+                            // the colour straight in). One tool meaning "erase" and
+                            // twelve meaning "do nothing" was the disagreement.
+                            pixels[index] = pixels[index].withCoverage(255 - coverage)
                         } else {
                             pixels[index] = colour.withCoverage(coverage)
                                 .overCompositing(pixels[index])
@@ -261,6 +286,29 @@ public enum Raster {
                     if along % (runs.on + runs.off) >= runs.on { continue }
                 }
 
+                let i = bitmap.index(PixelPoint(x: x, y: y))
+
+                // **The antialiased path erases too.**
+                //
+                // This is the one that mattered most and the one that was missed:
+                // the shipping default is a round brush with smooth edges, and
+                // `PaintEngine.strokePath` sends exactly that combination here. So
+                // a transparent colour rubbed out a single dot at mouse-down —
+                // `beginStroke` stamps directly — and then did nothing for the
+                // rest of the drag. Half a fix reads worse than none, because the
+                // first dot proves the feature works.
+                //
+                // Same arithmetic as `stamp`: destination-out, scaled by the
+                // antialiasing coverage, which is `withCoverage` on the
+                // destination because these pixels are premultiplied. A smooth
+                // edge therefore erases with a smooth edge.
+                if colour.a == 0 {
+                    bitmap.pixels[i] = bitmap.pixels[i]
+                        .withCoverage(UInt8(((1 - coverage) * 255).rounded()))
+                    dirty = dirty.union(PixelRect(x: x, y: y, width: 1, height: 1))
+                    continue
+                }
+
                 let alpha = Double(colour.a) * coverage
                 let src = RGBA8(
                     r: UInt8((Double(colour.r) * coverage).rounded()),
@@ -269,7 +317,6 @@ public enum Raster {
                     a: UInt8(alpha.rounded())
                 )
                 guard src.a > 0 else { continue }
-                let i = bitmap.index(PixelPoint(x: x, y: y))
                 bitmap.pixels[i] = src.overCompositing(bitmap.pixels[i])
                 dirty = dirty.union(PixelRect(x: x, y: y, width: 1, height: 1))
             }
@@ -600,7 +647,11 @@ public enum Raster {
             )
             guard bitmap.isInBounds(target) else { continue }
             let index = bitmap.index(target)
-            bitmap.pixels[index] = colour.overCompositing(bitmap.pixels[index])
+            // A dot lands or it does not, so a transparent airbrush takes the
+            // pixel out entirely — the same meaning every other tool now gives it.
+            bitmap.pixels[index] = colour.a == 0
+                ? .clear
+                : colour.overCompositing(bitmap.pixels[index])
             dirty = dirty.union(PixelRect(x: target.x, y: target.y, width: 1, height: 1))
         }
         return dirty

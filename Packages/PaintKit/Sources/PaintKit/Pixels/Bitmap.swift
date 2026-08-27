@@ -174,10 +174,18 @@ public struct Bitmap: Equatable, Sendable {
     }
 
     /// Source-over composite a solid colour across `rect`.
+    ///
+    /// **Except at zero alpha, where it takes the paint away instead.** Source-over
+    /// with a transparent source is arithmetically a no-op, so a filled shape drawn
+    /// in a transparent colour used to leave the canvas untouched — the same silent
+    /// nothing `Raster.stamp` used to do, and the same fix: a colour with no colour
+    /// in it means "remove what is here". The bucket has meant that since the first
+    /// build.
     public mutating func blend(_ rect: PixelRect, with colour: RGBA8) {
         if colour.a == 255 { return fill(rect, with: colour) }
+        if colour.a == 0 { return fill(rect, with: .clear) }
         let clipped = rect.intersection(bounds)
-        guard !clipped.isEmpty, colour.a > 0 else { return }
+        guard !clipped.isEmpty else { return }
         for row in clipped.minY..<clipped.maxY {
             let start = row * width + clipped.minX
             for i in start..<(start + clipped.width) {
