@@ -141,32 +141,19 @@ final class EditorModel {
         isOptionsExpanded = true
     }
 
-    var foreground: PaintColour {
-        didSet {
-            engine.colours.foreground = foreground
-            rememberColour(foreground)
-        }
-    }
+    var foreground: PaintColour { didSet { engine.colours.foreground = foreground } }
 
     var background: PaintColour { didSet { engine.colours.background = background } }
 
     var palette: Palette = .standard
 
-    /// Colours used recently that are not already in the fixed palette.
-    ///
-    /// The 28 swatches are muscle memory and must not move, so custom colours
-    /// get their own short row in the popover instead of displacing them. Kept
-    /// out of the rail deliberately: they arrive unpredictably, and a toolbar
-    /// that changes size while you work moves the button you were reaching for.
-    /// Most recent first.
-    private(set) var recentColours: [PaintColour] = []
-
-    private func rememberColour(_ colour: PaintColour) {
-        guard !palette.swatches.contains(colour) else { return }
-        recentColours.removeAll { $0 == colour }
-        recentColours.insert(colour, at: 0)
-        if recentColours.count > 8 { recentColours.removeLast() }
-    }
+    // **Recent colours are the system's, not ours.** This model used to keep its
+    // own list of eight, rendered in one place: the bespoke colour popover. That
+    // popover is gone — the system panel it half-copied is better at every part of
+    // the job — and `NSColorPanel` already carries a recently-used row that
+    // persists across quitting and across every app on the Mac. Ours was
+    // per-document and died with the window. Two lists of the same thing, and the
+    // one that survived is the one that survives.
 
     /// A stable identity for this model, so the shared colour panel knows which
     /// document currently owns it.
@@ -284,8 +271,6 @@ final class EditorModel {
     /// Turning it on draws the grid too. Snapping you cannot see is a drag that
     /// disobeys you for reasons you have to guess.
     var snapGrid: Int = 0 { didSet { engine.settings.snapGrid = snapGrid } }
-    /// Set by ⇧⌘C; the cluster's colour well observes it and opens.
-    var isColourPopoverRequested: Bool = false
     var isSizeSheetPresented: Bool = false
 
     var presentedError: PresentableError?

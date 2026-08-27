@@ -5,8 +5,8 @@ import SwiftUI
 ///
 /// With nothing selected the artwork owns ~96% of the window. All chrome is a
 /// single glass cluster at the bottom, an options pill that trails it, a title
-/// chip, and a colour popover on demand. Nothing is permanently docked to an
-/// edge, and nothing is ever placed on the artwork itself.
+/// chip, and the system colour panel on demand. Nothing is permanently docked
+/// to an edge, and nothing is ever placed on the artwork itself.
 ///
 /// Three rules govern everything below.
 ///
@@ -19,7 +19,8 @@ import SwiftUI
 /// selected one and nothing else paints an edge.
 ///
 /// **Elevation is the one thing this direction spends.** Exactly two levels:
-/// the cluster and the popover sit at the same height, and nothing else lifts.
+/// the cluster and the options panel sit at the same height, and nothing else
+/// lifts.
 enum Tokens {
 
     // MARK: - Spacing
@@ -44,10 +45,14 @@ enum Tokens {
         static let segment: CGFloat = 21
         /// The options panel's label column.
         ///
-        /// Fixed, so "Size", "Stroke", "Flow" and "Corner" all end at the same
-        /// x and every control in the panel starts at the same x. This one
-        /// number is the difference between a panel and a stack of unrelated
-        /// rows that happen to share a background.
+        /// Fixed, so "Tip", "Fill", "Line" and "Align" all end at the same x and
+        /// every control beside them starts at the same x. This one number is the
+        /// difference between a panel and a stack of unrelated rows that happen to
+        /// share a background.
+        ///
+        /// Continuous values do not use it: a `Mark` carries its own name on a
+        /// caption line and takes the panel's whole width for its track. See
+        /// `OptionRow`, which states the rule and why it is two rules.
         static let optionLabel: CGFloat = 42
         /// `GeometryReader` offers only 10pt intrinsically, which is not enough
         /// travel for a size mark when the bottom panel measures its own row.
@@ -63,14 +68,19 @@ enum Tokens {
         static let colourSwap: CGFloat = 18
         /// Glyph inside a tool cell — optically sized, not mathematically.
         static let toolGlyph: CGFloat = 19
-        /// The same pair restated at full size inside the popover.
-        static let colourPairLarge: CGFloat = 28
         /// A swatch in the always-visible palette.
         static let swatch: CGFloat = 16
         /// Every capsule in the top header shares one optical height.
         static let headerControl: CGFloat = 32
         /// One square in the transparency grid behind the artwork.
         static let transparencyTile: CGFloat = 8
+        /// The same grid, at chip scale.
+        ///
+        /// Half, stated as a relationship rather than as a second magic 4: a chip
+        /// has to read as the *same kind of nothing* the artwork does. At the
+        /// canvas's own 8pt an entire 24pt colour well is three squares across,
+        /// which reads as three grey blocks and not as pattern at all.
+        static let transparencyTileChip: CGFloat = transparencyTile / 2
     }
 
     // MARK: - Radii
@@ -84,7 +94,7 @@ enum Tokens {
         /// The options panel: tighter than the rail, so it reads as attached to
         /// it rather than as a second window floating nearby.
         static let panel: CGFloat = 12
-        /// The well a grid sits in, inside the popover.
+        /// The well a grid sits in.
         static let well: CGFloat = 10
         static let segmentTrack: CGFloat = 7
         static let segmentInner: CGFloat = 5
@@ -230,7 +240,7 @@ enum Tokens {
         ///
         /// A thin rail spends its length on tools, and the full fourteen pairs
         /// would run past the bottom of the window on a laptop screen. The rest
-        /// are one click away in the colour popover, and the pairs kept are the
+        /// are one press away in the system colour panel, and the pairs kept are the
         /// leading ones, so a swatch is where it always was.
         ///
         /// Six rather than seven since Clone joined the Draw run. A thirteenth
@@ -279,6 +289,57 @@ enum Tokens {
         static let optionsWidth: CGFloat = 258
         /// Inside the panel's own padding.
         static let optionsContentWidth: CGFloat = optionsWidth - Space.snug * 2
+    }
+
+    // MARK: - The header row
+
+    /// **What the header costs, derived from the cells it is built from.**
+    ///
+    /// Derived, not written down. `WorkingActions` has gained three buttons since
+    /// the row was designed, and a literal here would go stale on the commit that
+    /// adds the fourth — silently, and in the direction that clips.
+    enum Header {
+        /// A `HeaderButton`, a `ShareButton`, a `DragOutHandle`.
+        static let cell: CGFloat = 26
+        /// A `HeaderMenu`: glyph plus chevron.
+        static let menu: CGFloat = 34
+        /// `ZoomReadout`'s floor.
+        static let readout: CGFloat = 40
+        /// A `HeaderDivider`: a 1pt rule with 2pt either side.
+        static let divider: CGFloat = 5
+        static let cellGap: CGFloat = 1
+        /// `HeaderGroup`'s horizontal padding, both sides.
+        static let groupPad: CGFloat = 6
+
+        /// One capsule holding these cells.
+        static func group(_ cells: CGFloat...) -> CGFloat {
+            cells.reduce(0, +) + CGFloat(cells.count - 1) * cellGap + groupPad
+        }
+
+        static let clipboard = group(cell, cell, cell, cell)
+        static let dragOnly = group(cell)
+        static let history = group(cell, cell)
+        static let menus = group(menu, menu)
+        static let zoom = group(cell, readout, cell)
+        static let zoomOnly = group(readout)
+        static let document = group(cell, divider, cell, cell, divider, cell)
+        static let shareOnly = group(cell)
+
+        /// Everything in the row that is not a control: its own padding, the
+        /// traffic lights, the spacer holding the title off the cluster, and the
+        /// four gaps between the five things in it.
+        static let surround = Space.comfortable * 2 + Chrome.trafficLightClearance
+            + Space.base + Space.comfortable * 4
+
+        /// Room kept for the filename before the next control is shed.
+        ///
+        /// **The number with its evidence.** The name this app sees most is not
+        /// `Untitled.png`, it is `Screenshot 2026-08-26 at 14.02.11.png` — about
+        /// 250pt at 13pt semibold, which no narrow window can show whole. 140pt is
+        /// what middle-truncation needs before it stops carrying information:
+        /// `Screenshot 20…14.02.11.png`, not `S…png`. Below it, truncating says
+        /// nothing and the row should be shedding a control instead.
+        static let titleRoom: CGFloat = 140
     }
 
     // MARK: - Chrome geometry
@@ -362,7 +423,7 @@ struct SelectedSegmentFill: View {
 // MARK: - The chrome material
 
 /// The one surface treatment shared by the cluster, the pill, the title chip
-/// and the popover.
+/// and the options panel.
 ///
 /// **The glass never relies on the artwork behind it.** A fixed tint floor sits
 /// over the blur, so label contrast is constant whether the chrome straddles

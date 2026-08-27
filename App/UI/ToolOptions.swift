@@ -139,6 +139,13 @@ struct ToolOptions: View {
     private var hint: String? {
         switch model.tool {
         case .pencil: "1 px, fixed"
+        // **The eraser paints Colour 2**, so what it leaves behind is whatever is
+        // loaded there — and that is invisible until you have already used it.
+        // It matters more now than it did: a transparent Colour 2 rubs a real hole
+        // through the picture, where until this release it silently did nothing at
+        // all. A hint is exactly the right size for a fact that changes under you.
+        case .eraser:
+            model.background.alpha == 0 ? "Rubs through to nothing" : "Rubs back to Colour 2"
         case .text: "⌘↩ places it"
         case .eyedropper: "⌥ from any tool"
         case .select where model.selectionKind == .lasso: "Closes itself"
@@ -180,13 +187,10 @@ struct ToolOptions: View {
             // tip that has it rather than sitting greyed out under three that
             // do not.
             if model.brushShape.isSpray {
-                OptionRow("Flow") {
-                    OptionSlider(
-                        value: $model.sprayDensity,
-                        range: 0.02...0.6,
-                        readout: "\(Int(model.sprayDensity * 100))%"
-                    )
-                }
+                Mark(
+                    value: $model.sprayDensity, range: 0.02...0.6, style: .meter, name: "Flow",
+                    readout: "\(Int((model.sprayDensity * 100).rounded()))%", normal: 0.12
+                )
             }
 
         case .highlighter:
@@ -261,27 +265,24 @@ struct ToolOptions: View {
                 }
             }
             if model.shapeKind == .roundedRectangle || model.shapeKind == .callout {
-                OptionRow("Corner") {
-                    OptionSlider(
-                        value: Binding(
-                            get: { Double(model.cornerRadius) },
-                            set: { model.cornerRadius = Int($0.rounded()) }
-                        ),
-                        range: 0...48,
-                        readout: "\(model.cornerRadius)"
-                    )
-                }
+                Mark(
+                    value: Binding(
+                        get: { Double(model.cornerRadius) },
+                        set: { model.cornerRadius = Int($0.rounded()) }
+                    ),
+                    range: 0...48, style: .meter, name: "Corner",
+                    readout: "\(model.cornerRadius)", normal: 12
+                )
             }
 
         case .text:
-            OptionRow("Size") {
-                OptionSlider(
-                    value: $model.textSize,
-                    range: 8...200,
-                    readout: "\(Int(model.textSize))",
-                    gamma: 2
-                )
-            }
+            // A meter, not a wedge. The wedge is this app's word for *stroke
+            // weight*, and a taper in the Text panel would say you were holding a
+            // brush.
+            Mark(
+                value: $model.textSize, range: 8...200, style: .meter, name: "Size",
+                gamma: 2, readout: "\(Int(model.textSize))", normal: 36
+            )
             OptionRow("Font") {
                 OptionMenu(
                     selection: $model.textFont,
@@ -316,16 +317,14 @@ struct ToolOptions: View {
             widthMark(name: "Size")
 
         case .fill:
-            OptionRow("Match") {
-                OptionSlider(
-                    value: Binding(
-                        get: { Double(model.fillTolerance) },
-                        set: { model.fillTolerance = Int($0.rounded()) }
-                    ),
-                    range: 0...Double(ToolSettings.usefulTolerance),
-                    readout: "\(model.fillTolerance)"
-                )
-            }
+            Mark(
+                value: Binding(
+                    get: { Double(model.fillTolerance) },
+                    set: { model.fillTolerance = Int($0.rounded()) }
+                ),
+                range: 0...Double(ToolSettings.usefulTolerance), style: .meter, name: "Match",
+                readout: "\(model.fillTolerance)", normal: 16
+            )
 
         case .spotlight:
             // One property, so the panel is that property: a plate whose darkness is
@@ -334,16 +333,14 @@ struct ToolOptions: View {
             SpotlightDimPlate(dim: $model.spotlightDim)
 
         case .pixelate:
-            OptionRow("Block") {
-                OptionSlider(
-                    value: Binding(
-                        get: { Double(model.pixelateBlockSize) },
-                        set: { model.pixelateBlockSize = Int($0.rounded()) }
-                    ),
-                    range: 4...48,
-                    readout: "\(model.pixelateBlockSize)"
-                )
-            }
+            Mark(
+                value: Binding(
+                    get: { Double(model.pixelateBlockSize) },
+                    set: { model.pixelateBlockSize = Int($0.rounded()) }
+                ),
+                range: 4...48, style: .meter, name: "Block",
+                readout: "\(model.pixelateBlockSize)", normal: 12
+            )
 
         case .select:
             OptionRow("Mode") {
@@ -352,16 +349,14 @@ struct ToolOptions: View {
                 })
             }
             if model.selectionKind == .instantAlpha {
-                OptionRow("Match") {
-                    OptionSlider(
-                        value: Binding(
-                            get: { Double(model.selectionTolerance) },
-                            set: { model.selectionTolerance = Int($0.rounded()) }
-                        ),
-                        range: 0...Double(ToolSettings.usefulTolerance),
-                        readout: "\(model.selectionTolerance)"
-                    )
-                }
+                Mark(
+                    value: Binding(
+                        get: { Double(model.selectionTolerance) },
+                        set: { model.selectionTolerance = Int($0.rounded()) }
+                    ),
+                    range: 0...Double(ToolSettings.usefulTolerance), style: .meter, name: "Match",
+                    readout: "\(model.selectionTolerance)", normal: 12
+                )
             }
 
         case .eyedropper:
@@ -401,7 +396,6 @@ struct ToolOptions: View {
             readout: "\(model.brushSize)",
             normal: Double(max(allowed.lowerBound, 2))
         )
-        .frame(minWidth: isVertical ? nil : Tokens.Size.horizontalMarkMinimum)
     }
 
     // MARK: - Selection
@@ -733,6 +727,21 @@ private struct BadgeNumber: View {
     }
 }
 
+/// One row of the panel: a label in the shared column, then its control.
+///
+/// **Two anatomies, and which one you get is decided by what kind of control it
+/// is.** A *value* — anything continuous — is a `Mark`, which carries its own
+/// name and its live number on one caption line with a full-bleed track beneath.
+/// A *choice* stays here: a label in the 42pt column and a track of cells beside
+/// it, on one line.
+///
+/// That is a rule rather than an accident, and the alternative was measured
+/// rather than assumed. Giving the choices a caption line too would align every
+/// control in the panel at one x — and cost the Shape panel three extra lines,
+/// on the tool that is already the tallest thing the rail has to make room for.
+/// Giving the values a label column instead would hand the readout back to the
+/// end of the track, which is what made every track a different length depending
+/// on how many digits its value happened to have: "8" against "200".
 struct OptionRow<Content: View>: View {
     let title: String?
     @ViewBuilder let content: Content
@@ -845,52 +854,6 @@ struct OptionMenu<Value: Hashable>: View {
         .menuIndicator(.hidden)
         .onHover { isHovering = $0 }
         .animation(Tokens.Motion.micro, value: isHovering)
-    }
-}
-
-/// A slider with a live read-out, filling whatever column it is given.
-///
-/// `gamma` bends the travel: 2 squares the input, which is what turns a 1–96
-/// range from "everything useful in the first centimetre" into a control you
-/// can actually land 6px with.
-struct OptionSlider: View {
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let readout: String
-    var gamma: Double = 1
-
-    @Environment(\.optionsAxisIsVertical) private var isVertical
-
-    var body: some View {
-        HStack(spacing: Tokens.Space.tight) {
-            Slider(value: curved, in: 0...1)
-                .controlSize(.mini)
-                .frame(maxWidth: isVertical ? .infinity : 68)
-                .labelsHidden()
-            Text(readout)
-                .font(Tokens.Text.pillValue)
-                .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
-                .frame(minWidth: 26, alignment: .trailing)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityValue(readout)
-    }
-
-    /// The slider works in 0...1 and the curve maps it onto the real range, so
-    /// the control keeps a linear feel while the values do not.
-    private var curved: Binding<Double> {
-        Binding(
-            get: {
-                let span = range.upperBound - range.lowerBound
-                guard span > 0 else { return 0 }
-                let t = (value - range.lowerBound) / span
-                return pow(max(0, min(1, t)), 1 / gamma)
-            },
-            set: { t in
-                let span = range.upperBound - range.lowerBound
-                value = range.lowerBound + pow(max(0, min(1, t)), gamma) * span
-            }
-        )
     }
 }
 

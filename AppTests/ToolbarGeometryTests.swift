@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import PaintKit
 import Testing
 @testable import ItsPaint
@@ -138,20 +139,99 @@ struct ToolbarGeometryTests {
 
     @Test("The rail fits the height of a small laptop window")
     func railFitsAShortWindow() {
-        // The side rail runs the length of the window, so its content has to
-        // fit a 13-inch display's usable height or the rail starts scrolling —
-        // and a toolbar you scroll to reach a tool is a toolbar that hid it.
-        let cell = Tokens.Size.toolCell + Tokens.Space.hair
-        let tools = ToolKind.groups.reduce(CGFloat.zero) { $0 + CGFloat($1.count) * cell }
-        let separators = CGFloat(ToolKind.groups.count) * (1 + Tokens.Rail.sectionSpacing * 2)
-        let pair = Tokens.Size.colourWell * 1.42 + Tokens.Space.hair + Tokens.Size.colourSwap
-        let swatches = CGFloat(Tokens.Rail.swatchPairs) * (Tokens.Size.swatch + Tokens.Rail.swatchGap)
-        let colours = pair + Tokens.Space.tight + swatches + Tokens.Rail.colourInset * 2
-        let toggle = Tokens.Rail.sectionSpacing + Tokens.Size.toolCell
-        let total = Tokens.Rail.padding * 2 + tools + separators + colours + toggle
+        // The side rail runs the length of the window, so its content has to fit a
+        // 13-inch display's usable height or the rail starts scrolling — and a
+        // toolbar you scroll to reach a tool is a toolbar that hid it.
+        //
+        // Asked of the shipping arithmetic rather than of a copy of it. This test
+        // used to re-derive the whole sum locally, which is `CHECKS_THAT_MISS.md`
+        // §1: it could only ever agree with itself, and it would have gone on
+        // passing while the rail on screen grew a row.
+        let total = RailFit.tail(pairs: Tokens.Rail.swatchPairs, isVertical: true)
+            + RailFit.toolRunLength
 
         // 800pt of window, less the titlebar reserve and the bottom safe inset.
         let usable: CGFloat = 800 - Tokens.Chrome.titleReserve - Tokens.Space.safeInset
         #expect(total <= usable, "the rail needs \(total)pt but only \(usable)pt is on offer")
+    }
+
+    /// **Neither edge may cut its own colour block — measured, not asserted.**
+    ///
+    /// `RailFit` decides what to shed from arithmetic, so checking `RailFit`
+    /// against `Tokens` would be `docs/CHECKS_THAT_MISS.md` §1: it could only ever
+    /// agree with itself, and it would go on passing while the rail on screen grew
+    /// a row. That is exactly how this file's previous height check went wrong — it
+    /// kept a private copy of the same sum.
+    ///
+    /// So this renders the real `ToolRail` at the smallest window the app can be
+    /// dragged to and measures the picture. Both things it asserts had a real
+    /// failure to catch: the bottom bar was handed all fourteen palette columns
+    /// whatever the window was and ran off the right-hand end, and `RailFit`'s model
+    /// of the tool run disagreed with the layout by 16pt because it charged a flat
+    /// pitch for cells that are separated by a rule.
+    ///
+    /// `DrawingDocument` is an `NSDocument`, so reading its window floor means
+    /// touching AppKit — and AppKit class realisation off the main thread takes the
+    /// whole test process down rather than failing one check.
+    @MainActor
+    @Test("Both edges shed their palette rather than cutting the colours")
+    func neitherEdgeClipsTheColourBlock() throws {
+        let floor = DrawingDocument.minimumContentSize
+
+        for edge in [EditorModel.ChromeEdge.left, .bottom] {
+            let isVertical = edge.isVertical
+            let length = isVertical
+                ? floor.height - Tokens.Chrome.titleReserve - Tokens.Space.safeInset
+                : floor.width - Tokens.Chrome.railInset * 2
+
+            let pairs = RailFit.swatchPairs(fitting: length, isVertical: isVertical)
+            let room = RailFit.toolRoom(in: length, pairs: pairs, isVertical: isVertical)
+
+            let model = EditorModel(canvas: Bitmap(width: 400, height: 300, fill: .white))
+            model.chromeEdge = edge
+            let renderer = ImageRenderer(
+                content: ToolRail(model: model, swatchPairs: pairs, toolsLength: room)
+                    .environment(TooltipController())
+            )
+            renderer.scale = 1
+            let drawn = try #require(renderer.nsImage, "the \(edge) rail did not render").size
+            let along = isVertical ? drawn.height : drawn.width
+            let across = isVertical ? drawn.width : drawn.height
+
+            #expect(
+                along <= length,
+                "the \(edge) rail draws \(along)pt into the \(length)pt a smallest window offers"
+            )
+            // The tools may be shortened, never the colours: the rail has to still
+            // be its declared thickness, which is the number the canvas inset and
+            // the tooltip column are both computed from.
+            #expect(
+                abs(across - Tokens.Rail.thickness) <= 1,
+                "the \(edge) rail is \(across)pt thick against a declared \(Tokens.Rail.thickness)pt"
+            )
+            #expect(
+                (room ?? .infinity) >= Tokens.Size.toolCell,
+                "the tool run is down to \(room ?? 0)pt on the \(edge) edge"
+            )
+        }
+    }
+
+    /// The fold in a shortened tool run lands **between** cells.
+    ///
+    /// `toolRoom` used to divide by an average pitch, which is right only while the
+    /// fold stays inside one group: the groups are separated by a rule, so past the
+    /// fifth cell the answer drifts and slices a glyph down the middle. A
+    /// half-drawn button reads as a rendering fault, not as "there is more below".
+    @Test("A shortened tool run is never cut through a glyph")
+    func theFoldLandsBetweenCells() {
+        let ends = Set(RailFit.toolCellEnds)
+        for height in stride(from: 200.0, through: 900.0, by: 1) {
+            let pairs = RailFit.swatchPairs(fitting: height, isVertical: true)
+            guard let room = RailFit.toolRoom(in: height, pairs: pairs, isVertical: true) else { continue }
+            #expect(
+                ends.contains(room) || room == Tokens.Size.toolCell,
+                "at \(height)pt the run is cut at \(room)pt, which is not a cell boundary"
+            )
+        }
     }
 }

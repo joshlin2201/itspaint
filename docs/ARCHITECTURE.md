@@ -68,7 +68,7 @@ App/
     ToolOptions.swift      the active tool's options, expanded from its button
     EditorView.swift       window layout: canvas, chrome, status, title
     DesignTokens.swift     spacing/size/radius/motion tokens + chrome material
-    ColourPopover.swift · SizeSheet.swift · Tooltip.swift · CanvasOverlays.swift
+    SizeSheet.swift · Tooltip.swift · CanvasOverlays.swift
     FixedGrid.swift        deterministic grid (see "Grids", below)
 ```
 

@@ -143,7 +143,7 @@ final class DrawingDocument: NSDocument {
 
         let window = NSWindow(contentViewController: hosting)
         window.setContentSize(sized.contentSize)
-        window.minSize = NSSize(width: 560, height: 420)
+        window.minSize = Self.minimumContentSize
         window.title = displayName
 
         // Canvas-first: the artwork runs to all four edges, so the titlebar is
@@ -187,6 +187,15 @@ final class DrawingDocument: NSDocument {
         controller.shouldCascadeWindows = true
         addWindowController(controller)
     }
+
+    /// The narrowest window this app will make.
+    ///
+    /// Stated once, so the header's shed-ladder can be checked against the number
+    /// the window is actually built from rather than against a copy of it. It was
+    /// a literal at the call site, and the header needed 647pt to draw itself with
+    /// *no filename in it* — the app shipped a window its own chrome could not fit
+    /// and nothing noticed, because nothing had ever compared the two.
+    static let minimumContentSize = NSSize(width: 560, height: 420)
 
     /// The window size and zoom a canvas of `size` wants.
     ///
