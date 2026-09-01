@@ -57,6 +57,12 @@ struct WindowCaptureTests {
         // The title chip shows the document name; without a file URL the
         // capture would read "Untitled".
         document.fileURL = imageURL
+        // Light or dark on demand. A capture otherwise comes out in whichever
+        // appearance the machine happens to be set to, and the light one is the
+        // one nobody was looking at (issue #29).
+        if let appearance = environment["ITSPAINT_CAPTURE_APPEARANCE"] {
+            NSApp.appearance = NSAppearance(named: appearance == "light" ? .aqua : .darkAqua)
+        }
         document.makeWindowControllers()
         document.showWindows()
 

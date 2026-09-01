@@ -29,9 +29,15 @@ struct DocumentTitle: View {
             // The subtitle carries what the document *is*, which is the thing
             // that used to sit in a floating strip over the bottom-right of
             // the artwork.
+            // `muted`, which the token file defines as "a value or read-out
+            // beside a label" — and this is the document's dimensions beside its
+            // name. It was `faint`, the hint step, and at 10.5pt over the light
+            // appearance's grey that measured about 2.4:1; `muted` measures about
+            // 4:1 light and 6:1 dark. `HeaderContrastTests` keeps it above the
+            // 3:1 floor in both appearances.
             Text(subtitle)
                 .font(.system(size: 10.5))
-                .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
+                .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
                 .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
@@ -158,12 +164,6 @@ struct DragOutHandle: View {
     @State private var frame: CGRect = .zero
 
     var body: some View {
-        // Resolved before the gesture rather than inside it. `draggable` takes
-        // the payload up front, and there is no version of this that can hand
-        // over an empty PNG and call it a drag — if the encode fails the handle
-        // goes dim and refuses instead.
-        let payload = model.draggableImage()
-
         // `photo.on.rectangle.angled`, not an up-arrow. The first version used
         // `square.and.arrow.up.on.square`, which is a share glyph with a box
         // behind it — three cells from the real Share button and nearly
@@ -174,10 +174,10 @@ struct DragOutHandle: View {
         Image(systemName: "photo.on.rectangle.angled")
             .font(.system(size: 12, weight: .medium))
             .frame(width: 26, height: 26)
-            .foregroundStyle(.primary.opacity(payload == nil ? Tokens.Ink.disabled : Tokens.Ink.regular))
+            .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
             .background {
                 RoundedRectangle(cornerRadius: Tokens.Radius.control, style: .continuous)
-                    .fill(.primary.opacity(isHovering && payload != nil ? Tokens.Fill.hover : 0))
+                    .fill(.primary.opacity(isHovering ? Tokens.Fill.hover : 0))
             }
             .contentShape(Rectangle())
             .trackedForTooltip($frame)
@@ -193,13 +193,16 @@ struct DragOutHandle: View {
                         anchor: frame
                     )
                     : tooltips.endHover(key: "header-drag")
-                guard payload != nil else { return }
                 // A grab cursor is the other half of the instruction: it says
                 // "drag me" before anyone has waited for any tooltip at all.
                 if hovering { NSCursor.openHand.push() } else { NSCursor.pop() }
             }
             .animation(Tokens.Motion.micro, value: isHovering)
-            .overlay { DragOutSurface(payload: payload) }
+            // The PNG is encoded when a drag actually begins, not on every render
+            // of the header: the header follows `revision`, and a full-canvas
+            // encode per hover or per resize frame was the cost of having the
+            // bytes ready for a drag that mostly never came.
+            .overlay { DragOutSurface(model: model) }
             .accessibilityLabel("Drag image out")
     }
 }
@@ -221,17 +224,30 @@ struct DragOutHandle: View {
 /// `NSView` at that spot, which then has to be the thing that starts the drag as
 /// well. That is this. The glyph, the hover fill and the cursor stay in SwiftUI
 /// underneath; this is a pane of glass over them that owns the mouse.
-private struct DragOutSurface: NSViewRepresentable {
-    let payload: DraggedImage?
+///
+/// **And the second half of it (issue #28).** That answer shipped in 0.19.0 and
+/// a report against 0.19.0 on macOS 26.5 said the window still came along. The
+/// flag is a request the titlebar honours *when the press reaches this view*: a
+/// press on a window that is not key does not reach any view unless the view
+/// accepts first mouse, and a picture is dragged out of a window that is behind
+/// Slack more often than out of the front one. So the surface accepts the first
+/// click — and, belt to those braces, tells the window at its own level that it
+/// cannot be moved at all for as long as the pointer is over the handle. A lock
+/// the frame checks before hit-testing anything does not depend on which view
+/// a given macOS decides the press landed on.
+struct DragOutSurface: NSViewRepresentable {
+    let model: EditorModel
 
     func makeNSView(context: Context) -> DragSurfaceView { DragSurfaceView() }
 
     func updateNSView(_ view: DragSurfaceView, context: Context) {
-        view.payload = payload
+        view.model = model
     }
 
     final class DragSurfaceView: NSView, NSDraggingSource {
-        var payload: DraggedImage?
+        /// Asked for the picture when a drag begins, so the encode happens once
+        /// per drag instead of once per render.
+        weak var model: EditorModel?
         /// Shared: one promise is written at a time and the work is a single
         /// `Data.write`.
         ///
@@ -245,11 +261,45 @@ private struct DragOutSurface: NSViewRepresentable {
         /// The whole point of the file.
         override var mouseDownCanMoveWindow: Bool { false }
 
-        /// Nothing to drag means nothing to intercept: the click should fall
-        /// through to whatever is underneath rather than being swallowed by an
-        /// invisible pane that cannot do anything with it.
-        override func hitTest(_ point: NSPoint) -> NSView? {
-            payload == nil ? nil : super.hitTest(point)
+        /// A drag proxy takes the first click. Without this, a press on the handle
+        /// of a window that is not key only activates the window, and the press
+        /// belongs to the titlebar — which moves the window with it.
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        /// The window-level lock. `activeAlways`, because the case it exists for is
+        /// a window that is not the active one.
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            for area in trackingAreas { removeTrackingArea(area) }
+            addTrackingArea(NSTrackingArea(
+                rect: .zero,
+                options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                owner: self,
+                userInfo: nil
+            ))
+        }
+
+        override func mouseEntered(with event: NSEvent) { window?.isMovable = false }
+        override func mouseExited(with event: NSEvent) { window?.isMovable = true }
+
+        /// Restored whenever the gesture that needed the lock is over, and
+        /// re-armed if the pointer is still on the handle — a press without a
+        /// drag, or a drop back onto the handle itself, must not leave the window
+        /// stuck either way.
+        func releaseLock(pointerInWindow point: NSPoint?) {
+            guard let window else { return }
+            let inside = point.map { bounds.contains(convert($0, from: nil)) } ?? false
+            window.isMovable = !inside
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            releaseLock(pointerInWindow: event.locationInWindow)
+        }
+
+        override func viewWillMove(toWindow newWindow: NSWindow?) {
+            // Leaving a window must leave it movable.
+            window?.isMovable = true
+            super.viewWillMove(toWindow: newWindow)
         }
 
         override func mouseDown(with event: NSEvent) {
@@ -259,7 +309,7 @@ private struct DragOutSurface: NSViewRepresentable {
         }
 
         override func mouseDragged(with event: NSEvent) {
-            guard let payload else { return }
+            guard let payload = model?.draggableImage() else { return }
             guard let image = NSImage(data: payload.data) else { return }
 
             // A **file promise**, which is what carries the name across a
@@ -298,6 +348,12 @@ private struct DragOutSurface: NSViewRepresentable {
             sourceOperationMaskFor context: NSDraggingContext
         ) -> NSDragOperation {
             .copy
+        }
+
+        func draggingSession(
+            _ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation
+        ) {
+            releaseLock(pointerInWindow: window?.convertPoint(fromScreen: screenPoint))
         }
 
         fileprivate nonisolated static let nameKey = "itspaint.name"
@@ -485,9 +541,16 @@ struct HeaderDivider: View {
 /// white artwork would swallow the window controls. It fades out rather than
 /// ending on a hard line, so it reads as light falling off rather than a bar.
 struct TitlebarScrim: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
+        // Black falling off in dark appearance; the same rule inverted in light.
+        // One black scrim for both was issue #29: over the light appearance's
+        // pale grey it painted the top 64pt of every window a muddy mid-grey, and
+        // sat the title's black ink on the darkest band in the window.
+        let ink: Color = colorScheme == .dark ? .black : .white
         LinearGradient(
-            colors: [.black.opacity(0.34), .black.opacity(0)],
+            colors: [ink.opacity(0.34), ink.opacity(0)],
             startPoint: .top,
             endPoint: .bottom
         )
