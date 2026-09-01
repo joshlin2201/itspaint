@@ -7,7 +7,7 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
-## [0.20.0] — 2026-08-27
+## [0.20.0] — 2026-09-01
 
 ### Added
 - **A transparent colour actually paints now — and it rubs paint out.** The app
@@ -80,6 +80,26 @@ version may still carry breaking changes to the document format.
 - **VoiceOver can reach every value again.** The options panel's step was
   `max(range / 100, 1)`, which is one pixel on a size and the entire range on any
   0-to-1 fraction: Ink, Opacity and Strength had exactly two reachable values.
+- **Dragging the image out no longer moves the window on macOS 26 either**
+  ([#28](https://github.com/joshlin2201/itspaint/issues/28)). 0.19.0 put a real
+  AppKit view under the handle that answers no to the titlebar, and a report
+  against 0.19.0 said the window still came along. The flag is only honoured
+  when the press reaches that view — and a press on a window that is not the
+  front one does not reach any view unless it accepts the first click, which a
+  picture being dragged out from behind Slack is the ordinary case of. The
+  handle takes the first click now and, while the pointer is over it, tells the
+  window at its own level that it cannot be moved at all. The PNG is also encoded
+  when a drag begins rather than on every render of the header.
+- **The light appearance's header is not muddy any more**
+  ([#29](https://github.com/joshlin2201/itspaint/issues/29)). One black scrim
+  served both appearances; over the light appearance's pale grey it painted the
+  top of every window a mid-grey band and sat the title's black ink on the
+  darkest part of the window. The scrim is white in light now, black in dark —
+  the same rule the chrome's tint floor already follows. The dimensions read-out
+  under the filename moves from the hint step of the ink scale to the read-out
+  step, which is the step the token file defines it as: about 2.4:1 to about
+  4:1 against the well in light, and `HeaderContrastTests` keeps both
+  appearances above 3:1 off the real system colours.
 
 ## [0.19.0] — 2026-08-26
 
