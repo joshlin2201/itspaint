@@ -12,7 +12,7 @@ runs the whole engine suite:
 ```bash
 git clone https://github.com/joshlin2201/itspaint.git
 cd itspaint
-swift test          # 338 tests, 52 suites
+swift test          # 345 tests, 52 suites
 ```
 
 That is the entire loop for anything in `Packages/PaintKit/` — drawing, raster
