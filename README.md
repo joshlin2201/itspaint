@@ -57,7 +57,7 @@ a PNG with none of the app around it. No AppKit, no third-party dependency, **ma
 and up**.
 
 ```swift
-.package(url: "https://github.com/joshlin2201/itspaint", from: "0.20.0")
+.package(url: "https://github.com/joshlin2201/itspaint", from: "0.21.0")
 ```
 
 [![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/joshlin2201/itspaint)
