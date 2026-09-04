@@ -7,6 +7,29 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+## [0.21.0] — 2026-09-04
+
+### Added
+- **The app asks for a rating once you have got some work out of it.** After the
+  third export that succeeded, and once more at the twenty-fifth. Not on launch,
+  and not after an export that failed — the ask sits on the success path so it
+  never lands on somebody who has just hit an error. macOS shows the prompt
+  itself, out of process, so the app still opens no socket and still ships with
+  no network entitlement. Outside the Mac App Store build it does nothing.
+
+### Changed
+- **The App Store listing is named for what the app does.** It was "ItsPaint",
+  eight characters of a thirty-character field, in the field Apple weights above
+  every other. Searching the store for "itspaint" returned ibisPaint, Paint X
+  and 138 other apps, and not this one, because "ItsPaint" tokenises to "its"
+  plus "paint", "its" is a stopword, and what is left is a generic "paint"
+  ranking. Every other language already had a descriptive name. English did not.
+  It is "ItsPaint - Screenshot Markup" now, and "screenshot" and "markup" come
+  out of the keyword field, since a term in the name is already indexed.
+- **The promotional text says what the app does rather than how it is
+  sandboxed.** The old line told shoppers macOS blocks the app, which is a true
+  sentence about the network entitlement and a strange first thing to read.
+
 ## [0.20.0] — 2026-09-01
 
 ### Added
@@ -957,7 +980,9 @@ First public beta.
   one would be a dependency this app does not have. AVIF covers the same need.
 - Text is pixels once committed; re-editing means undo and retype.
 
-[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/joshlin2201/itspaint/compare/v0.20.0...v0.21.0
+[0.20.0]: https://github.com/joshlin2201/itspaint/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/joshlin2201/itspaint/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/joshlin2201/itspaint/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/joshlin2201/itspaint/compare/v0.16.4...v0.17.0
