@@ -824,3 +824,40 @@ struct MenuCommandTests {
         #expect(!document.validateMenuItem(item))
     }
 }
+
+
+/// The rating prompt's arithmetic, which decides whether the App Store listing ever
+/// accumulates the ratings it is ranked on. The prompt itself is the system's to draw;
+/// what is testable here is when the app decides to ask, and that it never asks twice
+/// for the same piece of work.
+@Suite("Rating request")
+struct RatingRequestTests {
+
+    @Test("It asks only at the two chosen export counts")
+    func asksAtThreeAndTwentyFive() {
+        #expect(RatingRequest.shouldAsk(afterExportCount: 3))
+        #expect(RatingRequest.shouldAsk(afterExportCount: 25))
+        // The ones on either side matter more than the hits: an off-by-one here is an
+        // interruption on somebody's first export, which is the review this is trying
+        // not to earn.
+        for n in [0, 1, 2, 4, 5, 24, 26, 100] {
+            #expect(!RatingRequest.shouldAsk(afterExportCount: n), "asked at \(n)")
+        }
+    }
+
+    @MainActor
+    @Test("Every successful export advances the count by exactly one")
+    func countAdvancesOncePerExport() throws {
+        let suite = "com.joshlin.itspaint.tests.rating"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        // Seeded past both prompt points, so the counter is exercised without the
+        // system prompt being asked for inside a test run.
+        defaults.set(40, forKey: RatingRequest.exportsKey)
+        RatingRequest.recordSuccessfulExport(defaults: defaults)
+        #expect(defaults.integer(forKey: RatingRequest.exportsKey) == 41)
+        RatingRequest.recordSuccessfulExport(defaults: defaults)
+        #expect(defaults.integer(forKey: RatingRequest.exportsKey) == 42)
+    }
+}

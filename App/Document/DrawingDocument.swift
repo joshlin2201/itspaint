@@ -1,6 +1,7 @@
 import AppKit
 import Darwin
 import PaintKit
+import StoreKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -674,6 +675,8 @@ final class DrawingDocument: NSDocument {
                         message: failure.message,
                         recovery: failure.recovery
                     )
+                } else {
+                    RatingRequest.recordSuccessfulExport()
                 }
             }
         }
@@ -861,5 +864,60 @@ private struct ExportAccessory: View {
         }
         .formStyle(.grouped)
         .frame(width: 380)
+    }
+}
+
+
+/// Asks the App Store for a rating, and only ever from someone who has finished
+/// something.
+///
+/// WHY THIS EXISTS. On 2026-09-02 the listing had `userRatingCount` 0, and nothing in
+/// the app had ever asked for one. That is not a vanity number: Apple ranks on ratings,
+/// so a paint app with none loses the generic `paint` query to every competitor with
+/// thousands, and `ItsPaint` itself tokenises to `its` + `paint` with `its` a stopword —
+/// which together is why the App Store app returned ibisPaint, Paint X and WowPaint for
+/// this app's own name and not this app. The listing copy and the name field are the
+/// other half of that fix; this is the half that compounds.
+///
+/// The counter is exports that SUCCEEDED. Not launches, which measure nothing, and not
+/// exports attempted — asking someone the moment their export failed is how an app earns
+/// the one star it went fishing for. That is why the call sits in the `else` of the
+/// failure branch rather than after the panel closes.
+///
+/// It holds no timer of its own on purpose. Apple already throttles this prompt to three
+/// a year per user and silently drops the rest, so a second scheduler here would only be
+/// a thing to get wrong. Two chances, then it stops asking forever.
+///
+/// Outside the Mac App Store build it is a no-op: StoreKit has no receipt to work from in
+/// the DMG, and it shows nothing rather than failing. The app opens no socket either way,
+/// so the listing's "no network access" claim still holds — the prompt is drawn by the
+/// system, out of process.
+enum RatingRequest {
+
+    /// Namespaced, because this key outlives any one release and a bare
+    /// `"exports"` in the shared domain is a collision waiting to happen.
+    static let exportsKey = "com.joshlin.itspaint.successfulExports"
+
+    /// The third export, then once more much later for anyone who kept the app.
+    /// Three is after the app has plainly done the job it was downloaded for, and
+    /// before the kind of person who exports once and quits has been interrupted.
+    private static let askAfter: Set<Int> = [3, 25]
+
+    /// The decision alone, with no side effects, so it is testable without a store.
+    static func shouldAsk(afterExportCount count: Int) -> Bool {
+        askAfter.contains(count)
+    }
+
+    @MainActor
+    static func recordSuccessfulExport(defaults: UserDefaults = .standard) {
+        let count = defaults.integer(forKey: exportsKey) + 1
+        defaults.set(count, forKey: exportsKey)
+        guard shouldAsk(afterExportCount: count) else { return }
+        // The save sheet is still dismissing on this turn of the run loop. Asking into
+        // a window mid-animation is how the prompt silently never appears.
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            SKStoreReviewController.requestReview()
+        }
     }
 }
