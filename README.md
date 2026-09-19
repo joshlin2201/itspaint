@@ -220,6 +220,17 @@ cd itspaint
 swift test          # the whole engine suite, in a fresh clone
 ```
 
+**If that stops with `plugin for module 'TestingMacros' not found`,** you have the
+Command Line Tools without Xcode, and Swift 6.4's build engine is not looking where
+the CLT keeps Swift Testing's macro plugin. Point it there and the same suite runs:
+
+```bash
+swift test -Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing
+```
+
+Measured 2026-09-18 in a fresh clone on Command Line Tools 27.0 (Swift 6.4): bare
+`swift test` fails at that error, and with the flag every test passes.
+
 **Seven issues are open and labelled [`good first issue`](https://github.com/joshlin2201/itspaint/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)**,
 each naming the file and the line to start at. They sit in three different parts of
 the app so you can pick whichever suits you:
