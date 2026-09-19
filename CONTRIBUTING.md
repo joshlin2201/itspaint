@@ -12,8 +12,12 @@ runs the whole engine suite:
 ```bash
 git clone https://github.com/joshlin2201/itspaint.git
 cd itspaint
-swift test          # 345 tests, 52 suites
+swift test          # 345 tests
 ```
+
+On the Command Line Tools alone, Swift 6.4 needs one extra flag to find Swift
+Testing's macro plugin — it is in the README under
+[Contributing](README.md#contributing-and-the-engine-needs-no-xcode).
 
 That is the entire loop for anything in `Packages/PaintKit/` — drawing, raster
 operations, selections, undo, codecs. No project to open, no scheme to pick, no
