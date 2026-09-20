@@ -114,6 +114,11 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
     @IBAction func openHelp(_ sender: Any?) { Self.openGuide("") }
     @IBAction func openShortcuts(_ sender: Any?) { Self.openGuide("#shortcuts") }
     @IBAction func openIssues(_ sender: Any?) { Self.open("/issues") }
+    /// The latest release page: the version, the notes, the download, and the
+    /// `Watch ▸ Custom ▸ Releases` line every release body carries — which is
+    /// how a .dmg user gets told about the next one without the app ever
+    /// checking anything itself.
+    @IBAction func checkForUpdates(_ sender: Any?) { Self.open("/releases/latest") }
 
     private static func open(_ path: String) {
         guard let url = URL(string: "https://github.com/joshlin2201/itspaint" + path) else { return }

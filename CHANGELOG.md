@@ -7,6 +7,13 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+### Added
+- **Check for Updates…**, in the ItsPaint menu of the direct download. The app
+  has no network entitlement, so it cannot check anything itself; the item opens
+  the latest release page in the browser, the same handoff the Help menu already
+  makes. The Mac App Store copy updates through the store and does not get the
+  item.
+
 ## [0.21.0] — 2026-09-04
 
 ### Added
