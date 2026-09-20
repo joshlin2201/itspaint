@@ -324,6 +324,17 @@ struct MenuBarTests {
         }
     }
 
+    @Test("Check for Updates is offered to the direct download and withheld from the store copy")
+    func checkForUpdatesOnlyOutsideTheStore() {
+        func appMenu(installedFromStore: Bool) -> [String] {
+            MainMenuBuilder.build(installedFromStore: installedFromStore).items
+                .first { $0.submenu?.title == "ItsPaint" }?
+                .submenu?.items.map(\.title) ?? []
+        }
+        #expect(appMenu(installedFromStore: false).contains("Check for Updates…"))
+        #expect(!appMenu(installedFromStore: true).contains("Check for Updates…"))
+    }
+
     @Test("No two menu items share a shortcut")
     func shortcutsDoNotCollide() {
         // Two items with the same key means one of them silently never fires.

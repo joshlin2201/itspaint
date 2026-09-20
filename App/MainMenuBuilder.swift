@@ -10,9 +10,9 @@ import PaintKit
 @MainActor
 enum MainMenuBuilder {
 
-    static func build() -> NSMenu {
+    static func build(installedFromStore: Bool = Self.installedFromStore) -> NSMenu {
         let root = NSMenu()
-        root.addItem(appMenu())
+        root.addItem(appMenu(installedFromStore: installedFromStore))
         root.addItem(fileMenu())
         root.addItem(editMenu())
         root.addItem(viewMenu())
@@ -25,11 +25,25 @@ enum MainMenuBuilder {
 
     // MARK: - Menus
 
-    private static func appMenu() -> NSMenuItem {
+    /// A store copy carries a receipt; a Developer ID copy never does.
+    static var installedFromStore: Bool {
+        guard let receipt = Bundle.main.appStoreReceiptURL else { return false }
+        return FileManager.default.fileExists(atPath: receipt.path)
+    }
+
+    private static func appMenu(installedFromStore: Bool) -> NSMenuItem {
         let item = NSMenuItem()
         let menu = NSMenu(title: "ItsPaint")
 
         menu.addItem(withTitle: "About ItsPaint", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        // The direct download has no updater — no network entitlement, so no
+        // Sparkle — and until now nothing told a .dmg user a newer build existed.
+        // The store copy updates through the store, and a store build that points
+        // at a GitHub release is the kind of thing review bounces, so it is the
+        // one copy that does not get this item.
+        if !installedFromStore {
+            add(to: menu, "Check for Updates…", #selector(AppCommands.checkForUpdates(_:)), "")
+        }
         menu.addItem(.separator())
         add(to: menu, "Settings…", #selector(AppCommands.showSettings(_:)), ",")
         menu.addItem(.separator())
@@ -396,6 +410,7 @@ enum MainMenuBuilder {
     func openHelp(_ sender: Any?)
     func openShortcuts(_ sender: Any?)
     func openIssues(_ sender: Any?)
+    func checkForUpdates(_ sender: Any?)
     func swapColours(_ sender: Any?)
     func toggleBold(_ sender: Any?)
     func toggleItalic(_ sender: Any?)
