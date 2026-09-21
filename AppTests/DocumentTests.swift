@@ -860,4 +860,45 @@ struct RatingRequestTests {
         RatingRequest.recordSuccessfulExport(defaults: defaults)
         #expect(defaults.integer(forKey: RatingRequest.exportsKey) == 42)
     }
+
+    @Test("A user's save counts as finished work; an autosave does not")
+    func savesCountAndAutosavesDoNot() {
+        // The prompt sat on File ▸ Export alone for sixteen days and nobody was
+        // asked: the job the listing sells ends at ⌘S. The other half matters as
+        // much — autosave runs on close, so counting it would ask people who
+        // never chose to keep anything.
+        for op in [NSDocument.SaveOperationType.saveOperation, .saveAsOperation, .saveToOperation] {
+            #expect(RatingRequest.counts(op), "\(op) did not count")
+        }
+        for op in [NSDocument.SaveOperationType.autosaveInPlaceOperation,
+                   .autosaveElsewhereOperation, .autosaveAsOperation] {
+            #expect(!RatingRequest.counts(op), "\(op) counted")
+        }
+    }
+
+    @MainActor
+    @Test("Saving a document through AppKit's safe-save path advances the count")
+    func documentSaveReachesTheCounter() throws {
+        // Through `writeSafely`, which is what ⌘S actually calls — not `write`, so a
+        // future move of the counter back onto the export panel fails here.
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: RatingRequest.exportsKey)
+        defer {
+            if let before { defaults.set(before, forKey: RatingRequest.exportsKey) }
+            else { defaults.removeObject(forKey: RatingRequest.exportsKey) }
+        }
+        // Seeded past both prompt points so no system prompt is requested from a test.
+        defaults.set(40, forKey: RatingRequest.exportsKey)
+
+        let document = DrawingDocument()
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("itspaint-rating-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        try document.writeSafely(to: url, ofType: "public.png", for: .autosaveInPlaceOperation)
+        #expect(defaults.integer(forKey: RatingRequest.exportsKey) == 40, "autosave counted")
+
+        try document.writeSafely(to: url, ofType: "public.png", for: .saveOperation)
+        #expect(defaults.integer(forKey: RatingRequest.exportsKey) == 41, "save did not count")
+    }
 }
