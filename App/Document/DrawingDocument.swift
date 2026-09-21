@@ -488,6 +488,18 @@ final class DrawingDocument: NSDocument {
         }
     }
 
+    // Every user save — ⌘S on an opened screenshot included — comes through here
+    // with its operation named. The rating counter used to sit on File ▸ Export
+    // alone, so the flow the listing sells (open, mark up, save) never counted,
+    // and the prompt could not fire for the people it was written for.
+    override func writeSafely(
+        to url: URL, ofType typeName: String, for saveOperation: NSDocument.SaveOperationType
+    ) throws {
+        try super.writeSafely(to: url, ofType: typeName, for: saveOperation)
+        guard RatingRequest.counts(saveOperation) else { return }
+        MainActor.assumeIsolated { RatingRequest.recordSuccessfulExport() }
+    }
+
     override func write(to url: URL, ofType typeName: String) throws {
         let snapshot = makeWriteSnapshot()
 
@@ -879,10 +891,16 @@ private struct ExportAccessory: View {
 /// this app's own name and not this app. The listing copy and the name field are the
 /// other half of that fix; this is the half that compounds.
 ///
-/// The counter is exports that SUCCEEDED. Not launches, which measure nothing, and not
-/// exports attempted — asking someone the moment their export failed is how an app earns
-/// the one star it went fishing for. That is why the call sits in the `else` of the
-/// failure branch rather than after the panel closes.
+/// The counter is saves and exports that SUCCEEDED. Not launches, which measure
+/// nothing, and not exports attempted — asking someone the moment their export failed
+/// is how an app earns the one star it went fishing for. That is why the export call
+/// sits in the `else` of the failure branch rather than after the panel closes, and
+/// why the save call sits after `super.writeSafely` returned rather than before.
+///
+/// Until 2026-09-20 it was exports only, and the listing had 0 ratings on every
+/// storefront sixteen days after the prompt shipped. The app is sold as screenshot
+/// markup; that job ends at ⌘S, which never went near File ▸ Export. A counter on the
+/// wrong action is a prompt that fires for nobody.
 ///
 /// It holds no timer of its own on purpose. Apple already throttles this prompt to three
 /// a year per user and silently drops the rest, so a second scheduler here would only be
@@ -898,7 +916,7 @@ enum RatingRequest {
     /// `"exports"` in the shared domain is a collision waiting to happen.
     static let exportsKey = "com.joshlin.itspaint.successfulExports"
 
-    /// The third export, then once more much later for anyone who kept the app.
+    /// The third save or export, then once more much later for anyone who kept the app.
     /// Three is after the app has plainly done the job it was downloaded for, and
     /// before the kind of person who exports once and quits has been interrupted.
     private static let askAfter: Set<Int> = [3, 25]
@@ -906,6 +924,16 @@ enum RatingRequest {
     /// The decision alone, with no side effects, so it is testable without a store.
     static func shouldAsk(afterExportCount count: Int) -> Bool {
         askAfter.contains(count)
+    }
+
+    /// Save, Save As and Save To are somebody finishing a piece of work. An
+    /// autosave is AppKit tidying up behind them — on close, mostly — and counting
+    /// it would ask people who never chose to keep anything.
+    static func counts(_ saveOperation: NSDocument.SaveOperationType) -> Bool {
+        switch saveOperation {
+        case .saveOperation, .saveAsOperation, .saveToOperation: true
+        default: false
+        }
     }
 
     @MainActor

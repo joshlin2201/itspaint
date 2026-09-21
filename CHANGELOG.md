@@ -14,6 +14,14 @@ version may still carry breaking changes to the document format.
   makes. The Mac App Store copy updates through the store and does not get the
   item.
 
+### Fixed
+- **Saving now counts towards the rating prompt.** The 0.21.0 prompt counted
+  File ▸ Export alone, so opening a screenshot, marking it up and pressing ⌘S —
+  the whole job the listing sells — never counted, and the listing sat at zero
+  ratings on every storefront sixteen days after the prompt shipped. Save, Save
+  As and Save To count now; the autosave that runs when a window closes does
+  not, since that is AppKit tidying up rather than somebody finishing.
+
 ## [0.21.0] — 2026-09-04
 
 ### Added
