@@ -22,6 +22,17 @@ version may still carry breaking changes to the document format.
 - **The toolbar un-dims when a stroke ends.** It could stay faded until
   something else redrew it.
 - **The marching ants move for a selection or paste made from the menu bar.**
+- **An open polygon or curve no longer swallows the next command.** With one
+  still being drawn, Invert, Flip, Rotate, Trim, Crop, Remove Background, Resize
+  or Paste was wiped by the next mouse move while its undo step stayed behind.
+  The shape now lands as its own step first, and a stray one- or two-corner
+  polygon is dropped before the command reads the picture. Revert to Saved and
+  turning a PDF page drop a shape in progress instead of painting the old page
+  back.
+- **⌘Z reaches every step.** One action that recorded two edits, like placing a
+  pasted image and filling in one click, registered a single undo step. On a
+  large canvas, once the history was full, a new edit could register none, and
+  undoing past the oldest kept step left a redo that replayed the wrong edit.
 - The Duplicate tooltip shows ⌥⇧⌘S, which is what the menu binds.
 
 ### Changed
@@ -32,6 +43,17 @@ version may still carry breaking changes to the document format.
 - **Pinch and ⌘-scroll stay smooth below 100%.** They draw at a lower quality
   while the scale is changing and sharpen when the gesture settles, and zooming
   with an Instant Alpha selection no longer retraces the whole mask every step.
+- **Smooth lines and arrows preview in about 2 ms instead of 30 ms** on a
+  12-megapixel canvas, because the line is drawn along its own band rather than
+  across its whole bounding box.
+- **A polygon or curve costs history the size of the shape.** A small polygon
+  on a 12-megapixel screenshot took 96 MB of undo history, which pushed most of
+  the earlier steps out. It now takes under 1 MB.
+- **Remove Background is about six times faster on a flat page**, 360 ms down
+  to 60 ms at 12 megapixels.
+- The highlighter and clone brush stop copying a canvas-sized buffer on every
+  mouse move, the lasso does half the work per move, and saving a PDF, or an
+  opaque image as JPEG or BMP, holds one less full copy of it in memory.
 - Tool and shape names are title case in the Tools menu.
 - Removed the "Warn before very large canvases" setting, which did nothing.
 
