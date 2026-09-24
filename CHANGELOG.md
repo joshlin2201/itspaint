@@ -7,6 +7,34 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+### Fixed
+- **A large default canvas size no longer stops the app at launch.** Settings
+  checked each side of a new canvas against 20,000 px but not the area, so
+  10,000 × 10,000 passed and every new, opened and untitled document stopped the
+  app. New images open at 1,280 × 800 when the preference is a size ItsPaint
+  can't make, and Settings says so under the field.
+- **⌘I is Italic again.** Invert Colours shared it and the Image menu won, so
+  pressing ⌘I while typing inverted the picture. Invert Colours is ⌥⌘I now.
+- **The clipboard shortcut works after a relaunch.** ⌃⌥⌘V was only registered
+  once Settings had been opened.
+- **Snap to Grid in the header uses the same spacing as ⇧⌘'.** It switched on an
+  8 px grid while the menu used the one you last picked.
+- **The toolbar un-dims when a stroke ends.** It could stay faded until
+  something else redrew it.
+- **The marching ants move for a selection or paste made from the menu bar.**
+- The Duplicate tooltip shows ⌥⇧⌘S, which is what the menu binds.
+
+### Changed
+- **Drawing on a large canvas no longer copies the whole image every frame.**
+  Each stroke segment after a repaint copied the canvas away from the image on
+  screen, 48 MB a frame on a 12-megapixel screenshot. At 100% and above the
+  canvas also redraws only the part a stroke touched.
+- **Pinch and ⌘-scroll stay smooth below 100%.** They draw at a lower quality
+  while the scale is changing and sharpen when the gesture settles, and zooming
+  with an Instant Alpha selection no longer retraces the whole mask every step.
+- Tool and shape names are title case in the Tools menu.
+- Removed the "Warn before very large canvases" setting, which did nothing.
+
 ## [0.22.0] — 2026-09-20
 
 ### Added
