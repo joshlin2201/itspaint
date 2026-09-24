@@ -100,8 +100,9 @@ struct EssentialsTests {
     }
 
     /// A command run with a polygon still open lands the polygon as its own
-    /// edit first, so one call records two edits and must register two actions,
-    /// or ⌘Z undoes the command and can never reach the shape beneath it.
+    /// edit first, so one call records two edits and must register two actions.
+    /// Both fall in the same event's undo group, so one ⌘Z replays both engine
+    /// steps and the two histories stay in step.
     @Test("A command that lands a pending polygon registers both edits")
     func landedShapeRegistersItsOwnAction() {
         let model = EditorModel(canvas: Bitmap(width: 120, height: 90, fill: .white))
@@ -118,6 +119,24 @@ struct EssentialsTests {
 
         #expect(!model.engine.hasPendingShape)
         #expect(names.count == 2, "registered \(names)")
+    }
+
+    /// These commands compute the new bitmap in the model from `canvas`, so a
+    /// stray one- or two-corner polygon has to be dropped before they read it.
+    @Test("Flip does not keep a stray polygon's rubber band")
+    func flipDropsStrayPolygon() {
+        let model = EditorModel(canvas: Bitmap(width: 120, height: 90, fill: .white))
+        let pristine = model.canvas
+        model.selectShape(.polygon)
+        for corner in [PixelPoint(x: 10, y: 10), PixelPoint(x: 100, y: 15)] {
+            model.noteChange(model.engine.beginStroke(at: corner))
+            model.noteChange(model.engine.endStroke(at: corner))
+        }
+        model.noteChange(model.engine.previewPolygon(to: PixelPoint(x: 60, y: 80)))
+        #expect(model.canvas != pristine, "the stray drew no rubber band to leak")
+
+        model.flipHorizontally()
+        #expect(model.canvas == ImageTransform.flippedHorizontally(pristine))
     }
 
     @Test("Undo and redo walk the full history in both directions")

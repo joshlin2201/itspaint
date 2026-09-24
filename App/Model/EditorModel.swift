@@ -658,6 +658,7 @@ final class EditorModel {
     /// Dropping a 3× retina screenshot onto a small canvas and silently losing
     /// three quarters of it is the failure this avoids.
     func dropImage(_ bitmap: Bitmap, centredOn point: PixelPoint) {
+        landPendingShape()
         if bitmap.width > canvas.width || bitmap.height > canvas.height {
             let target = (
                 width: max(canvas.width, bitmap.width),
@@ -899,14 +900,17 @@ final class EditorModel {
     func invertColours() { noteChange(engine.invertColours()) }
 
     func flipHorizontally() {
+        landPendingShape()
         replace(ImageTransform.flippedHorizontally(canvas), named: "Flip horizontal")
     }
 
     func flipVertically() {
+        landPendingShape()
         replace(ImageTransform.flippedVertically(canvas), named: "Flip vertical")
     }
 
     func rotate(_ rotation: ImageTransform.Rotation) {
+        landPendingShape()
         replace(ImageTransform.rotated(canvas, by: rotation), named: rotation.displayName)
     }
 
@@ -918,6 +922,7 @@ final class EditorModel {
     /// outcome nobody wants.
     func rotate(degrees: Double) {
         guard degrees.truncatingRemainder(dividingBy: 360) != 0 else { return }
+        landPendingShape()
         guard let rotated = ImageTransform.rotated(canvas, degrees: degrees, fill: background) else {
             present(
                 message: "Couldn't rotate the image.",
@@ -945,6 +950,7 @@ final class EditorModel {
             presentUnsupportedImageSize(width: width, height: height)
             return
         }
+        landPendingShape()
         replace(
             ImageTransform.resizedCanvas(canvas, to: (width, height), fill: background),
             named: "Canvas size"
@@ -956,11 +962,21 @@ final class EditorModel {
             presentUnsupportedImageSize(width: width, height: height)
             return
         }
+        landPendingShape()
         guard let scaled = ImageTransform.scaled(canvas, to: (width, height), using: scaling) else {
             present(message: "Couldn't resize the image.", recovery: "Try a different size.")
             return
         }
         replace(scaled, named: "Resize image")
+    }
+
+    /// Land a half-built shape before a command computes from `canvas`.
+    ///
+    /// These commands build the new bitmap here and hand it to the engine, so
+    /// the engine's own landing comes too late: a stray one- or two-corner
+    /// polygon's rubber band would already be in the bitmap.
+    private func landPendingShape() {
+        noteChange(engine.commitPendingShape())
     }
 
     private func replace(_ bitmap: Bitmap, named name: String) {

@@ -1419,6 +1419,56 @@ struct MultiStepShapeTests {
         #expect(engine.canvas == pristine, "undoing the \(shape) after \(command) missed pixels")
     }
 
+    /// One or two corners are a stray click, which landing drops rather than
+    /// records. A command that reads the canvas has to land first, or it reads
+    /// the stray's rubber band as artwork and keeps it.
+    @Test("A stray polygon's rubber band never reaches a command that reads the canvas",
+          arguments: ["trim", "crop", "background", "cut"])
+    func strayPolygonIsDroppedBeforeReading(command: String) {
+        var pristine = Bitmap(width: 120, height: 100, fill: .white)
+        pristine.fill(PixelRect(x: 96, y: 60, width: 10, height: 10), with: .black)
+
+        func prepared(stray: Bool) -> PaintEngine {
+            let engine = PaintEngine(canvas: pristine)
+            engine.settings.brushSize = 2
+            // The marquee first: a select stroke would land a pending polygon.
+            engine.settings.tool = .select
+            engine.beginStroke(at: PixelPoint(x: 10, y: 10))
+            engine.continueStroke(to: PixelPoint(x: 90, y: 90))
+            engine.endStroke(at: PixelPoint(x: 90, y: 90))
+            engine.settings.tool = .shape
+            engine.settings.shapeKind = .polygon
+            if stray {
+                for corner in [PixelPoint(x: 20, y: 20), PixelPoint(x: 70, y: 24)] {
+                    engine.beginStroke(at: corner)
+                    engine.endStroke(at: corner)
+                }
+                engine.previewPolygon(to: PixelPoint(x: 44, y: 66))
+                #expect(engine.hasPendingShape)
+                #expect(engine.canvas != pristine, "the stray drew no rubber band to leak")
+            }
+            return engine
+        }
+        func run(_ engine: PaintEngine) {
+            switch command {
+            case "trim": _ = engine.trimBorders()
+            case "crop": _ = engine.cropToSelection()
+            case "background": _ = engine.removeBackground()
+            default:
+                _ = engine.cutSelection()
+                _ = engine.commitFloating()
+            }
+        }
+
+        let clean = prepared(stray: false)
+        run(clean)
+        let strayed = prepared(stray: true)
+        run(strayed)
+        #expect(!strayed.hasPendingShape)
+        #expect(strayed.canvas == clean.canvas, "\(command) kept the stray's rubber band")
+        #expect(strayed.undoStack.undoCount == clean.undoStack.undoCount)
+    }
+
     @Test("A reset drops a pending shape instead of painting it over the new canvas",
           arguments: ["polygon", "curve"])
     func resetDropsPendingShape(shape: String) {

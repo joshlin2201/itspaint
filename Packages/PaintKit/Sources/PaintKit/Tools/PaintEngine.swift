@@ -821,11 +821,12 @@ public final class PaintEngine {
     /// background colour.
     @discardableResult
     public func cutSelection() -> PixelRect {
+        // Before `selectedContent()` reads the pixels, as in `trimBorders`.
+        let landed = commitPendingShape()
         guard floating == nil, let selection, !selection.isEmpty,
               let content = selectedContent()
-        else { return .empty }
+        else { return landed }
 
-        let landed = commitPendingShape()
         let before = canvas
         canvas.fill(selection, with: colours.background.rgba8)
         recordEdit(name: "Cut", before: before, dirty: selection.bounds)
@@ -894,6 +895,7 @@ public final class PaintEngine {
     /// succeeding at doing nothing is still a lie about what happened.
     @discardableResult
     public func removeBackground(tolerance: Int = 24) -> Bool {
+        _ = commitPendingShape()  // Before the flood reads the canvas, as in `trimBorders`.
         _ = commitFloating()
         guard !canvas.bounds.isEmpty else { return false }
 
@@ -1210,6 +1212,7 @@ public final class PaintEngine {
     /// committing can enlarge the canvas and shift the existing artwork, which
     /// moves the content's coordinates with it.
     public func cropToSelection() -> Bool {
+        _ = commitPendingShape()  // Before the read, as in `trimBorders`.
         if floating != nil {
             _ = commitFloating()
             if let placed = lastPlacedFloatingFrame {
@@ -1243,6 +1246,10 @@ public final class PaintEngine {
     /// most want to trim.
     @discardableResult
     public func trimBorders(tolerance: Int = 6) -> Bool {
+        // Landed before the canvas is read: a stray one- or two-corner polygon's
+        // landing takes its rubber band away, and a trim measured with it on the
+        // canvas would keep it as content.
+        _ = commitPendingShape()
         _ = commitFloating()
         guard let trimmed = ImageTransform.trimmingUniformBorder(canvas, tolerance: tolerance)
         else { return false }
@@ -1498,8 +1505,9 @@ public final class PaintEngine {
 
     @discardableResult
     public func undo() -> PixelRect {
-        _ = cancelStroke()
-        let floatingDirty = discardFloating()
+        // The cancelled preview is part of what changed on screen.
+        let cancelled = cancelStroke()
+        let floatingDirty = discardFloating().union(cancelled)
         guard let edit = undoStack.undo(on: &canvas) else { return floatingDirty }
         // A badge is a counter as well as some pixels. Undoing one hands its
         // number back, so the next stamp reuses it instead of skipping it.
@@ -1509,10 +1517,10 @@ public final class PaintEngine {
 
     @discardableResult
     public func redo() -> PixelRect {
-        _ = cancelStroke()
-        guard let edit = undoStack.redo(on: &canvas) else { return .empty }
+        let cancelled = cancelStroke()
+        guard let edit = undoStack.redo(on: &canvas) else { return cancelled }
         if let number = edit.badgeNumber { nextBadgeNumber = number + 1 }
-        return edit.dirtyRect
+        return edit.dirtyRect.union(cancelled)
     }
 
     // MARK: - Internals
