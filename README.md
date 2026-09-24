@@ -8,12 +8,9 @@
 
 # ItsPaint
 
-### MS Paint for the Mac. Paste a screenshot, number the steps, drag it out.
+### MS Paint for the Mac, in a 3.46 MB download
 
-Preview markup has no step badges, no pixelate and no drag-out.
-
-**3.46 MB** · free on the App Store · MIT ·
-**no network entitlement, so the kernel refuses a socket**
+Paste a screenshot, number the steps and drag the finished image into a bug report or a doc.
 
 [![Release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&style=flat-square&label=release&color=2563eb)](https://github.com/joshlin2201/itspaint/releases)
 [![Mac App Store](https://img.shields.io/badge/Mac_App_Store-free-2563eb?style=flat-square)](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)
@@ -24,37 +21,30 @@ Preview markup has no step badges, no pixelate and no drag-out.
 brew install --cask joshlin2201/itspaint/itspaint
 ```
 
-**[Download the disk image](https://github.com/joshlin2201/itspaint/releases/latest)** · **[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)** · macOS 14+, universal
+Or get the **[disk image](https://github.com/joshlin2201/itspaint/releases/latest)**, or install it free from the **[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)**. Needs macOS 14 or later.
 
 <img src="docs/images/markup-reel.gif" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
 
 </div>
 
-## What makes it different
+## Why ItsPaint
 
-- **3.46 MB, and a window on screen in half a second.** Krita is a gigabyte and
-  built for painters. CleanShot X is $29 plus a cloud subscription. Preview is
-  already on your Mac and will not number a step or pixelate a token.
-- **No network entitlement.** `com.apple.security.network.client` is not requested,
-  so the kernel will not open a socket for it.
-  [Three commands to check that yourself](#no-network-three-commands-to-prove-it).
-- **Background removal with no ML model** and nothing to download. Four
-  corner-seeded flood selections, unioned.
-  [Thirty lines of code](docs/BACKGROUND_REMOVAL.md).
-- **The drawing engine has no UI.** `Packages/PaintKit` imports Foundation,
-  CoreGraphics, ImageIO, CoreText and UniformTypeIdentifiers, and nothing else, so
-  `swift test` verifies most changes with no Xcode. It is also
-  [a package you can depend on](#paintkit-as-a-dependency).
-- **Free, MIT, and it stays that way.** There is no account and no telemetry.
+Preview can't number a step or pixelate anything, CleanShot X charges $29 plus a cloud
+subscription to do it, and Krita is a gigabyte built for painters. ItsPaint does the
+markup for free and paints too.
 
-Paste the screenshot, number the steps, crop it, drag it out, close the window.
-Nothing lands on your Desktop.
+It has no network access. The app doesn't request the network entitlement, so the
+sandbox won't let it open a socket, and [three commands](#no-network-and-how-to-check)
+will show you that on your own copy.
 
-## PaintKit as a dependency
+The drawing engine, PaintKit, has no UI. It imports Foundation, CoreGraphics, ImageIO,
+CoreText and UniformTypeIdentifiers and nothing else, so `swift test` covers most changes
+without Xcode, and you can [use it in your own code](#paintkit-as-a-swift-package).
 
-The engine is its own SwiftPM product, so you can draw, key out a background or encode
-a PNG with none of the app around it. No AppKit, no third-party dependency, **macOS 12
-and up**.
+## PaintKit as a Swift package
+
+The engine is its own SwiftPM product. It has no AppKit and no third-party dependencies,
+and it supports macOS 12 and later.
 
 ```swift
 .package(url: "https://github.com/joshlin2201/itspaint", from: "0.22.0")
@@ -63,20 +53,7 @@ and up**.
 [![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/joshlin2201/itspaint)
 [![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/joshlin2201/itspaint)
 
-Those two are served from the Swift Package Index's own API rather than written here,
-so they report what it built, on a machine that is not mine, and they go red without
-anybody having to notice. The same page records [zero data-race-safety
-errors](https://swiftpackageindex.com/joshlin2201/itspaint/builds) — every target in
-both manifests is `swiftLanguageMode(.v6)`, so strict concurrency is on and nothing is
-waived.
-
-The macOS 12 is deliberate. The app needs macOS 14; the engine does not and no longer
-says it does. It had the app's number by inheritance rather than by need, and a floor
-is not a warning a consumer can ignore — SwiftPM refuses to resolve at all when a
-dependency's deployment target is above yours.
-
-PaintKit gets you a product shot off its page in four lines, on device, with no model
-and no network:
+Removing the background from a product shot takes four lines, on device:
 
 ```swift
 import PaintKit
@@ -86,18 +63,14 @@ guard engine.removeBackground() else { fatalError("no background to remove") }
 try ImageCodec.encode(engine.canvas, as: .png).write(to: output)
 ```
 
-Those four lines are compiled on every push, by a CI job that builds them from a
-package outside this repository — the one that declares macOS 12, so the floor above
-cannot quietly rise. And the result is checked by counting transparent pixels rather
-than by whether the program exited quietly: on a 60px mark centred on a 400×400 page
-the count goes from 0 to 156,400, which is 160,000 minus the 3,600 pixels of subject,
-asserted for six subject sizes.
+CI compiles that snippet on every push from a separate package that declares macOS 12,
+so the floor can't creep up unnoticed, and it checks the output by counting transparent
+pixels. Every target builds in Swift 6 language mode with strict concurrency on, and the
+Swift Package Index reports [zero data-race errors](https://swiftpackageindex.com/joshlin2201/itspaint/builds).
 
-If you do depend on it: it ships often while it is in beta, and until 1.0 a minor
-version may still carry a breaking change to the document format —
-[CHANGELOG.md](CHANGELOG.md) says so at the top. **Watch ▸ Custom ▸ Releases** is the
-notification for that one thing. Watching the repository outright also mails you every
-issue and every comment, which is why most people do not.
+Until 1.0 a minor release can still change the document format, and
+[CHANGELOG.md](CHANGELOG.md) says so at the top when one does. **Watch > Custom > Releases**
+emails you about new versions and nothing else.
 
 ## What it does
 
@@ -105,24 +78,24 @@ issue and every comment, which is why most people do not.
 
 | | |
 |---|---|
-| **Step badges** | `1`, `2`, `3`… auto-numbered, numeral auto-contrasted, and the sequence can start anywhere for a run that spans two screenshots. |
-| **Arrows and callouts** | `A` draws an arrow. Fifteen shapes in all, solid, dashed or dotted, outlined or filled. |
-| **Highlighter** | Its own ink, kept apart from the colour pair. Overlapping passes in one stroke never darken. |
-| **Pixelate** | A mosaic over the part you would rather not publish. Block size 4–48. |
-| **Spotlight** | Drag a box and everything outside it dims, so the eye lands where you meant it to. |
-| **Text with a rim** | One colour cannot stay legible across a light panel and a dark one, so annotation text carries a contrasting edge. |
+| **Step badges** | Numbered automatically, with the numeral contrasted against its fill. A sequence can start at any number, so it can continue from another screenshot. |
+| **Arrows and callouts** | Fifteen shapes, solid, dashed or dotted, outlined or filled. `A` picks the arrow. |
+| **Highlighter** | Its own ink, separate from your two colours. Overlaps within one stroke don't darken. |
+| **Pixelate** | A mosaic with blocks from 4 to 48 px. It hides detail but isn't redaction, so cover secrets with a filled shape. |
+| **Spotlight** | Drag a box and everything outside it dims. |
+| **Text** | Annotation text gets a contrasting rim, so it stays readable over light and dark areas. |
 
-### Getting things in and out
+### Getting images in and out
 
 | | |
 |---|---|
-| **Drag straight out** | Into any app that takes an image. No save panel, and no `Screenshot 2026-08-07 at 11.42.13.png` left behind. |
-| **Paste onto anything** | It arrives floating. Bigger than the canvas and the canvas grows rather than cropping it. |
-| **Nine export formats** | PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF, ICO. Formats without alpha flatten onto Colour 2, not onto black. |
-| **Sign a PDF** | Open a contract, sign the page, save it back as a PDF. The page stays the size it was printed at, and the pages you did not touch keep their text. |
+| **Drag out** | Drag the image straight into any app that accepts one, without saving a file first. |
+| **Paste** | Pasted images arrive as a floating selection. If one is bigger than the canvas, the canvas grows to fit. |
+| **Nine export formats** | PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF and ICO. Formats without alpha flatten onto Colour 2 instead of black. |
+| **Sign a PDF** | Open a contract, sign it and save it back as a PDF. The page keeps its printed size and the pages you didn't touch keep their text. |
 | **Open With** | Registered for PNG, JPEG, TIFF, BMP, GIF, HEIC and PDF. |
 
-### Remove a background with no model and no network
+### Background removal
 
 <div align="center">
 
@@ -130,66 +103,33 @@ issue and every comment, which is why most people do not.
 
 </div>
 
-One command. It floods from all four corners and makes the union transparent. If the
-page is not actually separable it says so and changes nothing.
+One command floods from all four corners and makes the union transparent. If the
+background can't be separated, it says so and leaves the image alone.
 
-It knows what a page is, not what a subject is, so it works on logos, product shots
-and scanned diagrams. It is useless on hair.
-
-**[How it works, in thirty lines of code →](docs/BACKGROUND_REMOVAL.md)**
+It works on logos, product shots and scanned diagrams. It's useless on hair.
+[The thirty lines of code behind it](docs/BACKGROUND_REMOVAL.md).
 
 ### Painting
 
 | | |
 |---|---|
-| **Thirteen tools** | Pencil, brush, highlighter, eraser, clone, shape, text, badge, fill, eyedropper, select, pixelate, spotlight. One rail button each, every one a single key. |
-| **Four brush nibs** | Round, square, soft, and spray. Spray keeps spraying while you hold still, which is the whole feel of an airbrush. |
-| **Four ways to select** | Rectangle, ellipse, lasso, and Instant Alpha. Marching ants follow the pixel mask rather than its bounds. |
-| **Pixel control** | Pointer-centred zoom, nearest-neighbour above 100%, a pixel grid, live tool footprints, rotate by any angle. |
-| **Snap to grid** | `⇧⌘'` at 8–64px for shapes, selections and pasted content. Freehand ignores it. |
+| **Thirteen tools** | Pencil, brush, highlighter, eraser, clone, shape, text, badge, fill, eyedropper, select, pixelate and spotlight, each on a single key. |
+| **Brush nibs** | Round, square, soft and spray. Spray keeps going while you hold still, like an airbrush. |
+| **Selections** | Rectangle, ellipse, lasso and Instant Alpha. The marching ants follow the pixel mask. |
+| **Pixel control** | Zoom centres on the pointer and switches to nearest-neighbour above 100%. There's a pixel grid, live brush footprints and rotation by any angle. |
+| **Snap to grid** | `⇧⌘'` snaps shapes, selections and pasted content to an 8 to 64 px grid. Freehand strokes ignore it. |
 
 <div align="center">
 
 <img src="docs/images/editor-window.png" alt="ItsPaint editing a chameleon painting on a transparent canvas, with the brush options open">
 
-**Thirteen tools, fifteen shapes, and a transparent canvas.**
-The window above is ItsPaint painting, not marking up.
-
 </div>
 
-## Install
+## No network, and how to check
 
-```bash
-brew install --cask joshlin2201/itspaint/itspaint
-```
-
-Or take the [disk image](https://github.com/joshlin2201/itspaint/releases), open it
-and drag **ItsPaint** to Applications. It is also free on the
-[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12).
-
-It ships often while it is in beta. **Watch ▸ Custom ▸ Releases** is the quietest way
-to hear about a new build.
-
-| | |
-|---|---|
-| **Requires** | macOS 14 Sonoma or later |
-| **Architecture** | universal, one build for Apple silicon and Intel |
-| **Signing** | Developer ID, notarised, ticket stapled to the image *and* the app, so the check needs no network and there is nothing to clear from the Terminal |
-| **Download** | 3.46 MB for the disk image, with a SHA-256 in `checksums.txt` |
-
-```bash
-shasum -a 256 -c checksums.txt
-xcrun stapler validate ItsPaint-*.dmg
-```
-
-If macOS asks you to confirm the first launch, open **System Settings ▸ Privacy &
-Security** and click **Open Anyway**. [Why that happens](#first-launch).
-
-## No network. Three commands to prove it
-
-This is a property the kernel enforces, not a promise anyone is making. The first
-two commands run against the copy in `/Applications`, the third greps this
-repository:
+ItsPaint doesn't request `com.apple.security.network.client`, so the kernel won't open a
+socket for it. The first two commands inspect the copy in `/Applications` and the third
+searches this repository:
 
 ```bash
 codesign -d --entitlements - --xml /Applications/ItsPaint.app | plutil -p -
@@ -197,59 +137,79 @@ otool -L /Applications/ItsPaint.app/Contents/MacOS/ItsPaint
 grep -rniE 'URLSession|NWConnection|import Network|CFSocket' App Packages
 ```
 
-| Command | What comes back |
+| Command | What you should see |
 |---|---|
-| `codesign` | Three entitlements: sandbox, files you pick in a panel, app-scoped bookmarks. No `network.client` and no `.server`, so the kernel will not open a socket for it |
-| `otool` | Apple frameworks and the Swift runtime, on both architectures. No `CFNetwork`, no `Network.framework`, no bundled dylib |
-| `grep` | Nothing. `Package.swift` also declares no dependency, so there is no third-party code behind it |
+| `codesign` | Three entitlements: the sandbox, files you pick in a panel and app-scoped bookmarks. No `network.client` or `network.server`. |
+| `otool` | Apple frameworks and the Swift runtime, for both architectures. No `CFNetwork`, `Network.framework` or bundled dylib. |
+| `grep` | Nothing. `Package.swift` declares no dependencies either. |
 
-The entitlements check goes first because it is the one that holds even if the
-developer is lying to you. It reports what the kernel will permit.
+Start with `codesign`, because it's the one that holds even if the developer is lying to
+you. [Making the same claim checkable in your own app](docs/PROVING_NO_NETWORK.md).
 
-**[Why that order, and how to make the same claim falsifiable in your own app →](docs/PROVING_NO_NETWORK.md)**
+## Install
 
-## Contributing, and the engine needs no Xcode
+```bash
+brew install --cask joshlin2201/itspaint/itspaint
+```
 
-Because [PaintKit has no UI](#paintkit-as-a-dependency), most changes to how ItsPaint
-*draws* can be made and checked with a text editor and a terminal. No simulator, no
-GUI session, no Xcode project:
+Or open the [disk image](https://github.com/joshlin2201/itspaint/releases) and drag
+**ItsPaint** to Applications. It's also free on the
+[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12).
+
+| | |
+|---|---|
+| **Requires** | macOS 14 Sonoma or later |
+| **Architecture** | Universal, for Apple silicon and Intel |
+| **Signing** | Developer ID and notarised, with the ticket stapled to the disk image and the app, so Gatekeeper can check it offline |
+| **Download** | 3.46 MB, with SHA-256 sums in `checksums.txt` |
+
+```bash
+shasum -a 256 -c checksums.txt
+xcrun stapler validate ItsPaint-*.dmg
+```
+
+If macOS asks you to confirm the first launch, go to **System Settings > Privacy &
+Security** and click **Open Anyway**. [Why that can happen](#first-launch).
+
+## Contributing
+
+PaintKit has no UI, so most changes to how ItsPaint draws can be made and tested from a
+terminal:
 
 ```bash
 git clone https://github.com/joshlin2201/itspaint.git
 cd itspaint
-swift test          # the whole engine suite, in a fresh clone
+swift test
 ```
 
-**If that stops with `plugin for module 'TestingMacros' not found`,** you have the
-Command Line Tools without Xcode, and Swift 6.4's build engine is not looking where
-the CLT keeps Swift Testing's macro plugin. Point it there and the same suite runs:
+If that stops at `plugin for module 'TestingMacros' not found`, you have the Command Line
+Tools without Xcode, and Swift 6.4 is looking for the Swift Testing macro plugin in the
+wrong folder. Point it there:
 
 ```bash
 swift test -Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing
 ```
 
-Measured 2026-09-18 in a fresh clone on Command Line Tools 27.0 (Swift 6.4): bare
-`swift test` fails at that error, and with the flag every test passes.
+Checked on 2026-09-18 in a fresh clone with Command Line Tools 27.0.
 
 **Seven issues are open and labelled [`good first issue`](https://github.com/joshlin2201/itspaint/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)**,
-each naming the file and the line to start at. They sit in three different parts of
-the app so you can pick whichever suits you:
+and each one names the file and line to start at.
 
-*View layer, AppKit drawing, no engine knowledge needed*
-- [**#11** A loupe that follows the pointer](https://github.com/joshlin2201/itspaint/issues/11)
+Engine work, no Xcode needed:
 
-*Engine, pure functions over pixels, no Xcode needed*
 - [**#12** Brightness, contrast and saturation](https://github.com/joshlin2201/itspaint/issues/12)
-- [**#5** Arrowheads as a line style, not a separate shape](https://github.com/joshlin2201/itspaint/issues/5)
-
-*Selection arithmetic, also engine-only*
+- [**#5** Arrowheads as a line style instead of a separate shape](https://github.com/joshlin2201/itspaint/issues/5)
 - [**#3** Grow and shrink a selection by a pixel amount](https://github.com/joshlin2201/itspaint/issues/3)
 - [**#4** Make a selection from the alpha channel](https://github.com/joshlin2201/itspaint/issues/4)
-- [**#6** Flip and rotate the selection, not the whole image](https://github.com/joshlin2201/itspaint/issues/6)
+- [**#6** Flip and rotate the selection instead of the whole image](https://github.com/joshlin2201/itspaint/issues/6)
 - [**#7** Add to and subtract from a selection](https://github.com/joshlin2201/itspaint/issues/7)
 
-[CONTRIBUTING.md](CONTRIBUTING.md) covers the structure, the design constraints, and
-what a change has to prove before it lands.
+AppKit drawing in the view layer:
+
+- [**#11** A loupe that follows the pointer](https://github.com/joshlin2201/itspaint/issues/11)
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the structure, the design rules and what a
+change has to prove before it lands.
 
 <br>
 
@@ -260,14 +220,13 @@ what a change has to prove before it lands.
 
 | Group | Tools |
 |---|---|
-| **Draw** | Pencil, Brush (round / square / soft / spray), Highlighter (own ink, four colours), Eraser, Clone (clone / soften) |
+| **Draw** | Pencil, Brush (round, square, soft, spray), Highlighter (own ink, four colours), Eraser, Clone (clone, soften) |
 | **Insert** | Shape, Text, Step Badge, Fill, Eyedropper |
 | **Select** | Rectangle, Ellipse, Lasso, Instant Alpha |
 | **Effects** | Pixelate, Spotlight |
 
-Thirteen rail buttons. Variations live inside the tool that owns them, so there are fifteen
-shapes behind Shape, four nibs behind Brush and four modes behind Select. The whole
-set stays available without a button each.
+Thirteen rail buttons. Variants live inside their tool, so the fifteen shapes sit behind
+Shape, four nibs behind Brush and four modes behind Select.
 
 | Shortcut | Action | Shortcut | Action |
 |---|---|---|---|
@@ -278,21 +237,18 @@ set stays available without a button each.
 | `N` | Step Badge | `K` | Fill |
 | `I` | Eyedropper | `M` | Select |
 | `R` | Pixelate | `S` | Spotlight |
-| `X` | Swap colours | `[` / `]` | Change tool size |
-| `Space` | Pan | `Esc` | Cancel what you are doing |
+| `A` | Arrow | `X` | Swap colours |
+| `[` / `]` | Change tool size | `Space` | Pan |
 | `⌥1`–`⌥9` | Choose a shape | `⇧⌘'` | Snap to grid |
 | `⌘K` | Crop to selection | `⌘9` | Fit to window |
 | `⇧⌘E` | Export | `⌘V` | Paste as a floating image |
 
 Pinch or `⌘`-scroll to zoom around the pointer. Hold `⌥` to sample a colour without
-changing tools. Right-drag uses the second colour. `Esc` cancels the current shape,
-text box, selection, floating paste, or options panel.
+switching tools, and right-drag to paint with the second colour. `Esc` cancels the
+current shape, text box, selection, floating paste or options panel.
 
-Instant Alpha selects connected pixels by colour. `⇧`-click adds, `⌥`-click
-subtracts, then **Make transparent**.
-
-Pixelate is for visual de-emphasis and not for secure redaction. Cover private
-information with an opaque filled shape before you export a flattened image.
+Instant Alpha selects connected pixels by colour. `⇧`-click adds, `⌥`-click subtracts,
+then **Make transparent** clears them.
 
 </details>
 
@@ -301,76 +257,58 @@ information with an opaque filled shape before you export a flattened image.
 
 <br>
 
-ItsPaint documents use the `.itspaint` package format, which is a lossless PNG with
-JSON metadata for the canvas, colours and palette.
+An `.itspaint` document is a package holding a lossless PNG and JSON for the canvas,
+colours and palette.
 
-Export supports PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF and ICO, when the
-corresponding encoder ships with the installed macOS version. The export panel has
-format and scale controls, and formats without alpha are flattened onto the second
-colour.
+Each export format is offered when the installed macOS ships its encoder. There's no
+WebP export, because macOS has no WebP encoder. Text becomes pixels once you commit it.
 
-A PDF opens as a page: ItsPaint rasterises the page you are working on at 144 dpi so
-you can draw on it, and keeps the file it came from. Saving writes a real PDF — the
-edited page at its original size in points, and every other page copied through with
-its text intact. Multi-page documents get a page control at the bottom of the window,
-and turning a page keeps what you drew on the last one.
+A PDF opens one page at a time, rasterised at 144 dpi for drawing. Saving writes a real
+PDF, with the edited page at its original size in points and the other pages copied
+through untouched. Multi-page documents get a page control at the bottom of the window,
+and turning the page keeps what you drew.
 
-ItsPaint registers as an editor for PNG, JPEG, TIFF, BMP, GIF, HEIC and PDF, so it
-appears under right-click ▸ **Open With**. It asks for `Alternate` rank on PDF rather
-than owning the type, because Preview should stay the Mac's PDF reader.
-
-WebP export is not available, because macOS does not provide a WebP encoder. Text
-becomes pixels once it is committed.
+ItsPaint asks for `Alternate` rank on PDF so Preview stays the default reader.
 
 </details>
 
 <details>
-<summary><b>How it is built</b></summary>
+<summary><b>How it's built</b></summary>
 
 <br>
 
 ```text
-Packages/PaintKit/   UI-free drawing engine, raster operations, undo, and codecs
-App/                 AppKit document lifecycle, canvas, and SwiftUI interface
+Packages/PaintKit/   UI-free drawing engine, raster operations, undo and codecs
+App/                 AppKit document lifecycle, canvas and SwiftUI interface
 ```
 
-PaintKit stores pixels as premultiplied RGBA8 and returns the changed rectangle from
-every edit. The canvas redraws only that area, and undo history is bounded by memory
-rather than by a fixed number of steps.
+PaintKit stores pixels as premultiplied RGBA8, and every edit returns the rectangle it
+changed. The canvas redraws only that area, and undo history is capped by memory rather
+than by a step count.
 
-[**Background removal without a model**](docs/BACKGROUND_REMOVAL.md) is a worked
-example of both layers. Four corner-seeded flood selections unioned through the same
-combiner `⇧`-click uses, and a guard that declines rather than returning a nearly
-blank canvas.
+[Background removal without a model](docs/BACKGROUND_REMOVAL.md) walks through both
+layers. Its guard was wrong for three releases, which is written up in
+[a guard tuned to its test](docs/A_GUARD_TUNED_TO_ITS_TEST.md).
 
-That guard was also wrong for three releases, in a way worth reading about:
-**[a guard tuned to its test →](docs/A_GUARD_TUNED_TO_ITS_TEST.md)**
-
-PaintKit is a product of the root package, so it can be a dependency of anything that
-wants a raster canvas without an editor around it. The four-line example is in
-**Contributing** above.
-
-[docs/README.md](docs/README.md) has the design notes, architecture, feature
-reference, testing guide and roadmap. [CHANGELOG.md](CHANGELOG.md) has the version
-history.
+[docs/README.md](docs/README.md) has the design notes, architecture, feature reference,
+testing guide and roadmap, and [CHANGELOG.md](CHANGELOG.md) has the version history.
 
 </details>
 
 <a id="first-launch"></a>
 
 <details>
-<summary><b>First launch, and the Gatekeeper message</b></summary>
+<summary><b>First launch and Gatekeeper</b></summary>
 
 <br>
 
-Open **System Settings ▸ Privacy & Security** and click **Open Anyway**.
+Open **System Settings > Privacy & Security** and click **Open Anyway**.
 
-This happened once, on macOS 26.6, with a freshly downloaded 0.12.0, on a disk image
-that `spctl --assess` accepts and whose stapled ticket validates. It looks like a
-first-launch check that went to Apple and did not come back. It is alarming enough
-when it happens that it belongs here rather than in an issue.
+This happened once, with a freshly downloaded 0.12.0 on macOS 26.6. `spctl --assess`
+accepted the disk image and its stapled ticket validated, so it looks like a first-launch
+check that never heard back from Apple.
 
-Check the download yourself:
+To check the download yourself:
 
 ```bash
 shasum -a 256 -c checksums.txt
@@ -382,8 +320,8 @@ spctl -a -vvv -t exec /Volumes/ItsPaint*/ItsPaint.app   # expect: accepted
 
 <div align="center">
 
-**If you installed it, a star is how the next person finds it from search.**
+**If you installed it, a star helps the next person find it in search.**
 
-[MIT License](LICENSE) · Built by [Josh Lin](https://github.com/joshlin2201)
+MIT licensed. Built by [Josh Lin](https://github.com/joshlin2201).
 
 </div>
