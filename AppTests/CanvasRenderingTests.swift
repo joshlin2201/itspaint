@@ -324,13 +324,13 @@ struct CanvasRenderingTests {
         #expect(scaled.r < 60)
     }
 
-    /// The canvas blits only the part of its image under the dirty rect, so a
-    /// stroke frame costs the stroke, not the canvas. That crop must be
-    /// invisible: the same area drawn alone and drawn as part of the whole view
-    /// has to come out the same, including where a downscaled draw samples
-    /// across the crop's edge.
+    /// At 100% and above the canvas blits only the part of its image under the
+    /// dirty rect, so a stroke frame costs the stroke, not the canvas. That crop
+    /// must be invisible: the same area drawn alone and as part of the whole view
+    /// has to come out the same. Below 100% the view draws the whole image at
+    /// `.high` as it always has, so there is no crop to pin there.
     @Test("Redrawing part of the canvas matches that area of a full redraw",
-          arguments: [1.0, 0.5, 0.37, 3.0])
+          arguments: [1.0, 1.5, 3.0])
     func partialRedrawMatchesFull(zoom: Double) throws {
         // Every pixel differs from its neighbours, so a seam cannot hide.
         let pixels = (0..<(120 * 90)).map { i -> RGBA8 in
@@ -362,8 +362,7 @@ struct CanvasRenderingTests {
                 worst = max(worst, abs(Int(a.r) - Int(b.r)), abs(Int(a.g) - Int(b.g)), abs(Int(a.b) - Int(b.b)))
             }
         }
-        // Exact when magnified; resampling may round a level differently.
-        #expect(worst <= (zoom >= 1 ? 0 : 2), "worst channel difference \(worst) at \(zoom)x")
+        #expect(worst == 0, "worst channel difference \(worst) at \(zoom)x")
     }
 
     @Test("Nothing is drawn without a model, rather than crashing")
