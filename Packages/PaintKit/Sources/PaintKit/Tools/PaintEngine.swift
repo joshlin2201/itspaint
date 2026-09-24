@@ -92,9 +92,9 @@ public final class PaintEngine {
     ///
     /// `drawn` is the rect the preview currently covers. Outside it the canvas
     /// still equals `before`, so redrawing rolls back only that rect and
-    /// finishing records only that rect. An edit that lands while a shape is
-    /// pending joins `drawn` (see `coverInPendingShape`), and a canvas resized
-    /// under one is rolled back whole (see `pendingExtent`).
+    /// finishing records only that rect. That holds because nothing else writes
+    /// the canvas while a shape is pending: every command that would lands the
+    /// shape first (see `commitPendingShape`), and `reset(to:)` drops it.
     private var pendingCurve: (before: Bitmap, a: PixelPoint, b: PixelPoint, drawn: PixelRect)?
     private var pendingPolygon: (before: Bitmap, points: [PixelPoint], drawn: PixelRect)?
 
@@ -258,7 +258,7 @@ public final class PaintEngine {
         if settings.shapeKind == .curve, tool == .shape, let pending = pendingCurve {
             gesture = .bend(
                 before: pending.before, a: pending.a, b: pending.b,
-                dirty: pendingExtent(before: pending.before, drawn: pending.drawn), button: button
+                dirty: pending.drawn, button: button
             )
             pendingCurve = nil
             return dirty.union(continueStroke(to: point))
@@ -825,6 +825,7 @@ public final class PaintEngine {
               let content = selectedContent()
         else { return .empty }
 
+        let landed = commitPendingShape()
         let before = canvas
         canvas.fill(selection, with: colours.background.rgba8)
         recordEdit(name: "Cut", before: before, dirty: selection.bounds)
@@ -835,7 +836,7 @@ public final class PaintEngine {
         )
         self.selection = nil
         lassoPath = []
-        return selection.bounds
+        return landed.union(selection.bounds)
     }
 
     @discardableResult
@@ -997,7 +998,7 @@ public final class PaintEngine {
     /// current selection's origin when there is one).
     @discardableResult
     public func paste(_ bitmap: Bitmap) -> PixelRect {
-        var dirty = commitFloating()
+        var dirty = commitPendingShape().union(commitFloating())
 
         // Grow first, so the pasted image is *entirely on the canvas* the
         // moment it arrives.
@@ -1049,7 +1050,7 @@ public final class PaintEngine {
     /// compositing straight in.
     @discardableResult
     public func stamp(_ bitmap: Bitmap, coveringAtMost fraction: Double = 0.4) -> PixelRect {
-        var dirty = commitFloating()
+        var dirty = commitPendingShape().union(commitFloating())
         guard bitmap.width > 0, bitmap.height > 0, !canvas.bounds.isEmpty else { return dirty }
 
         var placed = bitmap
@@ -1100,6 +1101,12 @@ public final class PaintEngine {
     /// wants the old behaviour — a stamp clipped to the page.
     @discardableResult
     public func commitFloating() -> PixelRect {
+        guard floating != nil else { return .empty }
+        let landed = commitPendingShape()
+        return landed.union(placeFloating())
+    }
+
+    private func placeFloating() -> PixelRect {
         guard let floating else { return .empty }
         self.floating = nil
 
@@ -1259,23 +1266,27 @@ public final class PaintEngine {
     /// Called when anything else happens — another tool, a menu command, a
     /// save. A preview that silently disappears because you reached for the
     /// eraser is worse than one that commits.
+    ///
+    /// Every engine command that writes pixels or resizes the canvas calls this
+    /// first, so the shape is its own undo step beneath that command's, and
+    /// includes the rect returned here in its own. A preview redrawn over an edit
+    /// it did not make would roll that edit back and leave its undo step behind.
     @discardableResult
     public func commitPendingShape() -> PixelRect {
         if let pending = pendingCurve {
             pendingCurve = nil
-            let dirty = pendingExtent(before: pending.before, drawn: pending.drawn)
-            recordEdit(name: "Curve", before: pending.before, dirty: dirty)
-            return dirty
+            recordEdit(name: "Curve", before: pending.before, dirty: pending.drawn)
+            return pending.drawn
         }
         if let pending = pendingPolygon {
             pendingPolygon = nil
             // Fewer than three corners is a stray click, not a shape.
             guard pending.points.count > 2 else {
-                return rollBack(to: pending.before, drawn: pending.drawn)
+                canvas.restore(pending.drawn, from: pending.before)
+                return pending.drawn
             }
-            let dirty = pendingExtent(before: pending.before, drawn: pending.drawn)
-            recordEdit(name: "Polygon", before: pending.before, dirty: dirty)
-            return dirty
+            recordEdit(name: "Polygon", before: pending.before, dirty: pending.drawn)
+            return pending.drawn
         }
         return .empty
     }
@@ -1284,6 +1295,8 @@ public final class PaintEngine {
     /// first one.
     @discardableResult
     private func addPolygonCorner(at point: PixelPoint, button: PointerButton) -> PixelRect {
+        // A new polygon is a new shape, so a chord still waiting to be bent lands.
+        let landed = pendingPolygon == nil ? commitPendingShape() : .empty
         let before = pendingPolygon?.before ?? canvas
         var points = pendingPolygon?.points ?? []
         let drawn = pendingPolygon?.drawn ?? .empty
@@ -1297,7 +1310,7 @@ public final class PaintEngine {
 
         points.append(point)
         pendingPolygon = (before: before, points: points, drawn: drawn)
-        return redrawPendingPolygon(preview: point, button: button)
+        return landed.union(redrawPendingPolygon(preview: point, button: button))
     }
 
     /// Close the polygon where it stands. Bound to Return and a double-click.
@@ -1316,7 +1329,7 @@ public final class PaintEngine {
 
     private func redrawPendingPolygon(preview: PixelPoint, button: PointerButton) -> PixelRect {
         guard let pending = pendingPolygon else { return .empty }
-        let rolledBack = rollBack(to: pending.before, drawn: pending.drawn)
+        canvas.restore(pending.drawn, from: pending.before)
         let points = pending.points + (pending.points.last == preview ? [] : [preview])
         let style = settings.shapeStyle
         let stroke = colours.colour(for: button).rgba8
@@ -1331,35 +1344,7 @@ public final class PaintEngine {
             closed: points.count > 2
         )
         pendingPolygon = (before: pending.before, points: pending.points, drawn: drawn)
-        return rolledBack.union(drawn)
-    }
-
-    /// Where a pending shape may differ from its snapshot: `drawn`, or the whole
-    /// canvas once a resize has left the two different sizes.
-    private func pendingExtent(before: Bitmap, drawn: PixelRect) -> PixelRect {
-        before.width == canvas.width && before.height == canvas.height ? drawn : canvas.bounds
-    }
-
-    /// Put the canvas back to a pending shape's snapshot, returning what changed.
-    private func rollBack(to before: Bitmap, drawn: PixelRect) -> PixelRect {
-        guard before.width == canvas.width, before.height == canvas.height else {
-            canvas = before
-            return canvas.bounds
-        }
-        canvas.restore(drawn, from: before)
-        return drawn
-    }
-
-    /// Fold a rect some other edit wrote into the pending shape's `drawn`.
-    ///
-    /// Rolling back restores `drawn` from the snapshot, so a write outside it
-    /// would otherwise survive a rollback that is meant to reach the snapshot
-    /// everywhere. Every canvas write outside a gesture is recorded, so the
-    /// recorders call this.
-    private func coverInPendingShape(_ rect: PixelRect) {
-        guard !rect.isEmpty else { return }
-        if let drawn = pendingCurve?.drawn { pendingCurve?.drawn = drawn.union(rect) }
-        if let drawn = pendingPolygon?.drawn { pendingPolygon?.drawn = drawn.union(rect) }
+        return pending.drawn.union(drawn)
     }
 
     /// How close a click has to land to count as "the first corner again".
@@ -1379,6 +1364,9 @@ public final class PaintEngine {
         )
         let disc = colours.colour(for: button)
         let number = "\(nextBadgeNumber)"
+        // Landed here rather than inside `commitSingleShot`, so `dirty` below
+        // says whether the badge itself drew and the count only moves if it did.
+        let landed = commitPendingShape()
 
         let dirty = commitSingleShot("Badge \(number)", badgeNumber: nextBadgeNumber) { canvas in
             var touched = Raster.fillEllipse(in: rect, colour: disc.rgba8, into: &canvas)
@@ -1402,7 +1390,7 @@ public final class PaintEngine {
             return touched
         }
         if !dirty.isEmpty { nextBadgeNumber += 1 }
-        return dirty
+        return landed.union(dirty)
     }
 
     // MARK: - Text
@@ -1461,6 +1449,7 @@ public final class PaintEngine {
     /// instead — so resizing, rotating by an arbitrary angle or cropping is
     /// undoable like everything else, and the work before it survives.
     public func replaceCanvas(with newCanvas: Bitmap, actionName: String) {
+        commitPendingShape()
         // A pairing is a pair of coordinates, and a resize changes what those
         // coordinates mean. Keeping it would leave a repair tool quietly copying
         // whatever now occupies the old source.
@@ -1494,7 +1483,10 @@ public final class PaintEngine {
     public func reset(to newCanvas: Bitmap) {
         clearCloneSource()
         canvas = newCanvas
-        coverInPendingShape(canvas.bounds)
+        // A half-built shape belongs to the old canvas and its history, which
+        // are both gone; drawing its preview again would paint the old image back.
+        pendingCurve = nil
+        pendingPolygon = nil
         undoStack.removeAll()
         selection = nil
         lassoPath = []
@@ -1538,7 +1530,6 @@ public final class PaintEngine {
             ),
             canvasBytes: canvas.byteCount
         )
-        coverInPendingShape(dirty)
     }
 
     /// Record an edit that changed the canvas's size.
@@ -1553,17 +1544,17 @@ public final class PaintEngine {
             // thumbnail-sized.
             canvasBytes: max(before.byteCount, canvas.byteCount)
         )
-        coverInPendingShape(canvas.bounds)
     }
 
     private func commitSingleShot(
         _ name: String, badgeNumber: Int? = nil, _ body: (inout Bitmap) -> PixelRect
     ) -> PixelRect {
+        let landed = commitPendingShape()
         let before = canvas
         let dirty = body(&canvas)
-        guard !dirty.isEmpty else { return .empty }
+        guard !dirty.isEmpty else { return landed }
         recordEdit(name: name, before: before, dirty: dirty, badgeNumber: badgeNumber)
-        return dirty
+        return landed.union(dirty)
     }
 
     private func performReadOnly(_ tool: ToolKind, at point: PixelPoint) -> PixelRect {

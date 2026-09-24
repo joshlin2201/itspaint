@@ -1332,98 +1332,108 @@ struct MultiStepShapeTests {
         #expect(draw(wandering: true) == draw(wandering: false))
     }
 
-    /// An edit that lands while a shape is pending, then the preview redraws.
-    ///
-    /// The preview rolls back to its snapshot everywhere, whatever landed
-    /// meanwhile; a rollback that only covered the shape's own rect would leave
-    /// the edit around it and a rectangle of snapshot inside it.
-    @Test("A preview after an edit under a pending polygon rolls back to the snapshot everywhere",
-          arguments: ["invert", "fill", "text", "badge", "paste", "resize", "rotate twice"])
-    func pendingPolygonRollsBackOtherEdits(edit: String) {
-        let corners = [PixelPoint(x: 20, y: 20), PixelPoint(x: 70, y: 22), PixelPoint(x: 45, y: 70)]
-        let preview = PixelPoint(x: 30, y: 60)
-        func polygonEngine() -> PaintEngine {
-            let engine = PaintEngine(canvas: Bitmap(width: 120, height: 90, fill: .white))
+    /// The commands that write the canvas outside a gesture, each run while a
+    /// shape is pending. Returns the rect the command reported, when it has one.
+    private func runCommand(_ command: String, on engine: PaintEngine) -> PixelRect? {
+        switch command {
+        case "invert":
+            return engine.invertColours()
+        case "paste":
+            let pasted = engine.paste(Bitmap(width: 16, height: 12, fill: PaintColour(hex: "3366FF")!.rgba8))
+            return pasted.union(engine.commitFloating())
+        case "trim":
+            #expect(engine.trimBorders())
+            return nil
+        case "resize":
+            engine.replaceCanvas(
+                with: ImageTransform.resizedCanvas(engine.canvas, to: (140, 110)), actionName: "Resize"
+            )
+            return nil
+        case "text":
+            return engine.drawText("Hi", in: PixelRect(x: 4, y: 70, width: 30, height: 26),
+                                   style: TextRenderer.Style(pointSize: 16))
+        default:
+            engine.settings.tool = .badge
+            return engine.beginStroke(at: PixelPoint(x: 104, y: 14))
+        }
+    }
+
+    @Test("A pending polygon or curve lands as its own undo step before a command writes the canvas",
+          arguments: ["polygon", "curve"], ["invert", "paste", "trim", "resize", "text", "badge"])
+    func pendingShapeLandsBeforeCommands(shape: String, command: String) {
+        // A dark block off to one side, so a trim has a border to take away.
+        var pristine = Bitmap(width: 120, height: 100, fill: .white)
+        pristine.fill(PixelRect(x: 96, y: 60, width: 10, height: 10), with: .black)
+
+        func pendingEngine() -> PaintEngine {
+            let engine = PaintEngine(canvas: pristine)
             engine.settings.tool = .shape
-            engine.settings.shapeKind = .polygon
             engine.settings.brushSize = 2
-            for corner in corners {
+            if shape == "polygon" {
+                engine.settings.shapeKind = .polygon
+                for corner in [PixelPoint(x: 20, y: 20), PixelPoint(x: 70, y: 24), PixelPoint(x: 44, y: 66)] {
+                    engine.beginStroke(at: corner)
+                    engine.endStroke(at: corner)
+                }
+                engine.previewPolygon(to: PixelPoint(x: 30, y: 60))
+            } else {
+                engine.settings.shapeKind = .curve
+                engine.beginStroke(at: PixelPoint(x: 15, y: 40))
+                engine.endStroke(at: PixelPoint(x: 80, y: 45))
+            }
+            #expect(engine.hasPendingShape)
+            return engine
+        }
+
+        // What landing the shape on its own records and reports.
+        let alone = pendingEngine()
+        let shapeRect = alone.commitPendingShape()
+        let withShape = alone.canvas
+        #expect(!shapeRect.isEmpty)
+
+        let engine = pendingEngine()
+        let reported = runCommand(command, on: engine)
+        #expect(!engine.hasPendingShape, "\(command) left the \(shape) pending")
+        if let reported {
+            #expect(reported.union(shapeRect) == reported,
+                    "\(command) reported \(reported), not the landed \(shape) at \(shapeRect)")
+        }
+        #expect(engine.undoStack.undoCount == 2, "\(command) recorded \(engine.undoStack.undoCount) steps")
+
+        // Rubber-banding afterwards has nothing left to roll back.
+        let afterCommand = engine.canvas
+        engine.previewPolygon(to: PixelPoint(x: 5, y: 5))
+        #expect(engine.canvas == afterCommand, "a preview after \(command) changed the canvas")
+
+        engine.undo()
+        #expect(engine.undoStack.undoActionName == (shape == "polygon" ? "Polygon" : "Curve"))
+        #expect(engine.canvas == withShape, "undoing \(command) did not leave just the \(shape)")
+        engine.undo()
+        #expect(engine.canvas == pristine, "undoing the \(shape) after \(command) missed pixels")
+    }
+
+    @Test("A reset drops a pending shape instead of painting it over the new canvas",
+          arguments: ["polygon", "curve"])
+    func resetDropsPendingShape(shape: String) {
+        let engine = shapeEngine(shape == "polygon" ? .polygon : .curve)
+        if shape == "polygon" {
+            for corner in [PixelPoint(x: 20, y: 20), PixelPoint(x: 80, y: 25), PixelPoint(x: 50, y: 80)] {
                 engine.beginStroke(at: corner)
                 engine.endStroke(at: corner)
             }
-            return engine
-        }
-
-        let untouched = polygonEngine()
-        let pristine = Bitmap(width: 120, height: 90, fill: .white)
-        untouched.previewPolygon(to: preview)
-
-        let engine = polygonEngine()
-        switch edit {
-        case "invert":
-            engine.invertColours()
-        case "fill":
-            engine.settings.tool = .fill
-            engine.colours.background = PaintColour(hex: "3366FF")!
-            engine.beginStroke(at: PixelPoint(x: 110, y: 80), button: .secondary)
-            engine.colours.background = untouched.colours.background
-            engine.settings.tool = .shape
-        case "text":
-            engine.drawText("Hi", in: PixelRect(x: 80, y: 10, width: 36, height: 30),
-                            style: TextRenderer.Style(pointSize: 18))
-        case "badge":
-            engine.settings.tool = .badge
-            engine.beginStroke(at: PixelPoint(x: 100, y: 70))
-            engine.settings.tool = .shape
-        case "paste":
-            engine.paste(Bitmap(width: 20, height: 20, fill: .black))
-            engine.settings.tool = .shape
-            engine.commitFloating()
-        case "resize":
-            engine.replaceCanvas(with: Bitmap(width: 60, height: 40, fill: .black), actionName: "Crop")
-        default:
-            let turned = ImageTransform.rotated(engine.canvas, by: .clockwise90)
-            engine.replaceCanvas(with: turned, actionName: "Rotate")
-            let back = ImageTransform.rotated(
-                Bitmap(width: turned.width, height: turned.height, fill: .black), by: .counterClockwise90
-            )
-            engine.replaceCanvas(with: back, actionName: "Rotate")
-        }
-        engine.previewPolygon(to: preview)
-        #expect(engine.canvas == untouched.canvas, "after \(edit)")
-
-        // Size-preserving edits also undo cleanly back to before the shape.
-        guard edit != "resize" else { return }
-        engine.closePolygon()
-        engine.undo()
-        #expect(engine.canvas == pristine, "undoing the polygon after \(edit) missed pixels")
-    }
-
-    @Test("Bending a chord after an edit under it rolls back to the snapshot everywhere")
-    func pendingCurveRollsBackOtherEdits() {
-        func chordEngine() -> PaintEngine {
-            let engine = shapeEngine(.curve)
+        } else {
             engine.beginStroke(at: PixelPoint(x: 10, y: 50))
             engine.endStroke(at: PixelPoint(x: 90, y: 50))
-            return engine
         }
-        func bend(_ engine: PaintEngine) {
-            engine.beginStroke(at: PixelPoint(x: 50, y: 20))
-            engine.endStroke(at: PixelPoint(x: 50, y: 20))
-        }
-        let untouched = chordEngine()
-        bend(untouched)
+        #expect(engine.hasPendingShape)
 
-        let engine = chordEngine()
-        engine.invertColours()
-        bend(engine)
-        #expect(engine.canvas == untouched.canvas)
-
-        let committed = chordEngine()
-        committed.invertColours()
-        committed.commitPendingShape()
-        committed.undo()
-        #expect(committed.canvas == Bitmap(width: 100, height: 100, fill: .white))
+        let reverted = Bitmap(width: 100, height: 100, fill: PaintColour(hex: "FFE24D")!.rgba8)
+        engine.reset(to: reverted)
+        #expect(!engine.hasPendingShape)
+        #expect(engine.previewPolygon(to: PixelPoint(x: 40, y: 40)).isEmpty)
+        #expect(engine.commitPendingShape().isEmpty)
+        #expect(engine.canvas == reverted)
+        #expect(!engine.canUndo)
     }
 
     @Test("Badges number themselves, and keep counting")
