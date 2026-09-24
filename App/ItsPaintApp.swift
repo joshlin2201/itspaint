@@ -57,6 +57,10 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
         // is off until someone turns it on, and it stays off if the folder it was
         // given has since moved.
         _ = ScreenshotWatcher.shared
+        // Same for the global clipboard shortcut: its init registers the key when
+        // it is switched on, and until something touches it a relaunch leaves
+        // ⌃⌥⌘V dead until Settings happens to be opened.
+        _ = ClipboardHotKey.shared
 
         // The Info.plist entry puts "Edit in ItsPaint" in the Services menu; this
         // is what makes choosing it do something. `NSUpdateDynamicServices` is
@@ -90,13 +94,8 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    /// Settings has to work with no document open.
-    ///
-    /// The command lives on the document, because that is where every other
-    /// command lives — but with no window there is no document in the responder
-    /// chain, and `⌘,` would do nothing on a freshly launched app that had not
-    /// opened anything yet. The delegate is the tail of the chain, so putting
-    /// it here catches exactly that case and nothing else.
+    /// Settings is app-wide and has to work with no document open, so it lives
+    /// on the delegate, which is the tail of every responder chain.
     @IBAction func showSettings(_ sender: Any?) {
         SettingsWindowController.show()
     }

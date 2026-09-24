@@ -821,7 +821,7 @@ struct DocumentActions: View {
             // go: getting the result to someone else is what this app is for.
             if fit.showsLastActions {
             HeaderButton(
-                symbol: "doc.on.doc", title: "Duplicate", shortcut: "⇧⌘S",
+                symbol: "doc.on.doc", title: "Duplicate", shortcut: "⌥⇧⌘S",
                 detail: "Opens a copy in a new window"
             ) {
                 model.isDuplicateConfirmationPresented = true
@@ -1050,7 +1050,7 @@ struct ImageMenu: View {
             Button("Flip Vertical") { model.flipVertically() }
             Divider()
             Button("Invert Colours") { model.invertColours() }
-                .keyboardShortcut("i")
+                .keyboardShortcut("i", modifiers: [.command, .option])
             // The one item here that can decline. It says so itself when the
             // image is too flat to key safely, rather than guessing.
             Button("Remove Background") { model.removeBackground() }
@@ -1081,15 +1081,20 @@ struct ViewMenu: View {
             // the line that would draw it — the same floor the menu bar applies.
             .disabled(model.zoom < 4)
 
+            // The same remembered spacing ⇧⌘' and View ▸ Grid Spacing use, so the
+            // three ways to switch snapping on agree about the grid.
             Toggle("Snap to Grid", isOn: Binding(
                 get: { model.snapGrid != 0 },
-                set: { model.snapGrid = $0 ? ViewMenu.defaultSnap : 0 }
+                set: { model.snapGrid = $0 ? DrawingDocument.rememberedSnapGrid : 0 }
             ))
 
             if model.snapGrid != 0 {
                 Picker("Grid Spacing", selection: Binding(
                     get: { model.snapGrid },
-                    set: { model.snapGrid = $0 }
+                    set: {
+                        model.snapGrid = $0
+                        DrawingDocument.rememberedSnapGrid = $0
+                    }
                 )) {
                     ForEach(ToolSettings.snapGrids, id: \.self) { size in
                         Text("\(size) px").tag(size)
@@ -1105,10 +1110,6 @@ struct ViewMenu: View {
             Button("Colours…") { model.presentSystemColourPicker(for: .foreground) }
         }
     }
-
-    /// The spacing snapping returns to. Matches the menu bar's own default so
-    /// the two switches cannot disagree about what "on" means.
-    static let defaultSnap = 8
 }
 
 /// What you can do with a selection, once there is one.

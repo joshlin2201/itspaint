@@ -312,7 +312,8 @@ struct MenuBarTests {
         let titles = tools?.items.map(\.title) ?? []
 
         for kind in ToolKind.allCases {
-            #expect(titles.contains(kind.displayName), "Tools is missing \(kind.displayName)")
+            let title = kind.displayName.localizedCapitalized
+            #expect(titles.contains(title), "Tools is missing \(title)")
         }
         // And each carries the plain letter the canvas listens for, so the menu
         // documents reality instead of inventing a second set of bindings.
@@ -338,16 +339,24 @@ struct MenuBarTests {
     @Test("No two menu items share a shortcut")
     func shortcutsDoNotCollide() {
         // Two items with the same key means one of them silently never fires.
+        // Nested menus count: Tools ▸ Text ▸ Italic shared ⌘I with Invert
+        // Colours, and the Image menu, being first, always won. An uppercase
+        // key implies Shift, so "S" with ⌘ is the same chord as "s" with ⇧⌘.
         var seen: [String: String] = [:]
-        for top in MainMenuBuilder.build().items {
-            for item in top.submenu?.items ?? [] {
+        func walk(_ menu: NSMenu) {
+            for item in menu.items {
+                if let submenu = item.submenu { walk(submenu) }
                 guard !item.keyEquivalent.isEmpty else { continue }
-                let signature = "\(item.keyEquivalentModifierMask.rawValue):\(item.keyEquivalent)"
+                var modifiers = item.keyEquivalentModifierMask
+                let key = item.keyEquivalent.lowercased()
+                if key != item.keyEquivalent { modifiers.insert(.shift) }
+                let signature = "\(modifiers.rawValue):\(key)"
                 if let existing = seen[signature] {
                     Issue.record("'\(item.title)' collides with '\(existing)' on \(signature)")
                 }
                 seen[signature] = item.title
             }
         }
+        walk(MainMenuBuilder.build())
     }
 }

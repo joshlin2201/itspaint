@@ -213,7 +213,10 @@ enum MainMenuBuilder {
         // and grows the canvas, so it gets a sheet with a size preview.
         add(to: menu, "Rotate…", #selector(AppCommands.showRotateSheet(_:)), "")
         menu.addItem(.separator())
+        // ⌥⌘I, because ⌘I is Italic and ⇧⌘I is Invert Selection. The Image menu
+        // comes first in the bar, so sharing ⌘I inverted the picture mid-typing.
         add(to: menu, "Invert Colours", #selector(AppCommands.invertColours(_:)), "i")
+            .keyEquivalentModifierMask = [.command, .option]
         add(to: menu, "Clear Image", #selector(AppCommands.clearImage(_:)), "")
             .keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(.separator())
@@ -239,8 +242,10 @@ enum MainMenuBuilder {
         for (index, group) in ToolKind.groups.enumerated() {
             if index > 0 { menu.addItem(.separator()) }
             for kind in group {
+                // Title case, like every other item in the bar. The names are
+                // sentence case because the rail and tooltips use them mid-sentence.
                 let entry = NSMenuItem(
-                    title: kind.displayName,
+                    title: kind.displayName.localizedCapitalized,
                     action: #selector(AppCommands.selectToolFromMenu(_:)),
                     keyEquivalent: String(kind.shortcut)
                 )
@@ -271,7 +276,7 @@ enum MainMenuBuilder {
             // every screenshot should cost one key.
             let arrow = kind == .arrow
             let entry = NSMenuItem(
-                title: kind.displayName,
+                title: kind.displayName.localizedCapitalized,
                 action: #selector(AppCommands.selectShapeFromMenu(_:)),
                 keyEquivalent: arrow ? "a" : index < 9 ? String(index + 1) : ""
             )
@@ -308,7 +313,7 @@ enum MainMenuBuilder {
         // for something used once per document is a cell taken from the tools used
         // hundreds of times.
         //
-        // `⇧⌘S` is Duplicate, and `⌘S` is Save, so the signature gets `⌃⌘S`.
+        // `⇧⌘S` is Save As, and `⌘S` is Save, so the signature gets `⌃⌘S`.
         add(to: menu, "Signature…", #selector(AppCommands.showSignatureSheet(_:)), "s")
             .keyEquivalentModifierMask = [.command, .control]
 

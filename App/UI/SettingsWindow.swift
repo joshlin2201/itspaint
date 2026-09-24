@@ -24,7 +24,6 @@ final class Settings {
         static let defaultBrushSize = "defaultBrushSize"
         static let growCanvasOnPaste = "growCanvasOnPaste"
         static let resizeWindowWithCanvas = "resizeWindowWithCanvas"
-        static let confirmLargeCanvas = "confirmLargeCanvas"
     }
 
     /// The size File ▸ New starts at.
@@ -47,9 +46,6 @@ final class Settings {
         didSet { store(resizeWindowWithCanvas, Key.resizeWindowWithCanvas) }
     }
 
-    /// Warn before a paste that would produce a very large canvas.
-    var confirmLargeCanvas: Bool { didSet { store(confirmLargeCanvas, Key.confirmLargeCanvas) } }
-
     private init() {
         let defaults = UserDefaults.standard
         defaults.register(defaults: [
@@ -58,7 +54,6 @@ final class Settings {
             Key.defaultBrushSize: 2,
             Key.growCanvasOnPaste: true,
             Key.resizeWindowWithCanvas: true,
-            Key.confirmLargeCanvas: true,
         ])
         newCanvasWidth = defaults.integer(forKey: Key.newCanvasWidth)
         newCanvasHeight = defaults.integer(forKey: Key.newCanvasHeight)
@@ -67,7 +62,6 @@ final class Settings {
             .flatMap(ToolKind.init(rawValue:)) ?? .brush
         growCanvasOnPaste = defaults.bool(forKey: Key.growCanvasOnPaste)
         resizeWindowWithCanvas = defaults.bool(forKey: Key.resizeWindowWithCanvas)
-        confirmLargeCanvas = defaults.bool(forKey: Key.confirmLargeCanvas)
     }
 
     private func store(_ value: Any, _ key: String) {
@@ -81,13 +75,17 @@ final class Settings {
         model.engine.growsToFitFloating = growCanvasOnPaste
     }
 
-    /// The canvas size File ▸ New should use, clamped to what the engine
-    /// supports so a hand-edited defaults plist cannot produce a document that
-    /// refuses to open.
+    /// The canvas size File ▸ New should use, or the built-in default when the
+    /// preference is one the engine cannot allocate.
+    ///
+    /// Each side can be within `maximumDimension` while the area is not:
+    /// 10,000 × 10,000 is three times the pixel budget. `DrawingDocument.init()`
+    /// runs for opened files and the untitled window at launch too, so an
+    /// unchecked size here would stop the app on every start.
     var newCanvasSize: (width: Int, height: Int) {
-        let width = min(max(1, newCanvasWidth), Bitmap.maximumDimension)
-        let height = min(max(1, newCanvasHeight), Bitmap.maximumDimension)
-        return (width, height)
+        Bitmap.isSizeSupported(width: newCanvasWidth, height: newCanvasHeight)
+            ? (newCanvasWidth, newCanvasHeight)
+            : DrawingDocument.defaultCanvasSize
     }
 
     func resetToDefaults() {
@@ -97,7 +95,6 @@ final class Settings {
         defaultBrushSize = 2
         growCanvasOnPaste = true
         resizeWindowWithCanvas = true
-        confirmLargeCanvas = true
     }
 }
 
@@ -150,6 +147,12 @@ struct SettingsView: View {
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
                 }
+                if !Bitmap.isSizeSupported(width: settings.newCanvasWidth, height: settings.newCanvasHeight) {
+                    let fallback = DrawingDocument.defaultCanvasSize
+                    Text("Too large. New images open at \(fallback.width) × \(fallback.height) instead.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
 
                 Picker("Start with", selection: $settings.defaultTool) {
                     ForEach(ToolKind.allCases, id: \.self) { tool in
@@ -180,7 +183,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
 
                 Toggle("Resize the window with the canvas", isOn: $settings.resizeWindowWithCanvas)
-                Toggle("Warn before very large canvases", isOn: $settings.confirmLargeCanvas)
             }
 
             Section("Screenshots") {
@@ -271,7 +273,7 @@ private struct ClipboardHotKeyRow: View {
             }
         }
 
-        Text("Works from any app, without ItsPaint being open. "
+        Text("Works from any app while ItsPaint is running, even with no window open. "
              + "It always makes a new image, so it never pastes into what you were editing.")
             .font(.caption)
             .foregroundStyle(.secondary)
