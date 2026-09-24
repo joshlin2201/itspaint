@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import PaintKit
 
@@ -483,6 +484,96 @@ struct StrokeDashTests {
 
         for index in 0..<solid.pixels.count where dashed.pixels[index] == RGBA8.black {
             #expect(solid.pixels[index] == RGBA8.black, "a dash landed off the line at \(index)")
+        }
+    }
+}
+
+@Suite("Freeform selection solver")
+struct FreeformSolverTests {
+
+    /// `Selection(freeform:clippedTo:)` as it was before its edges were bucketed
+    /// by row: every row tests every edge. Kept as the reference the bucketed
+    /// solver has to match exactly.
+    private func everyEdgeReference(_ points: [PixelPoint], clippedTo canvas: PixelRect) -> Selection? {
+        guard points.count >= 3 else { return nil }
+        let minX = max(canvas.minX, points.map(\.x).min() ?? 0)
+        let maxX = min(canvas.maxX - 1, points.map(\.x).max() ?? 0)
+        let minY = max(canvas.minY, points.map(\.y).min() ?? 0)
+        let maxY = min(canvas.maxY - 1, points.map(\.y).max() ?? 0)
+        guard maxX >= minX, maxY >= minY else { return nil }
+        let box = PixelRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+        var coverage = [UInt8](repeating: 0, count: box.area)
+        for y in box.minY..<box.maxY {
+            let scan = Double(y) + 0.5
+            var crossings: [Double] = []
+            for i in 0..<points.count {
+                let a = points[i]
+                let b = points[(i + 1) % points.count]
+                let ay = Double(a.y), by = Double(b.y)
+                guard (ay <= scan && by > scan) || (by <= scan && ay > scan) else { continue }
+                let t = (scan - ay) / (by - ay)
+                crossings.append(Double(a.x) + t * Double(b.x - a.x))
+            }
+            crossings.sort()
+            var i = 0
+            while i + 1 < crossings.count {
+                let from = max(box.minX, Int(crossings[i].rounded()))
+                let to = min(box.maxX, Int(crossings[i + 1].rounded()))
+                if to > from {
+                    let row = (y - box.minY) * box.width
+                    for x in from..<to { coverage[row + (x - box.minX)] = 255 }
+                }
+                i += 2
+            }
+        }
+        guard coverage.contains(255) else { return nil }
+        return Selection(bounds: box, mask: coverage)
+    }
+
+    @Test("Bucketing edges by row selects exactly what testing every edge did")
+    func bucketedMatchesEveryEdge() {
+        var generator = SprayRandom(seed: 0x1A55_0F)
+        let canvas = PixelRect(x: 0, y: 0, width: 120, height: 90)
+        for index in 0..<400 {
+            let count = 3 + Int(generator.next() % 60)
+            // Coarse grids make horizontal edges and repeated points common;
+            // the margin puts corners off the canvas on every side.
+            let grid = [1, 1, 5, 20][index % 4]
+            let points = (0..<count).map { _ in
+                PixelPoint(
+                    x: (Int(generator.next() % 180) - 30) / grid * grid,
+                    y: (Int(generator.next() % 150) - 30) / grid * grid
+                )
+            }
+            #expect(Selection(freeform: points, clippedTo: canvas)
+                    == everyEdgeReference(points, clippedTo: canvas),
+                    "outline \(index): \(points)")
+        }
+    }
+
+    @Test("A long traced loop on a large canvas matches the reference")
+    func longLoopMatches() {
+        let canvas = PixelRect(x: 0, y: 0, width: 800, height: 600)
+        // A wobbling loop that runs past the canvas edge on both sides.
+        let points = (0..<600).map { i -> PixelPoint in
+            let angle = Double(i) / 600 * 2 * .pi
+            let wobble = 1 + 0.2 * sin(angle * 17)
+            return PixelPoint(x: 400 + Int(460 * wobble * cos(angle)), y: 300 + Int(250 * wobble * sin(angle)))
+        }
+        #expect(Selection(freeform: points, clippedTo: canvas) == everyEdgeReference(points, clippedTo: canvas))
+    }
+
+    @Test("Outlines at the limits of Int solve without overflowing")
+    func extremeOutlines() {
+        let canvas = PixelRect(x: 0, y: 0, width: 20, height: 20)
+        let outlines = [
+            [PixelPoint(x: 0, y: .min), PixelPoint(x: 10, y: .min), PixelPoint(x: 5, y: 10)],
+            [PixelPoint(x: 2, y: .max), PixelPoint(x: 18, y: .max), PixelPoint(x: 10, y: 3)],
+            [PixelPoint(x: -1_000_000_000, y: 2), PixelPoint(x: 1_000_000_000, y: 4), PixelPoint(x: 9, y: 19)],
+        ]
+        for points in outlines {
+            #expect(Selection(freeform: points, clippedTo: canvas) == everyEdgeReference(points, clippedTo: canvas),
+                    "\(points)")
         }
     }
 }

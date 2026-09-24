@@ -53,6 +53,30 @@ public struct Selection: Equatable, Sendable {
 
     public func contains(_ point: PixelPoint) -> Bool { coverage(at: point) > 0 }
 
+    /// Set `value` wherever this selection covers, in a mask laid out row-major
+    /// over `maskBounds`. Reads and writes whole rows rather than asking
+    /// `contains` pixel by pixel, which is what combining two page-sized
+    /// Instant Alpha regions spends its time on.
+    func write(_ value: UInt8, into mask: inout [UInt8], over maskBounds: PixelRect) {
+        let region = bounds.intersection(maskBounds)
+        guard !region.isEmpty, mask.count == maskBounds.area else { return }
+        let coverage = self.mask
+        mask.withUnsafeMutableBufferPointer { out in
+            for y in region.minY..<region.maxY {
+                let row = (y - maskBounds.minY) * maskBounds.width - maskBounds.minX
+                guard let coverage else {
+                    UnsafeMutableBufferPointer(rebasing: out[(row + region.minX)..<(row + region.maxX)])
+                        .update(repeating: value)
+                    continue
+                }
+                let source = (y - bounds.minY) * bounds.width - bounds.minX
+                for x in region.minX..<region.maxX where coverage[source + x] > 0 {
+                    out[row + x] = value
+                }
+            }
+        }
+    }
+
     /// Shrink `bounds` to the mask's actual extent.
     ///
     /// An inverted selection starts as a full-canvas mask; without this its
@@ -106,16 +130,48 @@ public struct Selection: Equatable, Sendable {
         let box = PixelRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
         var coverage = [UInt8](repeating: 0, count: box.area)
 
+        // A row only looks at the edges that cross it. The scan line through row
+        // `y` sits at `y + 0.5`, so an edge crosses rows `min(ay, by)` through
+        // `max(ay, by) - 1`. Edges are sorted by their first row and join an
+        // active list as the scan reaches them, which keeps a long lasso from
+        // testing every one of its points on every row while it is dragged out.
+        struct Edge {
+            let firstRow: Int, lastRow: Int
+            let ax: Double, ay: Double, by: Double, run: Double
+        }
+        var edges: [Edge] = []
+        edges.reserveCapacity(points.count)
+        for i in 0..<points.count {
+            let a = points[i]
+            let b = points[(i + 1) % points.count]
+            let firstRow = max(box.minY, min(a.y, b.y))
+            let bottom = max(a.y, b.y)
+            // Checked before `bottom - 1` is formed, so an edge at `Int.min`
+            // is skipped rather than overflowing.
+            guard bottom > firstRow, firstRow < box.maxY else { continue }
+            let lastRow = min(box.maxY - 1, bottom - 1)
+            edges.append(Edge(
+                firstRow: firstRow, lastRow: lastRow,
+                ax: Double(a.x), ay: Double(a.y), by: Double(b.y), run: Double(b.x - a.x)
+            ))
+        }
+        edges.sort { $0.firstRow < $1.firstRow }
+
+        var active: [Edge] = []
+        var nextEdge = 0
+        var crossings: [Double] = []
         for y in box.minY..<box.maxY {
+            while nextEdge < edges.count, edges[nextEdge].firstRow <= y {
+                active.append(edges[nextEdge])
+                nextEdge += 1
+            }
+            active.removeAll { $0.lastRow < y }
+
             let scan = Double(y) + 0.5
-            var crossings: [Double] = []
-            for i in 0..<points.count {
-                let a = points[i]
-                let b = points[(i + 1) % points.count]
-                let ay = Double(a.y), by = Double(b.y)
-                guard (ay <= scan && by > scan) || (by <= scan && ay > scan) else { continue }
-                let t = (scan - ay) / (by - ay)
-                crossings.append(Double(a.x) + t * Double(b.x - a.x))
+            crossings.removeAll(keepingCapacity: true)
+            for edge in active {
+                let t = (scan - edge.ay) / (edge.by - edge.ay)
+                crossings.append(edge.ax + t * edge.run)
             }
             crossings.sort()
 

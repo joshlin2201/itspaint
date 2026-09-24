@@ -394,3 +394,137 @@ struct BucketToleranceTests {
         #expect(bmp.unsafePixel(at: PixelPoint(x: 30, y: 10)) != RGBA8(r: 255, g: 0, b: 0, a: 255))
     }
 }
+
+@Suite("Smooth segment band")
+struct SmoothSegmentBandTests {
+
+    /// `Raster.strokeSegmentSmooth` as it was before its rows were clipped to the
+    /// line's band: every pixel of the padded bounding box is visited. Kept as
+    /// the reference the clipped version has to match byte for byte.
+    private func fullBoxReference(
+        from a: PixelPoint, to b: PixelPoint, width: Int, colour: RGBA8,
+        into bitmap: inout Bitmap, dash: Raster.Dash
+    ) -> PixelRect {
+        let w = max(1, width)
+        let half = Double(w) / 2
+        let ax = Double(a.x) + 0.5, ay = Double(a.y) + 0.5
+        let bx = Double(b.x) + 0.5, by = Double(b.y) + 0.5
+        let vx = bx - ax, vy = by - ay
+        let lengthSquared = vx * vx + vy * vy
+        let length = lengthSquared.squareRoot()
+        let pad = Int(half.rounded(.up)) + 1
+        let box = PixelRect(
+            x: min(a.x, b.x) - pad, y: min(a.y, b.y) - pad,
+            width: abs(a.x - b.x) + 1 + pad * 2, height: abs(a.y - b.y) + 1 + pad * 2
+        ).intersection(bitmap.bounds)
+        guard !box.isEmpty else { return .empty }
+        let runs = dash.runs(weight: w)
+        var dirty = PixelRect.empty
+        for y in box.minY..<box.maxY {
+            for x in box.minX..<box.maxX {
+                let px = Double(x) + 0.5, py = Double(y) + 0.5
+                var t = 0.0
+                if lengthSquared > 0 {
+                    t = ((px - ax) * vx + (py - ay) * vy) / lengthSquared
+                    t = min(max(t, 0), 1)
+                }
+                let dx = px - (ax + t * vx), dy = py - (ay + t * vy)
+                let distance = (dx * dx + dy * dy).squareRoot()
+                var coverage = half + 0.5 - distance
+                guard coverage > 0 else { continue }
+                if coverage > 1 { coverage = 1 }
+                if let runs {
+                    let along = Int(t * length)
+                    if along % (runs.on + runs.off) >= runs.on { continue }
+                }
+                let i = bitmap.index(PixelPoint(x: x, y: y))
+                if colour.a == 0 {
+                    bitmap.pixels[i] = bitmap.pixels[i]
+                        .withCoverage(UInt8(((1 - coverage) * 255).rounded()))
+                    dirty = dirty.union(PixelRect(x: x, y: y, width: 1, height: 1))
+                    continue
+                }
+                let alpha = Double(colour.a) * coverage
+                let src = RGBA8(
+                    r: UInt8((Double(colour.r) * coverage).rounded()),
+                    g: UInt8((Double(colour.g) * coverage).rounded()),
+                    b: UInt8((Double(colour.b) * coverage).rounded()),
+                    a: UInt8(alpha.rounded())
+                )
+                guard src.a > 0 else { continue }
+                bitmap.pixels[i] = src.overCompositing(bitmap.pixels[i])
+                dirty = dirty.union(PixelRect(x: x, y: y, width: 1, height: 1))
+            }
+        }
+        return dirty
+    }
+
+    private func check(
+        _ generator: inout SprayRandom, cases: Int, canvas: (width: Int, height: Int), reach: Int
+    ) {
+        let colours = [
+            RGBA8(r: 20, g: 90, b: 200),
+            RGBA8(r: 120, g: 30, b: 60, a: 150),   // translucent, premultiplied
+            RGBA8.clear,                           // erases
+        ]
+        func coordinate(_ extent: Int) -> Int {
+            Int(generator.next() % UInt64(extent + 2 * reach)) - reach
+        }
+        for index in 0..<cases {
+            let a = PixelPoint(x: coordinate(canvas.width), y: coordinate(canvas.height))
+            let b = index % 9 == 0
+                ? a
+                : PixelPoint(x: coordinate(canvas.width), y: coordinate(canvas.height))
+            let width = Int(generator.next() % 24) + 1
+            let colour = colours[index % colours.count]
+            let dash = Raster.Dash.allCases[index % Raster.Dash.allCases.count]
+
+            // A half-transparent ground, so compositing and erasing both show.
+            var ground = Bitmap(width: canvas.width, height: canvas.height,
+                                fill: RGBA8(r: 100, g: 100, b: 100, a: 200))
+            ground.fill(PixelRect(x: 0, y: 0, width: canvas.width / 2, height: canvas.height),
+                        with: .white)
+            var expected = ground
+            let expectedDirty = fullBoxReference(
+                from: a, to: b, width: width, colour: colour, into: &expected, dash: dash
+            )
+            var actual = ground
+            let actualDirty = Raster.strokeSegmentSmooth(
+                from: a, to: b, width: width, colour: colour, into: &actual, dash: dash
+            )
+            #expect(actualDirty == expectedDirty, "dirty rect for \(a) -> \(b), width \(width)")
+            #expect(actual == expected, "pixels for \(a) -> \(b), width \(width), \(dash)")
+        }
+    }
+
+    @Test("Clipping rows to the line's band draws exactly what the full box drew")
+    func bandMatchesFullBox() {
+        var generator = SprayRandom(seed: 0x5E6_BA4D)
+        // Endpoints up to 30px off every edge; every ninth segment is a dot.
+        check(&generator, cases: 360, canvas: (64, 48), reach: 30)
+        // Long segments from far off the canvas, where the band's extrapolated
+        // centre lands well outside the box on some rows.
+        check(&generator, cases: 24, canvas: (200, 150), reach: 2_000)
+    }
+
+    @Test("Absurdly distant endpoints still draw what the full box drew")
+    func distantEndpointsMatchFullBox() {
+        let far = Int.max - 100
+        let segments = [
+            (PixelPoint(x: 0, y: 0), PixelPoint(x: far, y: 1)),
+            (PixelPoint(x: -far / 2, y: 20), PixelPoint(x: far / 2, y: 30)),
+            (PixelPoint(x: 10, y: -3_000_000), PixelPoint(x: 40, y: 3_000_000)),
+            (PixelPoint(x: -1_000_000_000_000, y: 5), PixelPoint(x: 30, y: 25)),
+        ]
+        for (a, b) in segments {
+            var expected = Bitmap(width: 64, height: 48, fill: .white)
+            let expectedDirty = fullBoxReference(
+                from: a, to: b, width: 3, colour: .black, into: &expected, dash: .solid
+            )
+            var actual = Bitmap(width: 64, height: 48, fill: .white)
+            let actualDirty = Raster.strokeSegmentSmooth(from: a, to: b, width: 3, colour: .black, into: &actual)
+            #expect(actualDirty == expectedDirty, "\(a) -> \(b)")
+            #expect(actual == expected, "\(a) -> \(b)")
+        }
+    }
+}

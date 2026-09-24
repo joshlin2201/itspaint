@@ -194,6 +194,40 @@ struct DrawingDocumentTests {
         #expect(DrawingDocument().model.canvas.width == tooLarge.width)
     }
 
+    /// The engine's history budget drops old edits that `NSUndoManager` still
+    /// has actions for. Those actions must replay nothing and leave redo alone,
+    /// or the next redo replays the wrong edit.
+    @Test("An undo action for an edit the history dropped leaves redo alone")
+    func droppedHistoryLeavesRedoAlone() throws {
+        let document = DrawingDocument()
+        let undo = try #require(document.undoManager)
+        undo.groupsByEvent = false
+        func invert() {
+            undo.beginUndoGrouping()
+            document.model.invertColours()
+            undo.endUndoGrouping()
+        }
+
+        invert()
+        invert()
+        // Both engine entries gone while their actions remain, which is what a
+        // trimming budget does to the oldest ones.
+        document.model.engine.reset(to: document.model.canvas)
+        let beforeLast = document.model.canvas
+        invert()
+        let afterLast = document.model.canvas
+
+        undo.undo()
+        #expect(document.model.canvas == beforeLast)
+        undo.undo()  // an action whose edit is gone
+        #expect(document.model.canvas == beforeLast)
+        #expect(undo.redoActionName == "Invert colours", "a dropped edit put a redo on top")
+
+        undo.redo()
+        #expect(document.model.canvas == afterLast)
+        #expect(!undo.canRedo, "a dropped edit left a redo behind")
+    }
+
     @Test("The app and native document use one stable public identity")
     func publicIdentityIsConsistent() throws {
         #expect(Bundle.main.bundleIdentifier == "com.joshlin.itspaint")

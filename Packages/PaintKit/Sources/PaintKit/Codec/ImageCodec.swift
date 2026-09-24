@@ -400,7 +400,12 @@ public enum ImageCodec {
     }
 
     /// Composite over an opaque matte, for formats that cannot carry alpha.
+    ///
+    /// An opaque pixel composites to itself, so a bitmap with no transparency is
+    /// already flat and comes back as it is, rather than as a second canvas-sized
+    /// copy held for the length of the save.
     public static func flattened(_ bitmap: Bitmap, onto colour: PaintColour) -> Bitmap {
+        if bitmap.pixels.allSatisfy({ $0.a == 255 }) { return bitmap }
         var flat = Bitmap(width: bitmap.width, height: bitmap.height, fill: colour.rgba8)
         flat.composite(bitmap, at: .zero)
         return flat

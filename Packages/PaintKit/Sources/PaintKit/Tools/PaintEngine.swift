@@ -89,8 +89,14 @@ public final class PaintEngine {
     /// Both are *pending*: their pixels are on the canvas as a live preview but
     /// no undo step exists yet, so abandoning them leaves no trace and
     /// finishing them records exactly one edit.
-    private var pendingCurve: (before: Bitmap, a: PixelPoint, b: PixelPoint)?
-    private var pendingPolygon: (before: Bitmap, points: [PixelPoint])?
+    ///
+    /// `drawn` is the rect the preview currently covers. Outside it the canvas
+    /// still equals `before`, so redrawing rolls back only that rect and
+    /// finishing records only that rect. That holds because nothing else writes
+    /// the canvas while a shape is pending: every command that would lands the
+    /// shape first (see `commitPendingShape`), and `reset(to:)` drops it.
+    private var pendingCurve: (before: Bitmap, a: PixelPoint, b: PixelPoint, drawn: PixelRect)?
+    private var pendingPolygon: (before: Bitmap, points: [PixelPoint], drawn: PixelRect)?
 
     /// Whether a shape is mid-construction, so the UI can say so and the app
     /// knows to land it before doing anything else.
@@ -252,7 +258,7 @@ public final class PaintEngine {
         if settings.shapeKind == .curve, tool == .shape, let pending = pendingCurve {
             gesture = .bend(
                 before: pending.before, a: pending.a, b: pending.b,
-                dirty: canvas.bounds, button: button
+                dirty: pending.drawn, button: button
             )
             pendingCurve = nil
             return dirty.union(continueStroke(to: point))
@@ -386,26 +392,30 @@ public final class PaintEngine {
             )
             return stepDirty
 
-        case let .clone(before, coverage, last, dirty, origin):
+        case .clone(let before, var coverage, let last, let dirty, let origin):
+            // The gesture lets go of the coverage first, so the canvas-sized array
+            // is uniquely held here and the stamps below write into it in place
+            // instead of copying it on every event.
+            gesture = .idle
             // Shift locks the stroke to a row or a column through its first point.
             // Not `constrain()`, which snaps to a square or 45 degrees and would
             // throw the destination onto a diagonal.
             let aimed = constrained ? axisLocked(point, through: origin) : point
-            var updated = coverage
-            let stepDirty = strokeClone(from: last, to: aimed, into: &updated, before: before)
+            let stepDirty = strokeClone(from: last, to: aimed, into: &coverage, before: before)
             gesture = .clone(
-                before: before, coverage: updated, last: aimed,
+                before: before, coverage: coverage, last: aimed,
                 dirty: dirty.union(stepDirty), origin: origin
             )
             return stepDirty
 
-        case let .highlight(before, coverage, last, dirty, colour):
-            var updated = coverage
+        case .highlight(let before, var coverage, let last, let dirty, let colour):
+            // Released first for the same reason as the clone case above.
+            gesture = .idle
             let stepDirty = strokeHighlighter(
-                from: last, to: point, into: &updated, before: before, colour: colour
+                from: last, to: point, into: &coverage, before: before, colour: colour
             )
             gesture = .highlight(
-                before: before, coverage: updated, last: point,
+                before: before, coverage: coverage, last: point,
                 dirty: dirty.union(stepDirty), colour: colour
             )
             return stepDirty
@@ -414,8 +424,7 @@ public final class PaintEngine {
             // Roll back the previous preview, then draw the new one. Restoring
             // only the previously dirtied rect keeps a live preview cheap.
             if !previousDirty.isEmpty {
-                let patch = before.extract(previousDirty)
-                canvas.restore(patch.pixels, to: patch.rect)
+                canvas.restore(previousDirty, from: before)
             }
             let end = snappedEnd(constrained ? constrain(origin, to: point) : point, from: origin)
             let drawn: PixelRect
@@ -468,8 +477,7 @@ public final class PaintEngine {
 
         case let .bend(before, a, b, previousDirty, button):
             if !previousDirty.isEmpty {
-                let patch = before.extract(previousDirty)
-                canvas.restore(patch.pixels, to: patch.rect)
+                canvas.restore(previousDirty, from: before)
             }
             let drawn = Raster.strokeCurve(
                 from: a, through: point, to: b,
@@ -570,7 +578,7 @@ public final class PaintEngine {
             // A curve's first drag only lays the chord: hold it as a pending
             // preview so the next drag can bend it, and record nothing yet.
             if settings.tool == .shape, settings.shapeKind == .curve, !dirty.isEmpty {
-                pendingCurve = (before: before, a: origin, b: point ?? origin)
+                pendingCurve = (before: before, a: origin, b: point ?? origin, drawn: dirty)
                 return refreshed.union(dirty)
             }
             let name = settings.tool.isRegionEffect
@@ -738,22 +746,11 @@ public final class PaintEngine {
             bounds = current.bounds
         }
 
+        // The current selection is written in, then the incoming region is
+        // written over it: selected to add, cleared to subtract.
         var mask = [UInt8](repeating: 0, count: bounds.area)
-        for y in bounds.minY..<bounds.maxY {
-            for x in bounds.minX..<bounds.maxX {
-                let point = PixelPoint(x: x, y: y)
-                let wasSelected = current.contains(point)
-                let isIncoming = incoming?.contains(point) == true
-                let selected = switch operation {
-                case .replace: isIncoming
-                case .add: wasSelected || isIncoming
-                case .subtract: wasSelected && !isIncoming
-                }
-                if selected {
-                    mask[(y - bounds.minY) * bounds.width + (x - bounds.minX)] = 255
-                }
-            }
-        }
+        current.write(255, into: &mask, over: bounds)
+        incoming?.write(operation == .add ? 255 : 0, into: &mask, over: bounds)
         guard mask.contains(255) else { return nil }
         return Selection(bounds: bounds, mask: mask).tightened()
     }
@@ -824,9 +821,11 @@ public final class PaintEngine {
     /// background colour.
     @discardableResult
     public func cutSelection() -> PixelRect {
+        // Before `selectedContent()` reads the pixels, as in `trimBorders`.
+        let landed = commitPendingShape()
         guard floating == nil, let selection, !selection.isEmpty,
               let content = selectedContent()
-        else { return .empty }
+        else { return landed }
 
         let before = canvas
         canvas.fill(selection, with: colours.background.rgba8)
@@ -838,7 +837,7 @@ public final class PaintEngine {
         )
         self.selection = nil
         lassoPath = []
-        return selection.bounds
+        return landed.union(selection.bounds)
     }
 
     @discardableResult
@@ -896,6 +895,7 @@ public final class PaintEngine {
     /// succeeding at doing nothing is still a lie about what happened.
     @discardableResult
     public func removeBackground(tolerance: Int = 24) -> Bool {
+        _ = commitPendingShape()  // Before the flood reads the canvas, as in `trimBorders`.
         _ = commitFloating()
         guard !canvas.bounds.isEmpty else { return false }
 
@@ -909,13 +909,23 @@ public final class PaintEngine {
         // Built up in `selection` itself, through the same combiner Shift-click
         // uses — one description of "add these regions together" serves both, and
         // the page *is* what the selection should end up being.
+        //
+        // A corner of exactly an earlier corner's colour, inside the region that
+        // corner flooded, would flood the identical region again, so it is not
+        // flooded twice. The same colour matters: a corner of a nearby colour
+        // inside that region has its own tolerance window and can reach further.
         let previous = selection
         selection = nil
-        for corner in corners {
-            selection = combinedSelection(
-                with: Raster.floodSelection(from: corner, tolerance: tolerance, in: canvas),
-                operation: .add
-            )
+        var repeatsEarlierCorner = [Bool](repeating: false, count: corners.count)
+        for (index, corner) in corners.enumerated() where !repeatsEarlierCorner[index] {
+            let region = Raster.floodSelection(from: corner, tolerance: tolerance, in: canvas)
+            let colour = canvas.unsafePixel(at: corner)
+            for later in (index + 1)..<corners.count
+            where canvas.unsafePixel(at: corners[later]) == colour
+                && region?.contains(corners[later]) == true {
+                repeatsEarlierCorner[later] = true
+            }
+            selection = combinedSelection(with: region, operation: .add)
         }
 
         guard let page = selection, !page.isEmpty else {
@@ -990,7 +1000,7 @@ public final class PaintEngine {
     /// current selection's origin when there is one).
     @discardableResult
     public func paste(_ bitmap: Bitmap) -> PixelRect {
-        var dirty = commitFloating()
+        var dirty = commitPendingShape().union(commitFloating())
 
         // Grow first, so the pasted image is *entirely on the canvas* the
         // moment it arrives.
@@ -1042,7 +1052,7 @@ public final class PaintEngine {
     /// compositing straight in.
     @discardableResult
     public func stamp(_ bitmap: Bitmap, coveringAtMost fraction: Double = 0.4) -> PixelRect {
-        var dirty = commitFloating()
+        var dirty = commitPendingShape().union(commitFloating())
         guard bitmap.width > 0, bitmap.height > 0, !canvas.bounds.isEmpty else { return dirty }
 
         var placed = bitmap
@@ -1093,6 +1103,12 @@ public final class PaintEngine {
     /// wants the old behaviour — a stamp clipped to the page.
     @discardableResult
     public func commitFloating() -> PixelRect {
+        guard floating != nil else { return .empty }
+        let landed = commitPendingShape()
+        return landed.union(placeFloating())
+    }
+
+    private func placeFloating() -> PixelRect {
         guard let floating else { return .empty }
         self.floating = nil
 
@@ -1196,6 +1212,7 @@ public final class PaintEngine {
     /// committing can enlarge the canvas and shift the existing artwork, which
     /// moves the content's coordinates with it.
     public func cropToSelection() -> Bool {
+        _ = commitPendingShape()  // Before the read, as in `trimBorders`.
         if floating != nil {
             _ = commitFloating()
             if let placed = lastPlacedFloatingFrame {
@@ -1229,6 +1246,10 @@ public final class PaintEngine {
     /// most want to trim.
     @discardableResult
     public func trimBorders(tolerance: Int = 6) -> Bool {
+        // Landed before the canvas is read: a stray one- or two-corner polygon's
+        // landing takes its rubber band away, and a trim measured with it on the
+        // canvas would keep it as content.
+        _ = commitPendingShape()
         _ = commitFloating()
         guard let trimmed = ImageTransform.trimmingUniformBorder(canvas, tolerance: tolerance)
         else { return false }
@@ -1249,27 +1270,30 @@ public final class PaintEngine {
 
     /// Land whatever half-built shape is on the canvas as one undoable edit.
     ///
-    /// Called when anything else happens — another tool, a menu command, a
-    /// save. A preview that silently disappears because you reached for the
-    /// eraser is worse than one that commits.
+    /// Called when anything else happens: another tool, a menu command, a page
+    /// turn or an export. A preview that silently disappears because you
+    /// reached for the eraser is worse than one that commits.
+    ///
+    /// Every engine command that writes pixels or resizes the canvas calls this
+    /// first, so the shape is its own undo step beneath that command's, and
+    /// includes the rect returned here in its own. A preview redrawn over an edit
+    /// it did not make would roll that edit back and leave its undo step behind.
     @discardableResult
     public func commitPendingShape() -> PixelRect {
         if let pending = pendingCurve {
             pendingCurve = nil
-            let dirty = canvas.bounds
-            recordEdit(name: "Curve", before: pending.before, dirty: dirty)
-            return dirty
+            recordEdit(name: "Curve", before: pending.before, dirty: pending.drawn)
+            return pending.drawn
         }
         if let pending = pendingPolygon {
             pendingPolygon = nil
             // Fewer than three corners is a stray click, not a shape.
             guard pending.points.count > 2 else {
-                canvas = pending.before
-                return canvas.bounds
+                canvas.restore(pending.drawn, from: pending.before)
+                return pending.drawn
             }
-            let dirty = canvas.bounds
-            recordEdit(name: "Polygon", before: pending.before, dirty: dirty)
-            return dirty
+            recordEdit(name: "Polygon", before: pending.before, dirty: pending.drawn)
+            return pending.drawn
         }
         return .empty
     }
@@ -1278,19 +1302,22 @@ public final class PaintEngine {
     /// first one.
     @discardableResult
     private func addPolygonCorner(at point: PixelPoint, button: PointerButton) -> PixelRect {
+        // A new polygon is a new shape, so a chord still waiting to be bent lands.
+        let landed = pendingPolygon == nil ? commitPendingShape() : .empty
         let before = pendingPolygon?.before ?? canvas
         var points = pendingPolygon?.points ?? []
+        let drawn = pendingPolygon?.drawn ?? .empty
 
         // Clicking the first corner again closes the shape — the same gesture
         // the classic tool used, and the only one that needs no instruction.
         if let first = points.first, points.count > 2, first.isNear(point, within: closeTolerance) {
-            pendingPolygon = (before: before, points: points)
+            pendingPolygon = (before: before, points: points, drawn: drawn)
             return commitPendingShape()
         }
 
         points.append(point)
-        pendingPolygon = (before: before, points: points)
-        return redrawPendingPolygon(preview: point, button: button)
+        pendingPolygon = (before: before, points: points, drawn: drawn)
+        return landed.union(redrawPendingPolygon(preview: point, button: button))
     }
 
     /// Close the polygon where it stands. Bound to Return and a double-click.
@@ -1309,7 +1336,7 @@ public final class PaintEngine {
 
     private func redrawPendingPolygon(preview: PixelPoint, button: PointerButton) -> PixelRect {
         guard let pending = pendingPolygon else { return .empty }
-        canvas = pending.before
+        canvas.restore(pending.drawn, from: pending.before)
         let points = pending.points + (pending.points.last == preview ? [] : [preview])
         let style = settings.shapeStyle
         let stroke = colours.colour(for: button).rgba8
@@ -1317,13 +1344,14 @@ public final class PaintEngine {
         let fill = (style.drawsOutline
             ? colours.colour(for: button == .primary ? .secondary : .primary)
             : colours.colour(for: button)).rgba8
-        drawPolygonShape(
+        let drawn = drawPolygonShape(
             points,
             stroke: stroke,
             fill: fill,
             closed: points.count > 2
         )
-        return canvas.bounds
+        pendingPolygon = (before: pending.before, points: pending.points, drawn: drawn)
+        return pending.drawn.union(drawn)
     }
 
     /// How close a click has to land to count as "the first corner again".
@@ -1343,6 +1371,9 @@ public final class PaintEngine {
         )
         let disc = colours.colour(for: button)
         let number = "\(nextBadgeNumber)"
+        // Landed here rather than inside `commitSingleShot`, so `dirty` below
+        // says whether the badge itself drew and the count only moves if it did.
+        let landed = commitPendingShape()
 
         let dirty = commitSingleShot("Badge \(number)", badgeNumber: nextBadgeNumber) { canvas in
             var touched = Raster.fillEllipse(in: rect, colour: disc.rgba8, into: &canvas)
@@ -1366,7 +1397,7 @@ public final class PaintEngine {
             return touched
         }
         if !dirty.isEmpty { nextBadgeNumber += 1 }
-        return dirty
+        return landed.union(dirty)
     }
 
     // MARK: - Text
@@ -1425,6 +1456,7 @@ public final class PaintEngine {
     /// instead — so resizing, rotating by an arbitrary angle or cropping is
     /// undoable like everything else, and the work before it survives.
     public func replaceCanvas(with newCanvas: Bitmap, actionName: String) {
+        commitPendingShape()
         // A pairing is a pair of coordinates, and a resize changes what those
         // coordinates mean. Keeping it would leave a repair tool quietly copying
         // whatever now occupies the old source.
@@ -1458,6 +1490,10 @@ public final class PaintEngine {
     public func reset(to newCanvas: Bitmap) {
         clearCloneSource()
         canvas = newCanvas
+        // A half-built shape belongs to the old canvas and its history, which
+        // are both gone; drawing its preview again would paint the old image back.
+        pendingCurve = nil
+        pendingPolygon = nil
         undoStack.removeAll()
         selection = nil
         lassoPath = []
@@ -1469,8 +1505,9 @@ public final class PaintEngine {
 
     @discardableResult
     public func undo() -> PixelRect {
-        _ = cancelStroke()
-        let floatingDirty = discardFloating()
+        // The cancelled preview is part of what changed on screen.
+        let cancelled = cancelStroke()
+        let floatingDirty = discardFloating().union(cancelled)
         guard let edit = undoStack.undo(on: &canvas) else { return floatingDirty }
         // A badge is a counter as well as some pixels. Undoing one hands its
         // number back, so the next stamp reuses it instead of skipping it.
@@ -1480,10 +1517,10 @@ public final class PaintEngine {
 
     @discardableResult
     public func redo() -> PixelRect {
-        _ = cancelStroke()
-        guard let edit = undoStack.redo(on: &canvas) else { return .empty }
+        let cancelled = cancelStroke()
+        guard let edit = undoStack.redo(on: &canvas) else { return cancelled }
         if let number = edit.badgeNumber { nextBadgeNumber = number + 1 }
-        return edit.dirtyRect
+        return edit.dirtyRect.union(cancelled)
     }
 
     // MARK: - Internals
@@ -1520,11 +1557,12 @@ public final class PaintEngine {
     private func commitSingleShot(
         _ name: String, badgeNumber: Int? = nil, _ body: (inout Bitmap) -> PixelRect
     ) -> PixelRect {
+        let landed = commitPendingShape()
         let before = canvas
         let dirty = body(&canvas)
-        guard !dirty.isEmpty else { return .empty }
+        guard !dirty.isEmpty else { return landed }
         recordEdit(name: name, before: before, dirty: dirty, badgeNumber: badgeNumber)
-        return dirty
+        return landed.union(dirty)
     }
 
     private func performReadOnly(_ tool: ToolKind, at point: PixelPoint) -> PixelRect {

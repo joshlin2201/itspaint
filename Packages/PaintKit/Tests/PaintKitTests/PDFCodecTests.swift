@@ -138,6 +138,29 @@ struct PDFCodecTests {
         #expect(try pageSize(of: data, page: 1) == CGSize(width: 300, height: 200))
     }
 
+    @Test("Writing a signed page to disk keeps every page and reads back as written")
+    func writtenFileIsTheWholeDocument() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        var (bitmap, source) = try PDFCodec.open(
+            data: try sampleDocument(pages: 3), page: 1, named: "lease.pdf"
+        )
+        Raster.fillRect(PixelRect(x: 100, y: 100, width: 200, height: 80), colour: .black, into: &bitmap)
+        let url = directory.appendingPathComponent("lease.pdf")
+        try PDFCodec.write(bitmap, to: url, replacing: source)
+
+        let written = try Data(contentsOf: url)
+        #expect(try pageCount(of: written) == 3)
+        #expect(try pageSize(of: written, page: 2) == CGSize(width: 612, height: 792))
+        let reopened = try PDFCodec.open(contentsOf: url, page: 1)
+        #expect(reopened.bitmap.width == bitmap.width && reopened.bitmap.height == bitmap.height)
+        #expect(reopened.bitmap.pixel(at: PixelPoint(x: 200, y: 140))?.r ?? 255 < 16,
+                "the mark drawn on the page did not survive the write")
+    }
+
     @Test("PDF is writable and exportable, whatever ImageIO thinks")
     func pdfIsOffered() {
         #expect(ImageCodec.Format.pdf.isWritable)

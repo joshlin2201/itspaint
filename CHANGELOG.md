@@ -22,6 +22,21 @@ version may still carry breaking changes to the document format.
 - **The toolbar un-dims when a stroke ends.** It could stay faded until
   something else redrew it.
 - **The marching ants move for a selection or paste made from the menu bar.**
+- **An open polygon or curve no longer swallows the next command.** With one
+  still being drawn, Invert, Flip, Rotate, Trim, Crop, Remove Background, Resize
+  or Paste was wiped by the next mouse move while its undo step stayed behind.
+  The shape now lands as its own step first, and a stray one- or two-corner
+  polygon is dropped before the command reads the picture. Revert to Saved
+  drops a shape in progress instead of painting the old image back, and turning
+  a PDF page lands it on the page it was drawn on.
+- **A paste that is still floating survives Rotate, Flip, Resize and Scale.**
+  They rebuilt the canvas without it and the paste was lost. The same went for
+  a signature on a PDF page when you turned to another page.
+- **⌘Z reaches every step.** One action that recorded two edits, like placing a
+  pasted image and filling in one click, registered a single undo step. A paste
+  placed by a Trim that then found nothing to trim registered none, and neither
+  did a new edit on a large canvas once the history was full. Undoing past the
+  oldest kept step also left a redo that replayed the wrong edit.
 - The Duplicate tooltip shows ⌥⇧⌘S, which is what the menu binds.
 
 ### Changed
@@ -32,6 +47,17 @@ version may still carry breaking changes to the document format.
 - **Pinch and ⌘-scroll stay smooth below 100%.** They draw at a lower quality
   while the scale is changing and sharpen when the gesture settles, and zooming
   with an Instant Alpha selection no longer retraces the whole mask every step.
+- **A long smooth line or arrow previews in about 2 ms instead of 30 ms** on a
+  12-megapixel canvas, because the line is drawn along its own band rather than
+  across its whole bounding box.
+- **A polygon or curve costs history the size of the shape.** A small polygon
+  on a 12-megapixel screenshot took 96 MB of undo history, which pushed most of
+  the earlier steps out. It now takes under 1 MB.
+- **Remove Background is about six times faster on a flat page**, 360 ms down
+  to 60 ms at 12 megapixels.
+- The highlighter and clone brush stop copying a canvas-sized buffer on every
+  mouse move, a long lasso does about half the work per move, and saving a PDF,
+  or an opaque image as JPEG or BMP, holds one less full copy of it in memory.
 - Tool and shape names are title case in the Tools menu.
 - Removed the "Warn before very large canvases" setting, which did nothing.
 

@@ -79,6 +79,136 @@ struct EssentialsTests {
         #expect(model.canvas == before)
     }
 
+    /// The document mirrors engine edits into `NSUndoManager` through
+    /// `onEditCommitted`, and each registered action replays one engine undo. So
+    /// every recorded edit has to register exactly one action, including when
+    /// the history budget is dropping the oldest entry per new one and the entry
+    /// count stays flat.
+    @Test("Every recorded edit registers one undo action while history trims")
+    func everyEditRegistersOneAction() {
+        let engine = PaintEngine(
+            canvas: Bitmap(width: 64, height: 64, fill: .white), undoByteBudget: 1
+        )
+        let model = EditorModel(engine: engine)
+        var registered = 0
+        model.onEditCommitted = { _ in registered += 1 }
+
+        for _ in 0..<3 { model.invertColours() }
+
+        #expect(model.engine.undoStack.undoCount == 1, "the budget stopped trimming")
+        #expect(registered == 3)
+    }
+
+    /// A command run with a polygon still open lands the polygon as its own
+    /// edit first, so one call records two edits and must register two actions.
+    /// Both fall in the same event's undo group, so one ⌘Z replays both engine
+    /// steps and the two histories stay in step.
+    @Test("A command that lands a pending polygon registers both edits")
+    func landedShapeRegistersItsOwnAction() {
+        let model = EditorModel(canvas: Bitmap(width: 120, height: 90, fill: .white))
+        model.selectShape(.polygon)
+        for corner in [PixelPoint(x: 10, y: 10), PixelPoint(x: 100, y: 15), PixelPoint(x: 60, y: 80)] {
+            model.noteChange(model.engine.beginStroke(at: corner))
+            model.noteChange(model.engine.endStroke(at: corner))
+        }
+        #expect(model.engine.hasPendingShape)
+
+        var names: [String] = []
+        model.onEditCommitted = { names.append($0) }
+        model.invertColours()
+
+        #expect(!model.engine.hasPendingShape)
+        #expect(names.count == 2, "registered \(names)")
+    }
+
+    /// These commands compute the new bitmap in the model from `canvas`, so a
+    /// stray one- or two-corner polygon has to be dropped before they read it.
+    @Test("Flip does not keep a stray polygon's rubber band")
+    func flipDropsStrayPolygon() {
+        let model = EditorModel(canvas: Bitmap(width: 120, height: 90, fill: .white))
+        let pristine = model.canvas
+        model.selectShape(.polygon)
+        for corner in [PixelPoint(x: 10, y: 10), PixelPoint(x: 100, y: 15)] {
+            model.noteChange(model.engine.beginStroke(at: corner))
+            model.noteChange(model.engine.endStroke(at: corner))
+        }
+        model.noteChange(model.engine.previewPolygon(to: PixelPoint(x: 60, y: 80)))
+        #expect(model.canvas != pristine, "the stray drew no rubber band to leak")
+
+        model.flipHorizontally()
+        #expect(model.canvas == ImageTransform.flippedHorizontally(pristine))
+    }
+
+    /// Trim can decline after the shape has been landed, and a declined command
+    /// reaches no `noteChange`, so the landing has to be reported before it.
+    @Test("A declined trim still registers the polygon it landed")
+    func declinedTrimRegistersLandedShape() throws {
+        // No uniform border anywhere, so the trim declines.
+        let pixels: [RGBA8] = (0..<(120 * 90)).map { (i: Int) -> RGBA8 in
+            let r = UInt8(i % 251), g = UInt8(i % 241), b = UInt8(i % 239)
+            return RGBA8(r: r, g: g, b: b)
+        }
+        let canvas = try #require(Bitmap(width: 120, height: 90, pixels: pixels))
+        let model = EditorModel(canvas: canvas)
+        model.selectShape(.polygon)
+        for corner in [PixelPoint(x: 10, y: 10), PixelPoint(x: 100, y: 15), PixelPoint(x: 60, y: 80)] {
+            model.noteChange(model.engine.beginStroke(at: corner))
+            model.noteChange(model.engine.endStroke(at: corner))
+        }
+        var names: [String] = []
+        model.onEditCommitted = { names.append($0) }
+
+        model.trimBorders()
+
+        #expect(!model.engine.hasPendingShape)
+        #expect(names == ["Polygon"], "registered \(names)")
+    }
+
+    /// Every recorded edit gets an action, whichever route recorded it: a
+    /// declined trim after a paste, and an Instant Alpha click that places a
+    /// float while reporting only a selection change.
+    @Test("A float placed by a declined trim or an Instant Alpha click is registered",
+          arguments: ["trim", "instant alpha"])
+    func placedFloatIsRegistered(route: String) throws {
+        let pixels: [RGBA8] = (0..<(120 * 90)).map { (i: Int) -> RGBA8 in
+            let r = UInt8(i % 251), g = UInt8(i % 241), b = UInt8(i % 239)
+            return RGBA8(r: r, g: g, b: b)
+        }
+        let canvas = try #require(Bitmap(width: 120, height: 90, pixels: pixels))
+        let model = EditorModel(canvas: canvas)
+        model.noteChange(model.engine.paste(Bitmap(width: 20, height: 20, fill: .black)))
+        #expect(model.floating != nil)
+        let recordedBefore = model.engine.undoStack.recordedCount
+        var names: [String] = []
+        model.onEditCommitted = { names.append($0) }
+
+        if route == "trim" {
+            model.trimBorders()
+        } else {
+            model.selectionKind = .instantAlpha
+            model.noteVisualChange(model.engine.beginStroke(at: PixelPoint(x: 100, y: 70)))
+        }
+
+        #expect(model.floating == nil, "the float was not placed")
+        let recorded = model.engine.undoStack.recordedCount - recordedBefore
+        #expect(recorded > 0)
+        #expect(names.count == recorded, "\(recorded) edits, \(names.count) actions")
+    }
+
+    /// Rotate builds the new canvas from `canvas`, and `replaceCanvas` drops a
+    /// float, so a paste still floating has to be written down first.
+    @Test("Rotate keeps a paste that was still floating")
+    func rotateKeepsFloatingPaste() {
+        let model = EditorModel(canvas: Bitmap(width: 60, height: 40, fill: .white))
+        model.noteChange(model.engine.paste(Bitmap(width: 10, height: 10, fill: .black)))
+        #expect(model.floating != nil)
+
+        model.rotate(.clockwise90)
+
+        #expect(model.floating == nil)
+        #expect(model.canvas.pixels.contains(.black), "the paste was dropped")
+    }
+
     @Test("Undo and redo walk the full history in both directions")
     func historyWalks() {
         let model = EditorModel(canvas: Bitmap(width: 80, height: 80, fill: .white))
