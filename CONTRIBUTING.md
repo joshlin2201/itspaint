@@ -1,7 +1,7 @@
 # Contributing
 
-Thanks for looking. This is a small, deliberately-scoped app; the fastest way
-to get a change merged is to keep it in that spirit.
+Thanks for looking. ItsPaint is deliberately scoped, and a change that stays inside
+that scope is the fastest one to merge.
 
 ## Getting set up
 
@@ -16,15 +16,15 @@ swift test          # 345 tests
 ```
 
 On the Command Line Tools alone, Swift 6.4 needs one extra flag to find Swift
-Testing's macro plugin — it is in the README under
-[Contributing](README.md#contributing-and-the-engine-needs-no-xcode).
+Testing's macro plugin. It's in the README under
+[Contributing](README.md#contributing).
 
-That is the entire loop for anything in `Packages/PaintKit/` — drawing, raster
-operations, selections, undo, codecs. No project to open, no scheme to pick, no
-simulator, no signing, and no dependencies to fetch.
+That is the whole loop for anything in `Packages/PaintKit/`: drawing, raster
+operations, selections, undo and codecs. There is no project to open and nothing
+to sign or fetch.
 
-Xcode 16 or later is needed for the **app shell** — the window, menus, document
-lifecycle and SwiftUI panels in `App/`:
+Xcode 16 or later is needed for the **app shell**, meaning the window, menus,
+document lifecycle and SwiftUI panels in `App/`:
 
 ```bash
 open ItsPaint.xcodeproj   # build and run with ⌘R
@@ -47,17 +47,17 @@ xcodebuild -project ItsPaint.xcodeproj -scheme ItsPaint \
            -destination 'platform=macOS' test    # app integration, needs Xcode
 ```
 
-The engine suite is where most coverage lives and it runs in seconds — run it
+The engine suite is where most coverage lives and it runs in seconds, so run it
 constantly. The app suite drives real AppKit views offscreen, so it needs Xcode
-and a logged-in GUI session; if you cannot run it, say so in the pull request and
+and a logged-in GUI session. If you can't run it, say so in the pull request and
 CI will.
 
 ## Read first
 
-- [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) — the five rules the app is held to.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — where code goes, with recipes
+- [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md): the five rules the app is held to.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): where code goes, with recipes
   for adding a tool, a shape or an export format.
-- [docs/TESTING.md](docs/TESTING.md) — the four tests a new tool needs, and the
+- [docs/TESTING.md](docs/TESTING.md): the four tests a new tool needs, and the
   app-host traps.
 
 ## What a good change looks like
@@ -73,7 +73,7 @@ CI will.
   names the pixel that moved; an image diff shows two similar-looking PNGs.
 - **The rail lists jobs, not variations.** Fifteen shapes live inside one Shape
   tool. If a feature wants a new rail button, check first whether it is really
-  an option of an existing tool — a guard test fails the build past fourteen.
+  an option of an existing tool. A guard test fails the build past fourteen.
 - **Comments explain the decision, not the code.** Why this approach and what
   it costs; the code already says what it does.
 
