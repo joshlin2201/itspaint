@@ -208,9 +208,9 @@ struct CanvasRenderingTests {
         #expect(model.engine.undoStack.undoActionName == "Text")
     }
 
-    /// The chrome dims on `isDragging`. It has to be observable state that
-    /// clears at mouse-up, including for a tool whose press and release dirty
-    /// nothing, or the rail stays dimmed after the gesture is over.
+    /// The chrome dims on `isDragging`. It has to be observable state that rises
+    /// at the press and clears at mouse-up, including for a tool whose press
+    /// dirties nothing, or the rail stays dimmed after the gesture is over.
     @Test("The drag flag rises with a gesture and clears at release",
           arguments: [ToolKind.pencil, .select, .highlighter])
     func dragFlagFollowsTheGesture(tool: ToolKind) throws {
@@ -219,6 +219,7 @@ struct CanvasRenderingTests {
         let view = makeView(model)
 
         view.mouseDown(with: try #require(mouse(.leftMouseDown, at: NSPoint(x: 20, y: 20))))
+        #expect(model.isDragging, "\(tool) did not dim the chrome at the press")
         view.mouseDragged(with: try #require(mouse(.leftMouseDragged, at: NSPoint(x: 120, y: 80))))
         #expect(model.isDragging, "\(tool) did not dim the chrome mid-drag")
         view.mouseUp(with: try #require(mouse(.leftMouseUp, at: NSPoint(x: 120, y: 80))))

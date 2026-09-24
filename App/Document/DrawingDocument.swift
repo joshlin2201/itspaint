@@ -89,12 +89,7 @@ final class DrawingDocument: NSDocument {
 
     override func updateChangeCount(_ change: NSDocument.ChangeType) {
         super.updateChangeCount(change)
-        // Every stroke segment lands here. Writing an unchanged value would still
-        // invalidate whatever reads `isEdited`, once per mouse-moved event.
-        MainActor.assumeIsolated {
-            let edited = isDocumentEdited
-            if model.isEdited != edited { model.isEdited = edited }
-        }
+        MainActor.assumeIsolated { model.isEdited = isDocumentEdited }
     }
 
     override func close() {

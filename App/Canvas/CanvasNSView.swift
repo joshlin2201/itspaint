@@ -22,8 +22,9 @@ final class CanvasNSView: NSView {
     ///
     /// It shares the canvas's buffer, so while it is held the engine's next
     /// write copies the whole canvas away from it. The drag paths drop it with
-    /// `releaseCanvasSnapshot()` before they write, which is what keeps a stroke
-    /// frame proportional to the brush rather than to the canvas.
+    /// `releaseCanvasSnapshot()` before they write, which keeps every frame after
+    /// the first proportional to the brush. The first write copies once anyway,
+    /// because the engine keeps the pre-stroke canvas for undo.
     private var cachedImage: CGImage?
     private var cachedRevision: Int = -1
 
@@ -191,18 +192,33 @@ final class CanvasNSView: NSView {
         return isZoomSettling || inLiveResize ? .low : .high
     }
 
-    /// Blit only the part of the canvas under `dirtyRect`.
+    /// Blit the canvas, cropped to `dirtyRect` where that is exact.
     ///
     /// A crop shares the snapshot's buffer, so it costs nothing to make, and
-    /// Core Graphics then colour-matches the pixels a stroke touched rather than
-    /// the whole canvas on every frame. The margin gives a downscaled draw real
-    /// neighbours to sample at the crop's edge, so no seam shows where it ends.
+    /// Core Graphics then draws the pixels a stroke touched rather than the
+    /// whole canvas on every frame. That is pixel-identical at `.none` and
+    /// `.low`. At `.high` it is not: the downsampler's phase follows the
+    /// image's own extent, so a cropped patch resamples differently from its
+    /// surroundings, and that case keeps drawing the whole image under the clip.
     private func drawCanvas(_ image: CGImage, in dirtyRect: NSRect, context: CGContext, canvas: Bitmap) {
         guard canvas.width > 0, canvas.height > 0 else { return }
         // Scale from the frame, which is what the full-image blit stretched to.
         let sx = bounds.width / Double(canvas.width)
         let sy = bounds.height / Double(canvas.height)
         guard sx > 0, sy > 0 else { return }
+        let quality = interpolation
+        guard quality != .high else {
+            context.saveGState()
+            context.interpolationQuality = quality
+            context.setShouldAntialias(false)
+            context.translateBy(x: 0, y: bounds.height)
+            context.scaleBy(x: 1, y: -1)
+            context.draw(image, in: CGRect(origin: .zero, size: bounds.size))
+            context.restoreGState()
+            return
+        }
+        // Real neighbours for `.low` to sample at the crop's edge, however far
+        // it is downscaling.
         let margin = Int((4 / min(sx, 1)).rounded(.up)) + 2
         let minX = Int((dirtyRect.minX / sx).rounded(.down)) - margin
         let minY = Int((dirtyRect.minY / sy).rounded(.down)) - margin
@@ -217,7 +233,7 @@ final class CanvasNSView: NSView {
         else { return }
 
         context.saveGState()
-        context.interpolationQuality = interpolation
+        context.interpolationQuality = quality
         context.setShouldAntialias(false)
         // The view is flipped; CGImage draws bottom-up, so flip back for the blit.
         context.translateBy(x: 0, y: bounds.height)
@@ -653,26 +669,15 @@ final class CanvasNSView: NSView {
 
                     let region = model.floating?.frame ?? model.selectionBounds
                     guard let region else { return }
-                    let edge = NSRect(
-                        x: Double(region.minX) * self.zoom,
-                        y: Double(region.minY) * self.zoom,
-                        width: Double(region.width) * self.zoom,
-                        height: Double(region.height) * self.zoom
+                    let padded = region.insetBy(-Int(Self.handleScreenSize))
+                    self.setNeedsDisplay(
+                        NSRect(
+                            x: Double(padded.minX) * self.zoom,
+                            y: Double(padded.minY) * self.zoom,
+                            width: Double(padded.width) * self.zoom,
+                            height: Double(padded.height) * self.zoom
+                        )
                     )
-                    // Rectangular ants sit on the edge, so only four thin strips
-                    // move. Repainting the interior of a Select All at 30 fps is
-                    // most of a frame's budget, every frame, while idle.
-                    if model.floating != nil || model.selection?.isRectangular == true {
-                        let band: CGFloat = 3
-                        let outer = edge.insetBy(dx: -band, dy: -band)
-                        self.setNeedsDisplay(NSRect(x: outer.minX, y: outer.minY, width: outer.width, height: band * 2))
-                        self.setNeedsDisplay(NSRect(x: outer.minX, y: edge.maxY - band, width: outer.width, height: band * 2))
-                        self.setNeedsDisplay(NSRect(x: outer.minX, y: outer.minY, width: band * 2, height: outer.height))
-                        self.setNeedsDisplay(NSRect(x: edge.maxX - band, y: outer.minY, width: band * 2, height: outer.height))
-                    } else {
-                        let pad = Self.handleScreenSize * self.zoom
-                        self.setNeedsDisplay(edge.insetBy(dx: -pad, dy: -pad))
-                    }
                 }
             }
             // Common mode keeps the ants moving during a scroll or a resize,
@@ -992,7 +997,12 @@ final class CanvasNSView: NSView {
         }
         // A double-click closes a polygon where it stands, which is the other
         // half of the gesture people already know from every vector tool.
-        if NSApp.currentEvent?.clickCount ?? 1 > 1, model.tool == .shape, model.shapeKind == .polygon {
+        // `clickCount` raises on anything but a mouse event, so it is asked last,
+        // and only of a press.
+        if model.tool == .shape, model.shapeKind == .polygon,
+           let press = NSApp.currentEvent,
+           [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(press.type),
+           press.clickCount > 1 {
             commit(model.engine.closePolygon())
         }
         startSprayingIfNeeded(at: point, button: button)
@@ -1068,8 +1078,10 @@ final class CanvasNSView: NSView {
 
     private func commit(_ dirty: PixelRect) {
         updateAntsAnimation()
-        guard !dirty.isEmpty else { return }
+        // Ahead of the guard: an empty rect still syncs the model's mirrors, so a
+        // press that dirties nothing dims the chrome like any other gesture.
         model?.noteChange(dirty)
+        guard !dirty.isEmpty else { return }
         invalidate(dirty)
         // This view has painted the change; claim the revision so the SwiftUI
         // update it triggers does not repaint the whole canvas on top of it.
@@ -1078,8 +1090,8 @@ final class CanvasNSView: NSView {
 
     private func commitVisualChange(_ dirty: PixelRect) {
         updateAntsAnimation()
-        guard !dirty.isEmpty else { return }
         model?.noteVisualChange(dirty)
+        guard !dirty.isEmpty else { return }
         invalidate(dirty)
         paintedRevision = model?.revision ?? paintedRevision
     }

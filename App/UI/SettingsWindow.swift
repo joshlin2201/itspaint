@@ -149,7 +149,7 @@ struct SettingsView: View {
                 }
                 if !Bitmap.isSizeSupported(width: settings.newCanvasWidth, height: settings.newCanvasHeight) {
                     let fallback = DrawingDocument.defaultCanvasSize
-                    Text("Too large. New images open at \(fallback.width) × \(fallback.height) instead.")
+                    Text("ItsPaint can't make an image this size, so new images open at \(fallback.width) × \(fallback.height).")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
