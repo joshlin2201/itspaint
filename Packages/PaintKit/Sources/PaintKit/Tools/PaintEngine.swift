@@ -386,26 +386,30 @@ public final class PaintEngine {
             )
             return stepDirty
 
-        case let .clone(before, coverage, last, dirty, origin):
+        case .clone(let before, var coverage, let last, let dirty, let origin):
+            // The gesture lets go of the coverage first, so the canvas-sized array
+            // is uniquely held here and the stamps below write into it in place
+            // instead of copying it on every event.
+            gesture = .idle
             // Shift locks the stroke to a row or a column through its first point.
             // Not `constrain()`, which snaps to a square or 45 degrees and would
             // throw the destination onto a diagonal.
             let aimed = constrained ? axisLocked(point, through: origin) : point
-            var updated = coverage
-            let stepDirty = strokeClone(from: last, to: aimed, into: &updated, before: before)
+            let stepDirty = strokeClone(from: last, to: aimed, into: &coverage, before: before)
             gesture = .clone(
-                before: before, coverage: updated, last: aimed,
+                before: before, coverage: coverage, last: aimed,
                 dirty: dirty.union(stepDirty), origin: origin
             )
             return stepDirty
 
-        case let .highlight(before, coverage, last, dirty, colour):
-            var updated = coverage
+        case .highlight(let before, var coverage, let last, let dirty, let colour):
+            // Released first for the same reason as the clone case above.
+            gesture = .idle
             let stepDirty = strokeHighlighter(
-                from: last, to: point, into: &updated, before: before, colour: colour
+                from: last, to: point, into: &coverage, before: before, colour: colour
             )
             gesture = .highlight(
-                before: before, coverage: updated, last: point,
+                before: before, coverage: coverage, last: point,
                 dirty: dirty.union(stepDirty), colour: colour
             )
             return stepDirty

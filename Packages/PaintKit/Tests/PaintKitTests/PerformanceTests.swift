@@ -142,4 +142,28 @@ struct PerformanceTests {
 
         #expect(elapsed < 80, "eight tiny Core Graphics marks took \(Int(elapsed))ms")
     }
+
+    @Test("Highlighter and clone strokes do not copy their canvas-sized coverage per event",
+          arguments: [ToolKind.highlighter, .clone])
+    func coverageStrokeThroughput(tool: ToolKind) {
+        // An 8K canvas makes the coverage array 33 MB, so copying it on each of
+        // 300 events costs a quarter of a second; stamping in place costs a few
+        // milliseconds.
+        let engine = PaintEngine(canvas: Bitmap(width: 7680, height: 4320))
+        engine.settings.tool = tool
+        engine.settings.brushSize = 20
+        if tool == .clone {
+            engine.beginStroke(at: PixelPoint(x: 4000, y: 3000))
+            engine.endStroke()
+        }
+        engine.beginStroke(at: PixelPoint(x: 100, y: 300))
+        let elapsed = milliseconds {
+            for step in 1...300 {
+                engine.continueStroke(to: PixelPoint(x: 100 + step * 6, y: 300))
+            }
+        }
+        engine.endStroke()
+
+        #expect(elapsed < 120, "300 \(tool) events took \(Int(elapsed))ms")
+    }
 }
