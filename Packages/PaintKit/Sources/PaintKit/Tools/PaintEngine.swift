@@ -746,22 +746,11 @@ public final class PaintEngine {
             bounds = current.bounds
         }
 
+        // The current selection is written in, then the incoming region is
+        // written over it: selected to add, cleared to subtract.
         var mask = [UInt8](repeating: 0, count: bounds.area)
-        for y in bounds.minY..<bounds.maxY {
-            for x in bounds.minX..<bounds.maxX {
-                let point = PixelPoint(x: x, y: y)
-                let wasSelected = current.contains(point)
-                let isIncoming = incoming?.contains(point) == true
-                let selected = switch operation {
-                case .replace: isIncoming
-                case .add: wasSelected || isIncoming
-                case .subtract: wasSelected && !isIncoming
-                }
-                if selected {
-                    mask[(y - bounds.minY) * bounds.width + (x - bounds.minX)] = 255
-                }
-            }
-        }
+        current.write(255, into: &mask, over: bounds)
+        incoming?.write(operation == .add ? 255 : 0, into: &mask, over: bounds)
         guard mask.contains(255) else { return nil }
         return Selection(bounds: bounds, mask: mask).tightened()
     }
@@ -917,13 +906,23 @@ public final class PaintEngine {
         // Built up in `selection` itself, through the same combiner Shift-click
         // uses — one description of "add these regions together" serves both, and
         // the page *is* what the selection should end up being.
+        //
+        // A corner of exactly an earlier corner's colour, inside the region that
+        // corner flooded, would flood the identical region again, so it is not
+        // flooded twice. The same colour matters: a corner of a nearby colour
+        // inside that region has its own tolerance window and can reach further.
         let previous = selection
         selection = nil
-        for corner in corners {
-            selection = combinedSelection(
-                with: Raster.floodSelection(from: corner, tolerance: tolerance, in: canvas),
-                operation: .add
-            )
+        var repeatsEarlierCorner = [Bool](repeating: false, count: corners.count)
+        for (index, corner) in corners.enumerated() where !repeatsEarlierCorner[index] {
+            let region = Raster.floodSelection(from: corner, tolerance: tolerance, in: canvas)
+            let colour = canvas.unsafePixel(at: corner)
+            for later in (index + 1)..<corners.count
+            where canvas.unsafePixel(at: corners[later]) == colour
+                && region?.contains(corners[later]) == true {
+                repeatsEarlierCorner[later] = true
+            }
+            selection = combinedSelection(with: region, operation: .add)
         }
 
         guard let page = selection, !page.isEmpty else {

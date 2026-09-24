@@ -53,6 +53,30 @@ public struct Selection: Equatable, Sendable {
 
     public func contains(_ point: PixelPoint) -> Bool { coverage(at: point) > 0 }
 
+    /// Set `value` wherever this selection covers, in a mask laid out row-major
+    /// over `maskBounds`. Reads and writes whole rows rather than asking
+    /// `contains` pixel by pixel, which is what combining two page-sized
+    /// Instant Alpha regions spends its time on.
+    func write(_ value: UInt8, into mask: inout [UInt8], over maskBounds: PixelRect) {
+        let region = bounds.intersection(maskBounds)
+        guard !region.isEmpty, mask.count == maskBounds.area else { return }
+        let coverage = self.mask
+        mask.withUnsafeMutableBufferPointer { out in
+            for y in region.minY..<region.maxY {
+                let row = (y - maskBounds.minY) * maskBounds.width - maskBounds.minX
+                guard let coverage else {
+                    UnsafeMutableBufferPointer(rebasing: out[(row + region.minX)..<(row + region.maxX)])
+                        .update(repeating: value)
+                    continue
+                }
+                let source = (y - bounds.minY) * bounds.width - bounds.minX
+                for x in region.minX..<region.maxX where coverage[source + x] > 0 {
+                    out[row + x] = value
+                }
+            }
+        }
+    }
+
     /// Shrink `bounds` to the mask's actual extent.
     ///
     /// An inverted selection starts as a full-canvas mask; without this its

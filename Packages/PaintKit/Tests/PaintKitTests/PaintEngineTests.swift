@@ -1827,3 +1827,150 @@ struct SpotlightTests {
         #expect(engine.canvas == before, "undo did not restore the image")
     }
 }
+
+@Suite("Combining selections")
+struct SelectionCombineTests {
+
+    /// The combiner as it was before it went row-wise: asks `contains` of both
+    /// selections at every pixel of the result's bounds. Kept as the reference
+    /// the row-wise version has to match exactly.
+    private func perPixelCombine(_ current: Selection?, _ incoming: Selection?, add: Bool) -> Selection? {
+        guard let current else { return add ? incoming : nil }
+        let bounds = add ? (incoming.map { current.bounds.union($0.bounds) } ?? current.bounds) : current.bounds
+        var mask = [UInt8](repeating: 0, count: bounds.area)
+        for y in bounds.minY..<bounds.maxY {
+            for x in bounds.minX..<bounds.maxX {
+                let point = PixelPoint(x: x, y: y)
+                let wasSelected = current.contains(point)
+                let isIncoming = incoming?.contains(point) == true
+                if add ? (wasSelected || isIncoming) : (wasSelected && !isIncoming) {
+                    mask[(y - bounds.minY) * bounds.width + (x - bounds.minX)] = 255
+                }
+            }
+        }
+        guard mask.contains(255) else { return nil }
+        return Selection(bounds: bounds, mask: mask).tightened()
+    }
+
+    /// Remove Background with every corner flooded and combined per pixel.
+    private func referenceRemoveBackground(_ canvas: Bitmap, tolerance: Int = 24) -> Bitmap? {
+        let corners = [
+            PixelPoint(x: 0, y: 0), PixelPoint(x: canvas.width - 1, y: 0),
+            PixelPoint(x: 0, y: canvas.height - 1), PixelPoint(x: canvas.width - 1, y: canvas.height - 1),
+        ]
+        var page: Selection?
+        for corner in corners {
+            page = perPixelCombine(
+                page, Raster.floodSelection(from: corner, tolerance: tolerance, in: canvas), add: true
+            )
+        }
+        guard let page, !page.isEmpty else { return nil }
+        let covered = page.mask?.count { $0 > 0 } ?? page.bounds.area
+        guard canvas.count - covered >= max(64, canvas.count / 4000) else { return nil }
+        var clearsSomething = false
+        for y in page.bounds.minY..<page.bounds.maxY {
+            for x in page.bounds.minX..<page.bounds.maxX {
+                let point = PixelPoint(x: x, y: y)
+                if page.contains(point), (canvas.pixel(at: point)?.a ?? 0) > 0 { clearsSomething = true }
+            }
+        }
+        guard clearsSomething else { return nil }
+        var out = canvas
+        out.fill(page, with: .clear)
+        return out
+    }
+
+    private static let palette = [
+        RGBA8.white, RGBA8(r: 240, g: 240, b: 240), RGBA8(r: 222, g: 222, b: 222),
+        RGBA8(r: 200, g: 40, b: 40), RGBA8(r: 180, g: 60, b: 50), .black, .clear,
+    ]
+
+    private func randomCanvas(_ generator: inout SprayRandom, width: Int, height: Int) -> Bitmap {
+        let palette = Self.palette
+        var canvas = Bitmap(width: width, height: height, fill: palette[Int(generator.next() % 3)])
+        for _ in 0..<8 {
+            canvas.fill(
+                PixelRect(
+                    x: Int(generator.next() % UInt64(width)) - 4, y: Int(generator.next() % UInt64(height)) - 4,
+                    width: Int(generator.next() % 20) + 1, height: Int(generator.next() % 16) + 1
+                ),
+                with: palette[Int(generator.next() % UInt64(palette.count))]
+            )
+        }
+        return canvas
+    }
+
+    @Test("Shift- and Option-clicking Instant Alpha combine exactly as the per-pixel combiner did")
+    func rowWiseCombineMatchesPerPixel() {
+        var generator = SprayRandom(seed: 0xC0_4B1E)
+        func point(_ canvas: Bitmap) -> PixelPoint {
+            PixelPoint(x: Int(generator.next() % UInt64(canvas.width)), y: Int(generator.next() % UInt64(canvas.height)))
+        }
+        for index in 0..<240 {
+            let canvas = randomCanvas(&generator, width: 48, height: 36)
+            let engine = PaintEngine(canvas: canvas)
+            engine.settings.tool = .select
+
+            // Start from each kind of selection the combiner can be handed.
+            switch index % 4 {
+            case 0:
+                engine.settings.selectionTolerance = 12
+                engine.selectInstantAlpha(at: point(canvas))
+            case 1:
+                engine.settings.selectionKind = .ellipse
+                let a = point(canvas), b = point(canvas)
+                engine.beginStroke(at: a)
+                engine.endStroke(at: b)
+            case 2:
+                engine.selectAll()
+            default:
+                engine.settings.selectionKind = .lasso
+                engine.beginStroke(at: point(canvas))
+                for _ in 0..<6 { engine.continueStroke(to: point(canvas)) }
+                engine.endStroke(at: point(canvas))
+            }
+
+            let tolerance = [0, 12, 40][index % 3]
+            let add = index % 2 == 0
+            let seed = point(canvas)
+            engine.settings.selectionTolerance = tolerance
+            let expected = perPixelCombine(
+                engine.selection, Raster.floodSelection(from: seed, tolerance: tolerance, in: canvas), add: add
+            )
+            engine.selectInstantAlpha(at: seed, operation: add ? .add : .subtract)
+            #expect(engine.selection == expected, "case \(index), \(add ? "add" : "subtract") at \(seed)")
+        }
+    }
+
+    @Test("Remove Background floods a repeated corner once and keys exactly the same page")
+    func removeBackgroundMatchesEveryCornerFlooded() {
+        var generator = SprayRandom(seed: 0xBAC6_40)
+        var canvases: [Bitmap] = []
+
+        // A flat page: all four corners are one colour in one region.
+        var flat = Bitmap(width: 60, height: 40, fill: .white)
+        flat.fill(PixelRect(x: 20, y: 12, width: 18, height: 14), with: RGBA8(r: 200, g: 30, b: 30))
+        canvases.append(flat)
+
+        // A corner inside the white corner's region, but of a nearby grey whose
+        // own tolerance reaches a darker strip white's does not. It has to be
+        // flooded in its own right.
+        var graded = Bitmap(width: 60, height: 40, fill: .white)
+        graded.fill(PixelRect(x: 30, y: 0, width: 30, height: 40), with: RGBA8(r: 235, g: 235, b: 235))
+        graded.fill(PixelRect(x: 50, y: 10, width: 10, height: 20), with: RGBA8(r: 215, g: 215, b: 215))
+        graded.fill(PixelRect(x: 10, y: 15, width: 10, height: 10), with: .black)
+        canvases.append(graded)
+
+        for _ in 0..<60 { canvases.append(randomCanvas(&generator, width: 40, height: 30)) }
+
+        for (index, canvas) in canvases.enumerated() {
+            let expected = referenceRemoveBackground(canvas)
+            let engine = PaintEngine(canvas: canvas)
+            #expect(engine.removeBackground() == (expected != nil), "canvas \(index)")
+            if let expected {
+                #expect(engine.canvas == expected, "canvas \(index) keyed different pixels")
+            }
+        }
+        #expect(referenceRemoveBackground(graded)?.pixel(at: PixelPoint(x: 55, y: 20)) == .clear)
+    }
+}
