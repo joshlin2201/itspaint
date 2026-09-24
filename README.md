@@ -11,7 +11,6 @@
 ### MS Paint for the Mac, in a 3.46 MB download
 
 Paste a screenshot, number the steps and drag the finished image into a bug report or a doc.
-It's a full paint app as well.
 
 [![Release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&style=flat-square&label=release&color=2563eb)](https://github.com/joshlin2201/itspaint/releases)
 [![Mac App Store](https://img.shields.io/badge/Mac_App_Store-free-2563eb?style=flat-square)](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)
