@@ -1270,9 +1270,9 @@ public final class PaintEngine {
 
     /// Land whatever half-built shape is on the canvas as one undoable edit.
     ///
-    /// Called when anything else happens — another tool, a menu command, a
-    /// save. A preview that silently disappears because you reached for the
-    /// eraser is worse than one that commits.
+    /// Called when anything else happens: another tool, a menu command, a page
+    /// turn or an export. A preview that silently disappears because you
+    /// reached for the eraser is worse than one that commits.
     ///
     /// Every engine command that writes pixels or resizes the canvas calls this
     /// first, so the shape is its own undo step beneath that command's, and

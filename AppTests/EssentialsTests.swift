@@ -139,6 +139,29 @@ struct EssentialsTests {
         #expect(model.canvas == ImageTransform.flippedHorizontally(pristine))
     }
 
+    /// Trim can decline after the shape has been landed, and a declined command
+    /// reaches no `noteChange`, so the landing has to be reported before it.
+    @Test("A declined trim still registers the polygon it landed")
+    func declinedTrimRegistersLandedShape() throws {
+        // No uniform border anywhere, so the trim declines.
+        let pixels = (0..<(120 * 90)).map { i in
+            RGBA8(r: UInt8(i % 251), g: UInt8(i % 241), b: UInt8(i % 239))
+        }
+        let model = EditorModel(canvas: try #require(Bitmap(width: 120, height: 90, pixels: pixels)))
+        model.selectShape(.polygon)
+        for corner in [PixelPoint(x: 10, y: 10), PixelPoint(x: 100, y: 15), PixelPoint(x: 60, y: 80)] {
+            model.noteChange(model.engine.beginStroke(at: corner))
+            model.noteChange(model.engine.endStroke(at: corner))
+        }
+        var names: [String] = []
+        model.onEditCommitted = { names.append($0) }
+
+        model.trimBorders()
+
+        #expect(!model.engine.hasPendingShape)
+        #expect(names == ["Polygon"], "registered \(names)")
+    }
+
     @Test("Undo and redo walk the full history in both directions")
     func historyWalks() {
         let model = EditorModel(canvas: Bitmap(width: 80, height: 80, fill: .white))

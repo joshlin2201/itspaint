@@ -601,6 +601,9 @@ final class EditorModel {
     }
 
     func cutSelection() {
+        // Before the pixels are copied, so the clipboard never holds a stray
+        // polygon's rubber band that the delete below would then drop.
+        landPendingShape()
         guard let content = engine.selectedContent() else { return }
         writeToPasteboard(content)
         noteChange(engine.deleteSelection())
@@ -831,6 +834,7 @@ final class EditorModel {
         // ended up reporting "select an area first" immediately after pasting —
         // the paste had just been consumed.
         let hadRegion = hasSelection
+        landPendingShape()  // As in `trimBorders`.
 
         if engine.cropToSelection() {
             noteChange(canvas.bounds)
@@ -864,6 +868,9 @@ final class EditorModel {
     /// and a zero-tolerance trim silently does nothing on exactly the images
     /// people most want to trim.
     func trimBorders() {
+        // Landed and reported here, because the engine lands it too and then
+        // may decline, and a declined command reaches no `noteChange` below.
+        landPendingShape()
         guard engine.trimBorders() else {
             present(
                 message: "There's nothing to trim.",
@@ -881,6 +888,7 @@ final class EditorModel {
     /// nothing. Instant Alpha is the answer when it declines and you still want
     /// the region gone, so the message names it.
     func removeBackground() {
+        landPendingShape()  // As in `trimBorders`.
         guard engine.removeBackground() else {
             present(
                 message: "There's no background to remove.",
@@ -974,8 +982,9 @@ final class EditorModel {
     ///
     /// These commands build the new bitmap here and hand it to the engine, so
     /// the engine's own landing comes too late: a stray one- or two-corner
-    /// polygon's rubber band would already be in the bitmap.
-    private func landPendingShape() {
+    /// polygon's rubber band would already be in the bitmap. The document calls
+    /// it before a page turn or an export reads the canvas for the same reason.
+    func landPendingShape() {
         noteChange(engine.commitPendingShape())
     }
 
