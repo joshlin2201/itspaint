@@ -29,6 +29,9 @@ version may still carry breaking changes to the document format.
   polygon is dropped before the command reads the picture. Revert to Saved
   drops a shape in progress instead of painting the old image back, and turning
   a PDF page lands it on the page it was drawn on.
+- **A paste that is still floating survives Rotate, Flip, Resize and Scale.**
+  They rebuilt the canvas without it and the paste was lost. The same went for
+  a signature on a PDF page when you turned to another page.
 - **⌘Z reaches every step.** One action that recorded two edits, like placing a
   pasted image and filling in one click, registered a single undo step. On a
   large canvas, once the history was full, a new edit could register none, and
