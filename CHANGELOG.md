@@ -33,9 +33,10 @@ version may still carry breaking changes to the document format.
   They rebuilt the canvas without it and the paste was lost. The same went for
   a signature on a PDF page when you turned to another page.
 - **⌘Z reaches every step.** One action that recorded two edits, like placing a
-  pasted image and filling in one click, registered a single undo step. On a
-  large canvas, once the history was full, a new edit could register none, and
-  undoing past the oldest kept step left a redo that replayed the wrong edit.
+  pasted image and filling in one click, registered a single undo step. A paste
+  placed by a Trim that then found nothing to trim registered none, and neither
+  did a new edit on a large canvas once the history was full. Undoing past the
+  oldest kept step also left a redo that replayed the wrong edit.
 - The Duplicate tooltip shows ⌥⇧⌘S, which is what the menu binds.
 
 ### Changed

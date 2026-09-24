@@ -383,7 +383,6 @@ final class EditorModel {
         noteVisualChange(dirty)
         guard !dirty.isEmpty else { return }
         syncBadgeNumber()
-        noteCanvasSizeIfChanged()
         onCanvasChanged?(dirty)
     }
 
@@ -401,6 +400,9 @@ final class EditorModel {
         // guard, because that one is about repainting.
         syncFloatingState()
         registerNewEdits()
+        // Here rather than only in `noteChange`: placing an overhanging float on
+        // the way to an Instant Alpha click grows the canvas too.
+        noteCanvasSizeIfChanged()
         guard !dirty.isEmpty else { return }
         revision &+= 1
     }
