@@ -1285,6 +1285,147 @@ struct MultiStepShapeTests {
         #expect(!engine.canUndo)
     }
 
+    @Test("A small polygon on a large canvas is recorded and repainted at its own size")
+    func smallPolygonCostsItsRect() {
+        let engine = PaintEngine(canvas: Bitmap(width: 3000, height: 2000, fill: .white))
+        engine.settings.tool = .shape
+        engine.settings.shapeKind = .polygon
+        engine.settings.brushSize = 2
+        let pristine = engine.canvas
+
+        for corner in [PixelPoint(x: 1000, y: 1000), PixelPoint(x: 1040, y: 1000), PixelPoint(x: 1020, y: 1040)] {
+            engine.beginStroke(at: corner)
+            engine.endStroke(at: corner)
+        }
+        let preview = engine.previewPolygon(to: PixelPoint(x: 1010, y: 1050))
+        #expect(!preview.isEmpty && preview.area < 10_000, "a rubber-band move repainted \(preview)")
+        engine.closePolygon()
+
+        // Before and after patches of a ~50px box, not two 24 MB canvases.
+        #expect(engine.undoStack.byteCount < 64 * 1024,
+                "one small polygon retained \(engine.undoStack.byteCount) bytes of history")
+        engine.undo()
+        #expect(engine.canvas == pristine, "undo left part of the polygon behind")
+    }
+
+    @Test("Rubber-banding a polygon leaves nothing behind once it is closed")
+    func polygonPreviewRollsBackCompletely() {
+        let corners = [PixelPoint(x: 20, y: 20), PixelPoint(x: 80, y: 25), PixelPoint(x: 55, y: 85)]
+        func draw(wandering: Bool) -> Bitmap {
+            let engine = shapeEngine(.polygon)
+            engine.settings.shapeStyle = .outlineAndFill
+            engine.settings.brushSize = 4
+            for (index, corner) in corners.enumerated() {
+                engine.beginStroke(at: corner)
+                engine.endStroke(at: corner)
+                // Swing the loose edge right across the canvas and back.
+                if wandering, index > 0 {
+                    for step in 0..<40 {
+                        engine.previewPolygon(to: PixelPoint(x: (step * 37) % 130 - 15, y: (step * 53) % 130 - 15))
+                    }
+                    engine.previewPolygon(to: corner)
+                }
+            }
+            engine.closePolygon()
+            return engine.canvas
+        }
+        #expect(draw(wandering: true) == draw(wandering: false))
+    }
+
+    /// An edit that lands while a shape is pending, then the preview redraws.
+    ///
+    /// The preview rolls back to its snapshot everywhere, whatever landed
+    /// meanwhile; a rollback that only covered the shape's own rect would leave
+    /// the edit around it and a rectangle of snapshot inside it.
+    @Test("A preview after an edit under a pending polygon rolls back to the snapshot everywhere",
+          arguments: ["invert", "fill", "text", "badge", "paste", "resize", "rotate twice"])
+    func pendingPolygonRollsBackOtherEdits(edit: String) {
+        let corners = [PixelPoint(x: 20, y: 20), PixelPoint(x: 70, y: 22), PixelPoint(x: 45, y: 70)]
+        let preview = PixelPoint(x: 30, y: 60)
+        func polygonEngine() -> PaintEngine {
+            let engine = PaintEngine(canvas: Bitmap(width: 120, height: 90, fill: .white))
+            engine.settings.tool = .shape
+            engine.settings.shapeKind = .polygon
+            engine.settings.brushSize = 2
+            for corner in corners {
+                engine.beginStroke(at: corner)
+                engine.endStroke(at: corner)
+            }
+            return engine
+        }
+
+        let untouched = polygonEngine()
+        let pristine = Bitmap(width: 120, height: 90, fill: .white)
+        untouched.previewPolygon(to: preview)
+
+        let engine = polygonEngine()
+        switch edit {
+        case "invert":
+            engine.invertColours()
+        case "fill":
+            engine.settings.tool = .fill
+            engine.colours.background = PaintColour(hex: "3366FF")!
+            engine.beginStroke(at: PixelPoint(x: 110, y: 80), button: .secondary)
+            engine.colours.background = untouched.colours.background
+            engine.settings.tool = .shape
+        case "text":
+            engine.drawText("Hi", in: PixelRect(x: 80, y: 10, width: 36, height: 30),
+                            style: TextRenderer.Style(pointSize: 18))
+        case "badge":
+            engine.settings.tool = .badge
+            engine.beginStroke(at: PixelPoint(x: 100, y: 70))
+            engine.settings.tool = .shape
+        case "paste":
+            engine.paste(Bitmap(width: 20, height: 20, fill: .black))
+            engine.settings.tool = .shape
+            engine.commitFloating()
+        case "resize":
+            engine.replaceCanvas(with: Bitmap(width: 60, height: 40, fill: .black), actionName: "Crop")
+        default:
+            let turned = ImageTransform.rotated(engine.canvas, by: .clockwise90)
+            engine.replaceCanvas(with: turned, actionName: "Rotate")
+            let back = ImageTransform.rotated(
+                Bitmap(width: turned.width, height: turned.height, fill: .black), by: .counterClockwise90
+            )
+            engine.replaceCanvas(with: back, actionName: "Rotate")
+        }
+        engine.previewPolygon(to: preview)
+        #expect(engine.canvas == untouched.canvas, "after \(edit)")
+
+        // Size-preserving edits also undo cleanly back to before the shape.
+        guard edit != "resize" else { return }
+        engine.closePolygon()
+        engine.undo()
+        #expect(engine.canvas == pristine, "undoing the polygon after \(edit) missed pixels")
+    }
+
+    @Test("Bending a chord after an edit under it rolls back to the snapshot everywhere")
+    func pendingCurveRollsBackOtherEdits() {
+        func chordEngine() -> PaintEngine {
+            let engine = shapeEngine(.curve)
+            engine.beginStroke(at: PixelPoint(x: 10, y: 50))
+            engine.endStroke(at: PixelPoint(x: 90, y: 50))
+            return engine
+        }
+        func bend(_ engine: PaintEngine) {
+            engine.beginStroke(at: PixelPoint(x: 50, y: 20))
+            engine.endStroke(at: PixelPoint(x: 50, y: 20))
+        }
+        let untouched = chordEngine()
+        bend(untouched)
+
+        let engine = chordEngine()
+        engine.invertColours()
+        bend(engine)
+        #expect(engine.canvas == untouched.canvas)
+
+        let committed = chordEngine()
+        committed.invertColours()
+        committed.commitPendingShape()
+        committed.undo()
+        #expect(committed.canvas == Bitmap(width: 100, height: 100, fill: .white))
+    }
+
     @Test("Badges number themselves, and keep counting")
     func badgesCountUp() {
         let engine = PaintEngine(canvas: Bitmap(width: 200, height: 100, fill: .white))
