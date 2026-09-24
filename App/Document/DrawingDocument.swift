@@ -613,9 +613,15 @@ final class DrawingDocument: NSDocument {
         undoManager.setActionName(name)
     }
 
+    /// Once the engine's history budget drops its oldest edits, this manager
+    /// still holds their actions. Such an action replays nothing, so it
+    /// registers no inverse: a redo put on the stack for it would redo some
+    /// other edit, and every name after it would be off by one.
     private func replayUndo() {
+        let replays = model.engine.canUndo
         let name = model.engine.undoStack.undoActionName ?? "Edit"
         model.undo()
+        guard replays else { return }
         undoManager?.registerUndo(withTarget: self) { document in
             MainActor.assumeIsolated { document.replayRedo() }
         }
@@ -623,8 +629,10 @@ final class DrawingDocument: NSDocument {
     }
 
     private func replayRedo() {
+        let replays = model.engine.canRedo
         let name = model.engine.undoStack.redoActionName ?? "Edit"
         model.redo()
+        guard replays else { return }
         undoManager?.registerUndo(withTarget: self) { document in
             MainActor.assumeIsolated { document.replayUndo() }
         }
