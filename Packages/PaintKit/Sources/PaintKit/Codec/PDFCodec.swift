@@ -239,10 +239,18 @@ public enum PDFCodec {
     /// The canvas as a PDF: one page when it came from nowhere, and the original
     /// document with one page replaced when it came from a PDF.
     public static func encode(_ bitmap: Bitmap, replacing source: Source?) throws -> Data {
-        guard let image = bitmap.makeCGImage() else { throw Failure.encodeFailed }
-
         let output = NSMutableData()
         guard let consumer = CGDataConsumer(data: output) else { throw Failure.encodeFailed }
+        try draw(bitmap, replacing: source, into: consumer)
+        guard output.length > 0 else { throw Failure.encodeFailed }
+        return output as Data
+    }
+
+    /// The document `encode` and `write` both produce, sent to `consumer`.
+    private static func draw(
+        _ bitmap: Bitmap, replacing source: Source?, into consumer: CGDataConsumer
+    ) throws {
+        guard let image = bitmap.makeCGImage() else { throw Failure.encodeFailed }
 
         let edited = editedPageSize(for: bitmap, source: source)
         var mediaBox = CGRect(origin: .zero, size: edited)
@@ -287,16 +295,33 @@ public enum PDFCodec {
         }
 
         context.closePDF()
-        guard output.length > 0 else { throw Failure.encodeFailed }
-        return output as Data
     }
 
     /// Write `bitmap` as a PDF at `url`, staged so a failure part-way cannot
     /// leave a half-written document behind.
+    ///
+    /// Core Graphics writes the document straight into the staged file, the
+    /// same route `ImageCodec.write` takes, so a save holds the canvas and not
+    /// an in-memory copy of the whole PDF as well.
     public static func write(_ bitmap: Bitmap, to url: URL, replacing source: Source?) throws {
-        let data = try encode(bitmap, replacing: source)
         try FileStaging.replaceItem(at: url) { staged in
-            try data.write(to: staged)
+            // With no staging area the destination itself is handed over, and
+            // an encode that failed part-way must not truncate the file already
+            // there, so on that path the document is finished in memory first.
+            guard staged != url else {
+                try encode(bitmap, replacing: source).write(to: staged)
+                return
+            }
+            do {
+                guard let consumer = CGDataConsumer(url: staged as CFURL) else {
+                    throw Failure.encodeFailed
+                }
+                try draw(bitmap, replacing: source, into: consumer)
+            }
+            // The consumer has been released by here, which is what closes the
+            // file, so its size is the finished document's.
+            let size = (try? FileManager.default.attributesOfItem(atPath: staged.path)[.size]) as? Int
+            guard (size ?? 0) > 0 else { throw Failure.encodeFailed }
         }
     }
 

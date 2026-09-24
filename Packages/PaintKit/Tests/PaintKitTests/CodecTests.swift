@@ -243,6 +243,17 @@ struct ImageCodecTests {
         #expect(flat.pixel(at: PixelPoint(x: 1, y: 1)) == .black)
     }
 
+    @Test("An opaque image is already flat, and comes back unchanged")
+    func opaqueImageIsAlreadyFlat() {
+        var generator = SprayRandom(seed: 0xF1A7)
+        var bitmap = Bitmap(width: 16, height: 12)
+        for i in bitmap.pixels.indices {
+            let v = generator.next()
+            bitmap.pixels[i] = RGBA8(r: UInt8(v & 255), g: UInt8(v >> 8 & 255), b: UInt8(v >> 16 & 255))
+        }
+        #expect(ImageCodec.flattened(bitmap, onto: PaintColour(hex: "FF0000")!) == bitmap)
+    }
+
     @Test("Format is inferred from the file extension, case-insensitively")
     func formatInference() {
         #expect(ImageCodec.Format.inferred(from: URL(fileURLWithPath: "/a/b.PNG")) == .png)
