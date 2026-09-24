@@ -330,7 +330,9 @@ final class DrawingDocument: NSDocument {
               index >= 0, index < source.pageCount
         else { return }
 
-        model.landPendingShape()
+        // The float too: a signature is inserted floating, and the page reset
+        // below would drop it.
+        model.landPendingWork()
         do {
             let folded = try PDFCodec.encode(model.canvas, replacing: source)
             let page = try PDFCodec.open(
@@ -644,7 +646,7 @@ final class DrawingDocument: NSDocument {
 
     @IBAction func exportImage(_ sender: Any?) {
         guard let window = windowControllers.first?.window else { return }
-        model.landPendingShape()
+        model.landPendingWork()
 
         let options = ExportOptions()
         // A document that came from a PDF exports as one by default. Offering

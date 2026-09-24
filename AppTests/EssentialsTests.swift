@@ -164,6 +164,51 @@ struct EssentialsTests {
         #expect(names == ["Polygon"], "registered \(names)")
     }
 
+    /// Every recorded edit gets an action, whichever route recorded it: a
+    /// declined trim after a paste, and an Instant Alpha click that places a
+    /// float while reporting only a selection change.
+    @Test("A float placed by a declined trim or an Instant Alpha click is registered",
+          arguments: ["trim", "instant alpha"])
+    func placedFloatIsRegistered(route: String) throws {
+        let pixels: [RGBA8] = (0..<(120 * 90)).map { (i: Int) -> RGBA8 in
+            let r = UInt8(i % 251), g = UInt8(i % 241), b = UInt8(i % 239)
+            return RGBA8(r: r, g: g, b: b)
+        }
+        let canvas = try #require(Bitmap(width: 120, height: 90, pixels: pixels))
+        let model = EditorModel(canvas: canvas)
+        model.noteChange(model.engine.paste(Bitmap(width: 20, height: 20, fill: .black)))
+        #expect(model.floating != nil)
+        let recordedBefore = model.engine.undoStack.recordedCount
+        var names: [String] = []
+        model.onEditCommitted = { names.append($0) }
+
+        if route == "trim" {
+            model.trimBorders()
+        } else {
+            model.selectionKind = .instantAlpha
+            model.noteVisualChange(model.engine.beginStroke(at: PixelPoint(x: 100, y: 70)))
+        }
+
+        #expect(model.floating == nil, "the float was not placed")
+        let recorded = model.engine.undoStack.recordedCount - recordedBefore
+        #expect(recorded > 0)
+        #expect(names.count == recorded, "\(recorded) edits, \(names.count) actions")
+    }
+
+    /// Rotate builds the new canvas from `canvas`, and `replaceCanvas` drops a
+    /// float, so a paste still floating has to be written down first.
+    @Test("Rotate keeps a paste that was still floating")
+    func rotateKeepsFloatingPaste() {
+        let model = EditorModel(canvas: Bitmap(width: 60, height: 40, fill: .white))
+        model.noteChange(model.engine.paste(Bitmap(width: 10, height: 10, fill: .black)))
+        #expect(model.floating != nil)
+
+        model.rotate(.clockwise90)
+
+        #expect(model.floating == nil)
+        #expect(model.canvas.pixels.contains(.black), "the paste was dropped")
+    }
+
     @Test("Undo and redo walk the full history in both directions")
     func historyWalks() {
         let model = EditorModel(canvas: Bitmap(width: 80, height: 80, fill: .white))

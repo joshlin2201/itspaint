@@ -380,32 +380,19 @@ final class EditorModel {
         // Flags first, for the reason spelled out in `noteVisualChange`: a
         // command that changes the selection without dirtying a pixel still has
         // to take the selection bar with it.
-        guard !dirty.isEmpty else { syncFloatingState(); return }
         noteVisualChange(dirty)
+        guard !dirty.isEmpty else { return }
         syncBadgeNumber()
         noteCanvasSizeIfChanged()
         onCanvasChanged?(dirty)
-
-        // Distinguish a *new* edit from an undo/redo replay. Only the former
-        // registers an undo action, otherwise undoing would push another undo
-        // and ⌘Z would never reach the beginning.
-        //
-        // One action per edit the engine recorded, because a command can record
-        // two (a pending shape it landed, then itself) and each replay undoes
-        // one. Counted by `recordedCount`, not by entries: once the history
-        // budget drops the oldest entry per new one, the entry count stays flat.
-        let recorded = engine.undoStack.recordedCount
-        for _ in lastKnownRecordedCount..<max(lastKnownRecordedCount, recorded) {
-            onEditCommitted?(engine.undoStack.undoActionName ?? "Edit")
-        }
-        lastKnownRecordedCount = recorded
     }
 
     /// Invalidates canvas chrome without marking the document edited.
     ///
     /// Selections change what the user sees, but not the artwork they would
     /// save. Keeping that distinction here prevents a read-only marquee from
-    /// lighting the document's dirty dot.
+    /// lighting the document's dirty dot. An edit the engine recorded on the way
+    /// (an Instant Alpha click places a float first) still gets its undo action.
     func noteVisualChange(_ dirty: PixelRect) {
         // **The mirrors sync even when nothing is dirty.** They are *flags*, not
         // pixels: a selection that changes without marking any area — deselecting
@@ -413,8 +400,26 @@ final class EditorModel {
         // take the selection bar with it. The `revision` bump stays behind the
         // guard, because that one is about repainting.
         syncFloatingState()
+        registerNewEdits()
         guard !dirty.isEmpty else { return }
         revision &+= 1
+    }
+
+    /// One undo action per edit the engine has recorded since the last call.
+    ///
+    /// Run on every note, empty or not, so no route that records can leave an
+    /// edit without its action; a command can decline after landing a shape or
+    /// a float, and a click can record while reporting only a selection. An
+    /// undo or redo replay records nothing, so it registers nothing, and ⌘Z
+    /// can reach the beginning. Counted by `recordedCount` rather than by
+    /// entries, because a command can record two and a full history drops the
+    /// oldest entry per new one, leaving the entry count flat.
+    private func registerNewEdits() {
+        let recorded = engine.undoStack.recordedCount
+        for _ in lastKnownRecordedCount..<max(lastKnownRecordedCount, recorded) {
+            onEditCommitted?(engine.undoStack.undoActionName ?? "Edit")
+        }
+        lastKnownRecordedCount = recorded
     }
 
     @ObservationIgnored private var lastKnownRecordedCount: Int = 0
@@ -661,7 +666,7 @@ final class EditorModel {
     /// Dropping a 3× retina screenshot onto a small canvas and silently losing
     /// three quarters of it is the failure this avoids.
     func dropImage(_ bitmap: Bitmap, centredOn point: PixelPoint) {
-        landPendingShape()
+        landPendingWork()
         if bitmap.width > canvas.width || bitmap.height > canvas.height {
             let target = (
                 width: max(canvas.width, bitmap.width),
@@ -868,9 +873,9 @@ final class EditorModel {
     /// and a zero-tolerance trim silently does nothing on exactly the images
     /// people most want to trim.
     func trimBorders() {
-        // Landed and reported here, because the engine lands it too and then
-        // may decline, and a declined command reaches no `noteChange` below.
-        landPendingShape()
+        // Landed and reported here, shape and float, because the engine lands
+        // both too and then may decline, and a declined trim notes nothing below.
+        landPendingWork()
         guard engine.trimBorders() else {
             present(
                 message: "There's nothing to trim.",
@@ -888,7 +893,7 @@ final class EditorModel {
     /// nothing. Instant Alpha is the answer when it declines and you still want
     /// the region gone, so the message names it.
     func removeBackground() {
-        landPendingShape()  // As in `trimBorders`.
+        landPendingWork()  // As in `trimBorders`.
         guard engine.removeBackground() else {
             present(
                 message: "There's no background to remove.",
@@ -908,17 +913,17 @@ final class EditorModel {
     func invertColours() { noteChange(engine.invertColours()) }
 
     func flipHorizontally() {
-        landPendingShape()
+        landPendingWork()
         replace(ImageTransform.flippedHorizontally(canvas), named: "Flip horizontal")
     }
 
     func flipVertically() {
-        landPendingShape()
+        landPendingWork()
         replace(ImageTransform.flippedVertically(canvas), named: "Flip vertical")
     }
 
     func rotate(_ rotation: ImageTransform.Rotation) {
-        landPendingShape()
+        landPendingWork()
         replace(ImageTransform.rotated(canvas, by: rotation), named: rotation.displayName)
     }
 
@@ -930,7 +935,7 @@ final class EditorModel {
     /// outcome nobody wants.
     func rotate(degrees: Double) {
         guard degrees.truncatingRemainder(dividingBy: 360) != 0 else { return }
-        landPendingShape()
+        landPendingWork()
         guard let rotated = ImageTransform.rotated(canvas, degrees: degrees, fill: background) else {
             present(
                 message: "Couldn't rotate the image.",
@@ -958,7 +963,7 @@ final class EditorModel {
             presentUnsupportedImageSize(width: width, height: height)
             return
         }
-        landPendingShape()
+        landPendingWork()
         replace(
             ImageTransform.resizedCanvas(canvas, to: (width, height), fill: background),
             named: "Canvas size"
@@ -970,7 +975,7 @@ final class EditorModel {
             presentUnsupportedImageSize(width: width, height: height)
             return
         }
-        landPendingShape()
+        landPendingWork()
         guard let scaled = ImageTransform.scaled(canvas, to: (width, height), using: scaling) else {
             present(message: "Couldn't resize the image.", recovery: "Try a different size.")
             return
@@ -986,6 +991,14 @@ final class EditorModel {
     /// it before a page turn or an export reads the canvas for the same reason.
     func landPendingShape() {
         noteChange(engine.commitPendingShape())
+    }
+
+    /// Land a half-built shape and write floating content down, for commands
+    /// that read or replace the whole canvas. `replaceCanvas` would otherwise
+    /// drop a paste that was still floating.
+    func landPendingWork() {
+        landPendingShape()
+        placeFloating()
     }
 
     private func replace(_ bitmap: Bitmap, named name: String) {
