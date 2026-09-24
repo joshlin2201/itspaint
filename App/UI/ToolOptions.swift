@@ -561,7 +561,7 @@ private struct HighlighterInks: View {
         HStack(spacing: 3) {
             ForEach(ToolSettings.highlighterInks, id: \.name) { ink in
                 swatch(
-                    fill: Color(ink.colour.cgColor),
+                    ink.colour,
                     isSelected: model.highlighterColour == ink.colour,
                     label: ink.name
                 ) { model.highlighterColour = ink.colour }
@@ -570,7 +570,7 @@ private struct HighlighterInks: View {
             // plain black square on a dark panel — indistinguishable from a
             // disabled control, when what it means is "use whatever the pen has".
             swatch(
-                fill: Color(model.foreground.cgColor),
+                model.foreground,
                 isSelected: model.highlighterColour == nil,
                 label: "Follow the current colour"
             ) { model.highlighterColour = nil }
@@ -584,20 +584,22 @@ private struct HighlighterInks: View {
     }
 
     private func swatch(
-        fill: Color, isSelected: Bool, label: String, action: @escaping () -> Void
+        _ colour: PaintColour, isSelected: Bool, label: String, action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                .fill(fill)
+                .fill(Color(colour.cgColor))
                 .frame(height: 22)
                 .overlay {
                     // The chip's own contrast colour, never the accent. A blue ring on
                     // the blue ink disappears into it, and a blue ring on the yellow
                     // fights the thing it is pointing at. Same rule the rail palette
-                    // already follows.
+                    // already follows, and the same luminance test as the pencil glyph.
                     RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
                         .strokeBorder(
-                            isSelected ? ring(on: fill) : Color.primary.opacity(0.18),
+                            isSelected
+                                ? (colour.prefersDarkContrast ? Color.black.opacity(0.7) : .white.opacity(0.9))
+                                : Color.primary.opacity(0.18),
                             lineWidth: isSelected ? 2 : 1
                         )
                 }
@@ -606,13 +608,6 @@ private struct HighlighterInks: View {
         .help(label)
         .accessibilityLabel(label)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-    }
-
-    /// Black on a light ink, white on a dark one, judged on relative luminance.
-    private func ring(on fill: Color) -> Color {
-        let c = NSColor(fill).usingColorSpace(.sRGB) ?? .white
-        let luma = 0.2126 * c.redComponent + 0.7152 * c.greenComponent + 0.0722 * c.blueComponent
-        return luma > 0.55 ? .black.opacity(0.7) : .white.opacity(0.9)
     }
 }
 
@@ -723,7 +718,7 @@ private struct BadgeNumber: View {
         .buttonStyle(.plain)
         .disabled(!enabled)
         .foregroundStyle(.primary.opacity(enabled ? Tokens.Ink.regular : Tokens.Ink.disabled))
-        .accessibilityLabel(symbol == "plus" ? "Increase" : "Decrease")
+        .accessibilityLabel(symbol == "plus" ? "Next badge number up" : "Next badge number down")
     }
 }
 
@@ -972,87 +967,3 @@ struct OptionToggle: View {
     }
 }
 
-/// A number you nudge, in the panel's own idiom.
-///
-/// A native `Stepper` brings its own label layout and its own control height, both
-/// of which fight `OptionRow`; this is the same pill the rest of the panel uses,
-/// with the readout between the two ends so the value sits where the eye already
-/// looks for it.
-struct OptionStepper: View {
-    @Binding var value: Int
-    let range: ClosedRange<Int>
-
-    var body: some View {
-        HStack(spacing: 2) {
-            end("minus", enabled: value > range.lowerBound) { value = max(range.lowerBound, value - 1) }
-            Text("\(value)")
-                .font(.system(size: 11, weight: .medium).monospacedDigit())
-                .frame(minWidth: 22)
-                .accessibilityHidden(true)
-            end("plus", enabled: value < range.upperBound) { value = min(range.upperBound, value + 1) }
-        }
-        .padding(.horizontal, 4)
-        .frame(height: Tokens.Size.pillAction)
-        .background {
-            RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
-                .fill(.primary.opacity(0.10))
-        }
-        .accessibilityElement()
-        .accessibilityValue("\(value)")
-        .accessibilityAdjustableAction { direction in
-            switch direction {
-            case .increment: value = min(range.upperBound, value + 1)
-            case .decrement: value = max(range.lowerBound, value - 1)
-            @unknown default: break
-            }
-        }
-    }
-
-    private func end(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 9, weight: .semibold))
-                .frame(width: 16, height: Tokens.Size.pillAction)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : Tokens.Ink.muted)
-        .accessibilityLabel(symbol == "plus" ? "Increase" : "Decrease")
-    }
-}
-
-/// A small labelled action inside the panel.
-struct OptionButton: View {
-    let title: String
-    let symbol: String
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    init(_ title: String, symbol: String, action: @escaping () -> Void) {
-        self.title = title
-        self.symbol = symbol
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: symbol).font(.system(size: 10.5))
-                Text(title)
-            }
-            .padding(.horizontal, Tokens.Space.snug)
-            .frame(height: Tokens.Size.pillAction)
-            .background {
-                RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
-                    .fill(.primary.opacity(isHovering ? 0.18 : 0.10))
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-        .animation(Tokens.Motion.micro, value: isHovering)
-        .accessibilityLabel(title)
-    }
-}

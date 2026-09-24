@@ -19,6 +19,12 @@ final class CanvasNSView: NSView {
 
     /// Cached snapshot of the canvas. Rebuilt only when the pixels change, not
     /// on every scroll or window resize.
+    ///
+    /// It shares the canvas's buffer, so while it is held the engine's next
+    /// write copies the whole canvas away from it. The drag paths drop it with
+    /// `releaseCanvasSnapshot()` before they write, which keeps every frame after
+    /// the first proportional to the brush. The first write copies once anyway,
+    /// because the engine keeps the pre-stroke canvas for undo.
     private var cachedImage: CGImage?
     private var cachedRevision: Int = -1
 
@@ -30,9 +36,20 @@ final class CanvasNSView: NSView {
 
     /// Instant Alpha can expose thousands of pixel edges. Cache its path so the
     /// marching-ant timer only changes the dash phase, not the geometry.
+    ///
+    /// Traced once per selection in pixel units, and scaled per zoom, because
+    /// the trace walks the whole mask and a pinch changes the zoom every event.
     private var cachedSelectionOutline: CGPath?
     private var cachedOutlineSelection: Selection?
+    private var cachedScaledOutline: CGPath?
     private var cachedOutlineZoom: Double = -1
+
+    /// Set while a pinch or ⌘-scroll is changing the scale. Below 100%, `.high`
+    /// resamples the whole visible image for every new scale, which is tens of
+    /// milliseconds a frame on a large canvas; the gesture draws at `.low` and
+    /// one sharp frame follows when it settles.
+    private var isZoomSettling = false
+    private var zoomSettleTimer: Timer?
 
     private var activeButton: PointerButton?
     private var isShiftHeld: Bool = false
@@ -168,6 +185,82 @@ final class CanvasNSView: NSView {
 
     // MARK: - Drawing
 
+    /// Nearest-neighbour when magnified. A paint app that blurs its own pixels
+    /// at 800% is lying to the user about what they drew.
+    private var interpolation: CGInterpolationQuality {
+        if zoom >= 1 { return .none }
+        // A live resize only rescales while the canvas is still fitting the
+        // window; at a zoom the user picked, it redraws at the same scale.
+        let refitting = inLiveResize && model?.hasUserZoomed == false
+        return isZoomSettling || refitting ? .low : .high
+    }
+
+    /// Blit the canvas, cropped to `dirtyRect` where that is exact.
+    ///
+    /// A crop shares the snapshot's buffer, so it costs nothing to make, and
+    /// Core Graphics then draws the pixels a stroke touched rather than the
+    /// whole canvas on every frame. That is pixel-identical at `.none` and
+    /// `.low`. At `.high` it is not: the downsampler's phase follows the
+    /// image's own extent, so a cropped patch resamples differently from its
+    /// surroundings, and that case keeps drawing the whole image under the clip.
+    private func drawCanvas(_ image: CGImage, in dirtyRect: NSRect, context: CGContext, canvas: Bitmap) {
+        guard canvas.width > 0, canvas.height > 0 else { return }
+        // Scale from the frame, which is what the full-image blit stretched to.
+        let sx = bounds.width / Double(canvas.width)
+        let sy = bounds.height / Double(canvas.height)
+        guard sx > 0, sy > 0 else { return }
+        let quality = interpolation
+        guard quality != .high else {
+            context.saveGState()
+            context.interpolationQuality = quality
+            context.setShouldAntialias(false)
+            context.translateBy(x: 0, y: bounds.height)
+            context.scaleBy(x: 1, y: -1)
+            context.draw(image, in: CGRect(origin: .zero, size: bounds.size))
+            context.restoreGState()
+            return
+        }
+        // Real neighbours for `.low` to sample at the crop's edge, however far
+        // it is downscaling.
+        let margin = Int((4 / min(sx, 1)).rounded(.up)) + 2
+        let minX = Int((dirtyRect.minX / sx).rounded(.down)) - margin
+        let minY = Int((dirtyRect.minY / sy).rounded(.down)) - margin
+        let maxX = Int((dirtyRect.maxX / sx).rounded(.up)) + margin
+        let maxY = Int((dirtyRect.maxY / sy).rounded(.up)) + margin
+        let part = PixelRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+            .intersection(canvas.bounds)
+        guard !part.isEmpty,
+              let crop = image.cropping(to: CGRect(
+                  x: part.minX, y: part.minY, width: part.width, height: part.height
+              ))
+        else { return }
+
+        context.saveGState()
+        context.interpolationQuality = quality
+        context.setShouldAntialias(false)
+        // The view is flipped; CGImage draws bottom-up, so flip back for the blit.
+        context.translateBy(x: 0, y: bounds.height)
+        context.scaleBy(x: 1, y: -1)
+        context.draw(crop, in: CGRect(
+            x: Double(part.minX) * sx,
+            y: bounds.height - Double(part.maxY) * sy,
+            width: Double(part.width) * sx,
+            height: Double(part.height) * sy
+        ))
+        context.restoreGState()
+    }
+
+    /// Let go of the snapshot before the engine writes. See `cachedImage`.
+    private func releaseCanvasSnapshot() {
+        cachedImage = nil
+    }
+
+    override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
+        // The resize drew at `.low`; this is the sharp frame.
+        if zoom < 1 { needsDisplay = true }
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         guard let model,
               let context = NSGraphicsContext.current?.cgContext
@@ -180,18 +273,7 @@ final class CanvasNSView: NSView {
         guard let image = cachedImage else { return }
 
         drawTransparencyGrid(in: dirtyRect, context: context)
-
-        context.saveGState()
-        // Nearest-neighbour when magnified. A paint app that blurs its own
-        // pixels at 800% is lying to the user about what they drew.
-        context.interpolationQuality = zoom >= 1 ? .none : .high
-        context.setShouldAntialias(false)
-
-        // The view is flipped; CGImage draws bottom-up, so flip back for the blit.
-        context.translateBy(x: 0, y: bounds.height)
-        context.scaleBy(x: 1, y: -1)
-        context.draw(image, in: CGRect(origin: .zero, size: bounds.size))
-        context.restoreGState()
+        drawCanvas(image, in: dirtyRect, context: context, canvas: model.canvas)
 
         drawFloatingContent(context: context, model: model)
 
@@ -368,7 +450,7 @@ final class CanvasNSView: NSView {
         )
 
         context.saveGState()
-        context.interpolationQuality = zoom >= 1 ? .none : .high
+        context.interpolationQuality = interpolation
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1, y: -1)
         let flipped = CGRect(
@@ -469,10 +551,21 @@ final class CanvasNSView: NSView {
     /// on large flat backgrounds while still tracing holes and isolated detail.
     private func maskedOutline(for selection: Selection) -> CGPath? {
         guard selection.mask != nil else { return nil }
-        if cachedOutlineSelection == selection, cachedOutlineZoom == zoom {
-            return cachedSelectionOutline
+        if cachedOutlineSelection != selection {
+            cachedSelectionOutline = traceOutline(of: selection)
+            cachedOutlineSelection = selection
+            cachedScaledOutline = nil
         }
+        if cachedScaledOutline == nil || cachedOutlineZoom != zoom {
+            var scale = CGAffineTransform(scaleX: zoom, y: zoom)
+            cachedScaledOutline = cachedSelectionOutline?.copy(using: &scale)
+            cachedOutlineZoom = zoom
+        }
+        return cachedScaledOutline
+    }
 
+    /// The outline in canvas pixels. Walks the whole selection bounds.
+    private func traceOutline(of selection: Selection) -> CGPath {
         let path = CGMutablePath()
         let bounds = selection.bounds
 
@@ -489,8 +582,8 @@ final class CanvasNSView: NSView {
                     && !selected(x, y + selectedSide - (selectedSide == 0 ? 1 : -1))
                 if hasEdge, runStart == nil { runStart = x }
                 if !hasEdge, let start = runStart {
-                    path.move(to: CGPoint(x: Double(start) * zoom, y: Double(y) * zoom))
-                    path.addLine(to: CGPoint(x: Double(x) * zoom, y: Double(y) * zoom))
+                    path.move(to: CGPoint(x: start, y: y))
+                    path.addLine(to: CGPoint(x: x, y: y))
                     runStart = nil
                 }
             }
@@ -504,8 +597,8 @@ final class CanvasNSView: NSView {
                     && !selected(x + selectedSide - (selectedSide == 0 ? 1 : -1), y)
                 if hasEdge, runStart == nil { runStart = y }
                 if !hasEdge, let start = runStart {
-                    path.move(to: CGPoint(x: Double(x) * zoom, y: Double(start) * zoom))
-                    path.addLine(to: CGPoint(x: Double(x) * zoom, y: Double(y) * zoom))
+                    path.move(to: CGPoint(x: x, y: start))
+                    path.addLine(to: CGPoint(x: x, y: y))
                     runStart = nil
                 }
             }
@@ -522,9 +615,6 @@ final class CanvasNSView: NSView {
             appendVerticalRuns(x: x, selectedSide: -1)
         }
 
-        cachedOutlineSelection = selection
-        cachedOutlineZoom = zoom
-        cachedSelectionOutline = path
         return path
     }
 
@@ -567,7 +657,11 @@ final class CanvasNSView: NSView {
     /// than a whole dash a few times a second. A coarse step reads as a strobe;
     /// this reads as motion. The timer is also scoped to the selection's own
     /// rect, so an idle canvas is never repainted for a marquee in one corner.
-    private func updateAntsAnimation() {
+    ///
+    /// Called from the representable's update as well as from gestures, so a
+    /// selection or paste made from the menu bar marches too, and a deselect
+    /// from the menu stops the timer.
+    func updateAntsAnimation() {
         let needsAnts = model?.selection != nil || model?.floating != nil
         if needsAnts, antsTimer == nil {
             let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
@@ -906,7 +1000,12 @@ final class CanvasNSView: NSView {
         }
         // A double-click closes a polygon where it stands, which is the other
         // half of the gesture people already know from every vector tool.
-        if NSApp.currentEvent?.clickCount ?? 1 > 1, model.tool == .shape, model.shapeKind == .polygon {
+        // `clickCount` raises on anything but a mouse event, so it is asked last,
+        // and only of a press.
+        if model.tool == .shape, model.shapeKind == .polygon,
+           let press = NSApp.currentEvent,
+           [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(press.type),
+           press.clickCount > 1 {
             commit(model.engine.closePolygon())
         }
         startSprayingIfNeeded(at: point, button: button)
@@ -926,6 +1025,7 @@ final class CanvasNSView: NSView {
         let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, let model = self.model, let point = model.pointerPosition else { return }
+                self.releaseCanvasSnapshot()
                 self.commit(model.engine.continueStroke(to: point))
             }
         }
@@ -955,6 +1055,7 @@ final class CanvasNSView: NSView {
 
         let point = pixelPoint(for: event)
         model.pointerPosition = point
+        releaseCanvasSnapshot()
         commit(model.engine.continueStroke(to: point, constrained: isShiftHeld))
     }
 
@@ -969,6 +1070,7 @@ final class CanvasNSView: NSView {
         releaseGrab()
         guard let model, activeButton != nil else { return }
         let point = pixelPoint(for: event)
+        releaseCanvasSnapshot()
         let dirty = model.engine.endStroke(at: point, constrained: isShiftHeld)
         activeButton = nil
         commit(dirty)
@@ -979,8 +1081,10 @@ final class CanvasNSView: NSView {
 
     private func commit(_ dirty: PixelRect) {
         updateAntsAnimation()
-        guard !dirty.isEmpty else { return }
+        // Ahead of the guard: an empty rect still syncs the model's mirrors, so a
+        // press that dirties nothing dims the chrome like any other gesture.
         model?.noteChange(dirty)
+        guard !dirty.isEmpty else { return }
         invalidate(dirty)
         // This view has painted the change; claim the revision so the SwiftUI
         // update it triggers does not repaint the whole canvas on top of it.
@@ -989,8 +1093,8 @@ final class CanvasNSView: NSView {
 
     private func commitVisualChange(_ dirty: PixelRect) {
         updateAntsAnimation()
-        guard !dirty.isEmpty else { return }
         model?.noteVisualChange(dirty)
+        guard !dirty.isEmpty else { return }
         invalidate(dirty)
         paintedRevision = model?.revision ?? paintedRevision
     }
@@ -1214,6 +1318,7 @@ final class CanvasNSView: NSView {
 
         // A polygon in progress rubber-bands to the pointer between clicks.
         if model.engine.hasPendingShape, model.tool == .shape, model.shapeKind == .polygon {
+            releaseCanvasSnapshot()
             commit(model.engine.previewPolygon(to: point))
         }
 
@@ -1229,12 +1334,13 @@ final class CanvasNSView: NSView {
             }
         }
 
-        // Refresh the cursor only when the pointer crosses into or out of the
-        // floating content's handles, not on every mouse-moved event.
+        // Refresh the cursor only when the pointer moves onto a different handle,
+        // or in or out of the floating content, not on every mouse-moved event.
         if let floating = model.floating {
-            let wasOver = previous.map { floating.contains($0) || floating.handle(at: $0, tolerance: canvasHandleTolerance) != nil } ?? false
-            let isOver = floating.contains(point) || floating.handle(at: point, tolerance: canvasHandleTolerance) != nil
-            if wasOver != isOver || isOver {
+            let tolerance = canvasHandleTolerance
+            let now = (floating.handle(at: point, tolerance: tolerance), floating.contains(point))
+            let was = previous.map { (floating.handle(at: $0, tolerance: tolerance), floating.contains($0)) }
+            if was.map({ $0 != now }) ?? true {
                 window?.invalidateCursorRects(for: self)
             }
         }
@@ -1267,6 +1373,7 @@ final class CanvasNSView: NSView {
             activeButton = nil
             model.isOptionsExpanded = false
             commit(dirty)
+            model.syncFromEngine()
             needsDisplay = true
             return
 
@@ -1401,6 +1508,7 @@ final class CanvasNSView: NSView {
         model.setZoomExact(before * factor)
         guard model.zoom != before else { return }
         zoom = model.zoom
+        settleZoomSoon()
         invalidateCanvasSize()
 
         guard let clip, let pointerInClip else { return }
@@ -1416,6 +1524,23 @@ final class CanvasNSView: NSView {
         }
         clip.scroll(to: origin)
         enclosingScrollView?.reflectScrolledClipView(clip)
+    }
+
+    /// Draw at `.low` until the gesture has been still for a moment, then once
+    /// at full quality.
+    private func settleZoomSoon() {
+        isZoomSettling = true
+        zoomSettleTimer?.invalidate()
+        let timer = Timer(timeInterval: 0.15, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.isZoomSettling = false
+                self.zoomSettleTimer = nil
+                if self.zoom < 1 { self.needsDisplay = true }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        zoomSettleTimer = timer
     }
 
     /// Pinch and ⌘-scroll both land here, wherever AppKit delivered them.

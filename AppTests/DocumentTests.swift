@@ -183,6 +183,15 @@ struct DrawingDocumentTests {
         #expect(clamped.width >= 1)
         #expect(clamped.height <= Bitmap.maximumDimension)
         #expect(Bitmap.isSizeSupported(width: clamped.width, height: clamped.height))
+
+        // Both sides inside `maximumDimension`, area three times the budget.
+        // This one stopped the app at launch, because the untitled window
+        // builds its canvas from this size.
+        settings.newCanvasWidth = 10_000
+        settings.newCanvasHeight = 10_000
+        let tooLarge = settings.newCanvasSize
+        #expect(Bitmap.isSizeSupported(width: tooLarge.width, height: tooLarge.height))
+        #expect(DrawingDocument().model.canvas.width == tooLarge.width)
     }
 
     @Test("The app and native document use one stable public identity")

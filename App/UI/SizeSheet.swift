@@ -60,7 +60,7 @@ struct SizeSheet: View {
 
             if width > 0, height > 0,
                !Bitmap.isSizeSupported(width: width, height: height) {
-                Text("Choose a smaller size. ItsPaint supports images up to 32 megapixels.")
+                Text("Choose a smaller size. ItsPaint supports images up to about 33.5 megapixels.")
                     .font(Tokens.Text.popoverHint)
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
@@ -132,7 +132,7 @@ struct SizeSheet: View {
                 value: Binding(
                     get: { value.wrappedValue },
                     set: { newValue in
-                        value.wrappedValue = max(1, min(20_000, newValue))
+                        value.wrappedValue = max(1, min(Bitmap.maximumDimension, newValue))
                         onEdit(value.wrappedValue)
                     }
                 ),

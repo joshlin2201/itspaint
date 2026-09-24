@@ -200,10 +200,6 @@ extension DrawingDocument {
         }
     }
 
-    @IBAction func showSettings(_ sender: Any?) {
-        SettingsWindowController.show()
-    }
-
     /// Reflect state in the menu: checkmarks for toggles, and disable the
     /// commands that genuinely cannot run right now. A menu that offers
     /// "Crop to Selection" with nothing selected teaches people to distrust it.

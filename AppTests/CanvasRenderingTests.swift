@@ -208,6 +208,24 @@ struct CanvasRenderingTests {
         #expect(model.engine.undoStack.undoActionName == "Text")
     }
 
+    /// The chrome dims on `isDragging`. It has to be observable state that rises
+    /// at the press and clears at mouse-up, including for a tool whose press
+    /// dirties nothing, or the rail stays dimmed after the gesture is over.
+    @Test("The drag flag rises with a gesture and clears at release",
+          arguments: [ToolKind.pencil, .select, .highlighter])
+    func dragFlagFollowsTheGesture(tool: ToolKind) throws {
+        let model = EditorModel(canvas: Bitmap(width: 200, height: 120, fill: .white))
+        model.selectTool(tool)
+        let view = makeView(model)
+
+        view.mouseDown(with: try #require(mouse(.leftMouseDown, at: NSPoint(x: 20, y: 20))))
+        #expect(model.isDragging, "\(tool) did not dim the chrome at the press")
+        view.mouseDragged(with: try #require(mouse(.leftMouseDragged, at: NSPoint(x: 120, y: 80))))
+        #expect(model.isDragging, "\(tool) did not dim the chrome mid-drag")
+        view.mouseUp(with: try #require(mouse(.leftMouseUp, at: NSPoint(x: 120, y: 80))))
+        #expect(!model.isDragging, "\(tool) left the chrome dimmed after release")
+    }
+
     @Test("Switching tools lands an open text box rather than dropping it")
     func toolChangeCommitsText() throws {
         let model = EditorModel(canvas: Bitmap(width: 240, height: 120, fill: .white))
@@ -304,6 +322,47 @@ struct CanvasRenderingTests {
         // (30, 30) — outside it at 1× — is inside it at 4×.
         let scaled = try #require(rendered.pixel(at: PixelPoint(x: 30, y: 30)))
         #expect(scaled.r < 60)
+    }
+
+    /// At 100% and above the canvas blits only the part of its image under the
+    /// dirty rect, so a stroke frame costs the stroke, not the canvas. That crop
+    /// must be invisible: the same area drawn alone and as part of the whole view
+    /// has to come out the same. Below 100% the view draws the whole image at
+    /// `.high` as it always has, so there is no crop to pin there.
+    @Test("Redrawing part of the canvas matches that area of a full redraw",
+          arguments: [1.0, 1.5, 3.0])
+    func partialRedrawMatchesFull(zoom: Double) throws {
+        // Every pixel differs from its neighbours, so a seam cannot hide.
+        let pixels = (0..<(120 * 90)).map { i -> RGBA8 in
+            let x = i % 120, y = i / 120
+            return RGBA8(r: UInt8((x * 37) & 255), g: UInt8((y * 53) & 255), b: UInt8((x * y) & 255))
+        }
+        let canvas = try #require(Bitmap(width: 120, height: 90, pixels: pixels))
+        let view = makeView(EditorModel(canvas: canvas), zoom: zoom)
+        let full = try #require(render(view))
+
+        let area = NSRect(
+            x: (view.bounds.width * 0.3).rounded(.down),
+            y: (view.bounds.height * 0.25).rounded(.down),
+            width: (view.bounds.width * 0.4).rounded(.down),
+            height: (view.bounds.height * 0.4).rounded(.down)
+        )
+        let rep = try #require(view.bitmapImageRepForCachingDisplay(in: area))
+        view.cacheDisplay(in: area, to: rep)
+        let part = try #require(rep.cgImage.flatMap { Bitmap(cgImage: $0) })
+
+        var worst = 0
+        for y in 0..<part.height {
+            for x in 0..<part.width {
+                guard let a = part.pixel(at: PixelPoint(x: x, y: y)),
+                      let b = full.bitmap.pixel(at: PixelPoint(
+                          x: Int(area.minX) * full.scale + x, y: Int(area.minY) * full.scale + y
+                      ))
+                else { continue }
+                worst = max(worst, abs(Int(a.r) - Int(b.r)), abs(Int(a.g) - Int(b.g)), abs(Int(a.b) - Int(b.b)))
+            }
+        }
+        #expect(worst == 0, "worst channel difference \(worst) at \(zoom)x")
     }
 
     @Test("Nothing is drawn without a model, rather than crashing")
