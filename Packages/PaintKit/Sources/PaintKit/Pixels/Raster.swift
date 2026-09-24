@@ -262,9 +262,32 @@ public enum Raster {
         let runs = dash.runs(weight: w)
         var dirty = PixelRect.empty
 
+        // Only the band around the line can take coverage: a pixel centre further
+        // than `half + 0.5` from the infinite line is further than that from the
+        // segment too. So each row walks the band's span, widened by a pixel each
+        // side, instead of the whole bounding box — which for a long diagonal is
+        // most of the canvas. Pixels outside the band would compute zero coverage
+        // and be skipped anyway, so the output is the same.
+        //
+        // The pixel of margin covers rounding in the span's arithmetic only while
+        // the coordinates stay within a million pixels, fifty canvases wide.
+        // Beyond that the row walks the whole box, as it always could.
+        let reach = (half + 0.5) * length
+        let banded = vy != 0 && max(abs(ax), abs(ay), abs(bx), abs(by)) < 1_000_000
+
         for y in box.minY..<box.maxY {
-            for x in box.minX..<box.maxX {
-                let px = Double(x) + 0.5, py = Double(y) + 0.5
+            let py = Double(y) + 0.5
+            var columns = box.minX..<box.maxX
+            if banded {
+                let centre = ax + (py - ay) * vx / vy
+                let spread = reach / abs(vy)
+                let first = Int((centre - spread - 0.5).rounded(.down)) - 1
+                let last = Int((centre + spread - 0.5).rounded(.up)) + 1
+                let lower = min(box.maxX, max(box.minX, first))
+                columns = lower..<max(lower, min(box.maxX, last + 1))
+            }
+            for x in columns {
+                let px = Double(x) + 0.5
                 // Project onto the segment, clamped, which gives round caps at both
                 // ends. A square cap would need the unclamped `t` and a separate
                 // half-plane test, and round is what a drawn line wants.
