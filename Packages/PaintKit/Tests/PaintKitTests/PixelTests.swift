@@ -156,6 +156,37 @@ struct BitmapTests {
         #expect(bmp == before)
     }
 
+    @Test("Restoring a rect from another bitmap matches extract then restore")
+    func restoreFromBitmapMatchesPatchRoundTrip() {
+        var generator = SprayRandom(seed: 0xB17_4A9)
+        func noise(_ width: Int, _ height: Int) -> Bitmap {
+            var bitmap = Bitmap(width: width, height: height)
+            for i in bitmap.pixels.indices {
+                let v = generator.next()
+                bitmap.pixels[i] = RGBA8(r: UInt8(v & 255), g: UInt8(v >> 8 & 255),
+                                         b: UInt8(v >> 16 & 255), a: UInt8(v >> 24 & 255))
+            }
+            return bitmap
+        }
+        // Same-sized sources are the preview's case; the others pin the clipping.
+        for (width, height) in [(13, 9), (9, 13), (20, 4)] {
+            let source = noise(width, height)
+            for _ in 0..<200 {
+                let target = noise(13, 9)
+                let rect = PixelRect(
+                    x: Int(generator.next() % 30) - 8, y: Int(generator.next() % 30) - 8,
+                    width: Int(generator.next() % 24), height: Int(generator.next() % 24)
+                )
+                var viaPatch = target
+                let patch = source.extract(rect)
+                viaPatch.restore(patch.pixels, to: patch.rect)
+                var direct = target
+                direct.restore(rect, from: source)
+                #expect(direct == viaPatch, "rect \(rect) from a \(width)x\(height) source")
+            }
+        }
+    }
+
     @Test("extract clips to bounds instead of reading past the edge")
     func extractClips() {
         let bmp = Bitmap(width: 4, height: 4)

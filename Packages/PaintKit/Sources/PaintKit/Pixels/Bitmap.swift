@@ -137,20 +137,42 @@ public struct Bitmap: Equatable, Sendable {
     public mutating func restore(_ patch: [RGBA8], to rect: PixelRect) {
         let clipped = rect.intersection(bounds)
         guard !clipped.isEmpty, patch.count == rect.area else { return }
-        let canvasWidth = width
-        // Offsets into the patch when `rect` hangs off the canvas edge. Reading
-        // from row 0 / column 0 in that case would shift the restored pixels.
-        let patchColumnOffset = clipped.minX - rect.minX
-        let patchRowOffset = clipped.minY - rect.minY
-
+        // The patch is addressed from `rect`'s own origin, so a rect hanging off
+        // the canvas edge reads from the matching offset rather than row 0.
         patch.withUnsafeBufferPointer { source in
-            pixels.withUnsafeMutableBufferPointer { destination in
-                for row in 0..<clipped.height {
-                    let sourceStart = (patchRowOffset + row) * rect.width + patchColumnOffset
-                    let destinationStart = (clipped.minY + row) * canvasWidth + clipped.minX
-                    destination.baseAddress!.advanced(by: destinationStart)
-                        .update(from: source.baseAddress! + sourceStart, count: clipped.width)
-                }
+            copyRows(
+                clipped, from: source, width: rect.width,
+                origin: PixelPoint(x: rect.minX, y: rect.minY)
+            )
+        }
+    }
+
+    /// Copy `rect` from `source` into the same place here, row by row.
+    ///
+    /// Equivalent to `restore(source.extract(rect).pixels, to:)` without the
+    /// intermediate patch. The live shape preview rolls its previous frame back
+    /// through this on every mouse move, and on a large shape that patch was a
+    /// fresh canvas-sized allocation per frame.
+    public mutating func restore(_ rect: PixelRect, from source: Bitmap) {
+        let clipped = rect.intersection(bounds).intersection(source.bounds)
+        guard !clipped.isEmpty else { return }
+        source.pixels.withUnsafeBufferPointer { buffer in
+            copyRows(clipped, from: buffer, width: source.width, origin: .zero)
+        }
+    }
+
+    /// Copy `clipped`, which must lie inside `bounds`, from a buffer whose pixel
+    /// for canvas point `(x, y)` sits at `(y - origin.y) * width + (x - origin.x)`.
+    private mutating func copyRows(
+        _ clipped: PixelRect, from source: UnsafeBufferPointer<RGBA8>,
+        width sourceWidth: Int, origin: PixelPoint
+    ) {
+        let canvasWidth = width
+        pixels.withUnsafeMutableBufferPointer { destination in
+            for row in clipped.minY..<clipped.maxY {
+                let sourceStart = (row - origin.y) * sourceWidth + (clipped.minX - origin.x)
+                destination.baseAddress!.advanced(by: row * canvasWidth + clipped.minX)
+                    .update(from: source.baseAddress! + sourceStart, count: clipped.width)
             }
         }
     }

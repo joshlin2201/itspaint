@@ -418,8 +418,7 @@ public final class PaintEngine {
             // Roll back the previous preview, then draw the new one. Restoring
             // only the previously dirtied rect keeps a live preview cheap.
             if !previousDirty.isEmpty {
-                let patch = before.extract(previousDirty)
-                canvas.restore(patch.pixels, to: patch.rect)
+                canvas.restore(previousDirty, from: before)
             }
             let end = snappedEnd(constrained ? constrain(origin, to: point) : point, from: origin)
             let drawn: PixelRect
@@ -472,8 +471,7 @@ public final class PaintEngine {
 
         case let .bend(before, a, b, previousDirty, button):
             if !previousDirty.isEmpty {
-                let patch = before.extract(previousDirty)
-                canvas.restore(patch.pixels, to: patch.rect)
+                canvas.restore(previousDirty, from: before)
             }
             let drawn = Raster.strokeCurve(
                 from: a, through: point, to: b,
