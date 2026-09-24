@@ -189,7 +189,10 @@ final class CanvasNSView: NSView {
     /// at 800% is lying to the user about what they drew.
     private var interpolation: CGInterpolationQuality {
         if zoom >= 1 { return .none }
-        return isZoomSettling || inLiveResize ? .low : .high
+        // A live resize only rescales while the canvas is still fitting the
+        // window; at a zoom the user picked, it redraws at the same scale.
+        let refitting = inLiveResize && model?.hasUserZoomed == false
+        return isZoomSettling || refitting ? .low : .high
     }
 
     /// Blit the canvas, cropped to `dirtyRect` where that is exact.
