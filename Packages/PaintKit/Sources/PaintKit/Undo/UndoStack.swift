@@ -62,6 +62,13 @@ public struct UndoStack: Sendable {
     /// a long history quadratic in the number of strokes.
     public private(set) var byteCount = 0
 
+    /// Edits recorded over the stack's life. Undo, redo, trimming and
+    /// `removeAll` never lower it, so an owner that mirrors each edit into
+    /// another history (the app's `NSUndoManager`) counts new edits by watching
+    /// it. `undoCount` cannot tell it that: once the budget drops the oldest
+    /// entry as each new one lands, the count stays flat across a real edit.
+    public private(set) var recordedCount = 0
+
     /// Record an edit, sizing the budget to the canvas it was made on.
     ///
     /// The canvas is passed in rather than remembered because it changes under
@@ -79,6 +86,7 @@ public struct UndoStack: Sendable {
         redoable.removeAll(keepingCapacity: true)
         undoable.append(edit)
         byteCount += edit.byteCount
+        recordedCount += 1
         trimToBudget()
     }
 

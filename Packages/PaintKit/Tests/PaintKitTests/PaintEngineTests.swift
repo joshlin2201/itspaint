@@ -272,6 +272,13 @@ struct UndoStackTests {
         }
         #expect(engine.undoStack.undoCount >= 1)
         #expect(engine.undoStack.undoCount < 5)
+        // The entry count went flat once trimming started; the recorded count,
+        // which the app mirrors into NSUndoManager, did not.
+        #expect(engine.undoStack.recordedCount == 5)
+        engine.undo()
+        engine.redo()
+        engine.reset(to: engine.canvas)
+        #expect(engine.undoStack.recordedCount == 5, "only a new edit may move it")
     }
 
     @Test("The history budget follows the canvas instead of a fixed ceiling")

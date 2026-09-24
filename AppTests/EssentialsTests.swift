@@ -79,6 +79,47 @@ struct EssentialsTests {
         #expect(model.canvas == before)
     }
 
+    /// The document mirrors engine edits into `NSUndoManager` through
+    /// `onEditCommitted`, and each registered action replays one engine undo. So
+    /// every recorded edit has to register exactly one action, including when
+    /// the history budget is dropping the oldest entry per new one and the entry
+    /// count stays flat.
+    @Test("Every recorded edit registers one undo action while history trims")
+    func everyEditRegistersOneAction() {
+        let engine = PaintEngine(
+            canvas: Bitmap(width: 64, height: 64, fill: .white), undoByteBudget: 1
+        )
+        let model = EditorModel(engine: engine)
+        var registered = 0
+        model.onEditCommitted = { _ in registered += 1 }
+
+        for _ in 0..<3 { model.invertColours() }
+
+        #expect(model.engine.undoStack.undoCount == 1, "the budget stopped trimming")
+        #expect(registered == 3)
+    }
+
+    /// A command run with a polygon still open lands the polygon as its own
+    /// edit first, so one call records two edits and must register two actions,
+    /// or ⌘Z undoes the command and can never reach the shape beneath it.
+    @Test("A command that lands a pending polygon registers both edits")
+    func landedShapeRegistersItsOwnAction() {
+        let model = EditorModel(canvas: Bitmap(width: 120, height: 90, fill: .white))
+        model.selectShape(.polygon)
+        for corner in [PixelPoint(x: 10, y: 10), PixelPoint(x: 100, y: 15), PixelPoint(x: 60, y: 80)] {
+            model.noteChange(model.engine.beginStroke(at: corner))
+            model.noteChange(model.engine.endStroke(at: corner))
+        }
+        #expect(model.engine.hasPendingShape)
+
+        var names: [String] = []
+        model.onEditCommitted = { names.append($0) }
+        model.invertColours()
+
+        #expect(!model.engine.hasPendingShape)
+        #expect(names.count == 2, "registered \(names)")
+    }
+
     @Test("Undo and redo walk the full history in both directions")
     func historyWalks() {
         let model = EditorModel(canvas: Bitmap(width: 80, height: 80, fill: .white))

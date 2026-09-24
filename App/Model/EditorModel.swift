@@ -286,6 +286,7 @@ final class EditorModel {
     init(engine: PaintEngine) {
         self.engine = engine
         self.lastKnownCanvasSize = (engine.canvas.width, engine.canvas.height)
+        self.lastKnownRecordedCount = engine.undoStack.recordedCount
         self.tool = engine.settings.tool
         self.shapeKind = engine.settings.shapeKind
         self.brushSize = engine.settings.brushSize
@@ -339,7 +340,7 @@ final class EditorModel {
             background = metadata.background
             palette = metadata.palette
         }
-        lastKnownUndoCount = 0
+        lastKnownRecordedCount = engine.undoStack.recordedCount
         // Re-seed: an open or a revert is not a resize, and comparing against
         // the previous document's size would announce one.
         lastKnownCanvasSize = (canvas.width, canvas.height)
@@ -388,11 +389,16 @@ final class EditorModel {
         // Distinguish a *new* edit from an undo/redo replay. Only the former
         // registers an undo action, otherwise undoing would push another undo
         // and ⌘Z would never reach the beginning.
-        let count = engine.undoStack.undoCount
-        if count > lastKnownUndoCount {
+        //
+        // One action per edit the engine recorded, because a command can record
+        // two (a pending shape it landed, then itself) and each replay undoes
+        // one. Counted by `recordedCount`, not by entries: once the history
+        // budget drops the oldest entry per new one, the entry count stays flat.
+        let recorded = engine.undoStack.recordedCount
+        for _ in lastKnownRecordedCount..<max(lastKnownRecordedCount, recorded) {
             onEditCommitted?(engine.undoStack.undoActionName ?? "Edit")
         }
-        lastKnownUndoCount = count
+        lastKnownRecordedCount = recorded
     }
 
     /// Invalidates canvas chrome without marking the document edited.
@@ -411,7 +417,7 @@ final class EditorModel {
         revision &+= 1
     }
 
-    @ObservationIgnored private var lastKnownUndoCount: Int = 0
+    @ObservationIgnored private var lastKnownRecordedCount: Int = 0
     @ObservationIgnored var onCanvasChanged: ((PixelRect) -> Void)?
     @ObservationIgnored var onEditCommitted: ((String) -> Void)?
     /// Fires when the canvas changes *size*, so the window can follow it.
