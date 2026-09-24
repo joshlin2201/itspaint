@@ -144,10 +144,12 @@ struct EssentialsTests {
     @Test("A declined trim still registers the polygon it landed")
     func declinedTrimRegistersLandedShape() throws {
         // No uniform border anywhere, so the trim declines.
-        let pixels = (0..<(120 * 90)).map { i in
-            RGBA8(r: UInt8(i % 251), g: UInt8(i % 241), b: UInt8(i % 239))
+        let pixels: [RGBA8] = (0..<(120 * 90)).map { (i: Int) -> RGBA8 in
+            let r = UInt8(i % 251), g = UInt8(i % 241), b = UInt8(i % 239)
+            return RGBA8(r: r, g: g, b: b)
         }
-        let model = EditorModel(canvas: try #require(Bitmap(width: 120, height: 90, pixels: pixels)))
+        let canvas = try #require(Bitmap(width: 120, height: 90, pixels: pixels))
+        let model = EditorModel(canvas: canvas)
         model.selectShape(.polygon)
         for corner in [PixelPoint(x: 10, y: 10), PixelPoint(x: 100, y: 15), PixelPoint(x: 60, y: 80)] {
             model.noteChange(model.engine.beginStroke(at: corner))
