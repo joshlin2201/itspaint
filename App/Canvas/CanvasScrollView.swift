@@ -53,6 +53,9 @@ struct CanvasScrollView: NSViewRepresentable {
         // done here — re-laying out and rebuilding cursor rects on every stroke
         // segment, which is work proportional to input rate for no benefit.
         canvas.repaintIfChanged(revision: model.revision)
+        // Reads the selection and the float, so a marquee or paste made from the
+        // menu bar starts the ants and a menu deselect stops them.
+        canvas.updateAntsAnimation()
         canvas.refreshCursorIfNeeded()
         canvas.invalidateCanvasSize()
         fitToViewport(scrollView, canvas: canvas)

@@ -445,6 +445,9 @@ final class EditorModel {
         if engine.colours.foreground != foreground { foreground = engine.colours.foreground }
         if engine.colours.background != background { background = engine.colours.background }
         if engine.settings.tool != tool { tool = engine.settings.tool }
+        // A gesture can end with an empty dirty rect, which never reaches
+        // `noteChange`, so the mirrors are pulled here too.
+        syncFloatingState()
     }
 
     // MARK: - Commands
@@ -704,6 +707,8 @@ final class EditorModel {
         if hasFloatingContent != floats { hasFloatingContent = floats }
         let selected = engine.hasSelection
         if hasSelection != selected { hasSelection = selected }
+        let drawing = engine.isDrawing
+        if isDragging != drawing { isDragging = drawing }
     }
 
     /// Write the floating content down where it sits.
@@ -727,7 +732,11 @@ final class EditorModel {
 
     /// True while a gesture is in flight. The cluster dims so the marching ants
     /// are never competing with chrome.
-    var isDragging: Bool { engine.isDrawing }
+    ///
+    /// Mirrored like `hasSelection`: a passthrough to the engine is invisible to
+    /// SwiftUI, so the chrome only un-dimmed when something else happened to
+    /// re-render it after mouse-up.
+    private(set) var isDragging = false
 
     /// Size of the live selection or floating content, for the actions row.
     var selectionSize: (width: Int, height: Int)? {

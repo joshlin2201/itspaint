@@ -1030,8 +1030,6 @@ struct ImageMenu: View {
     @Bindable var model: EditorModel
 
     var body: some View {
-        let _ = model.revision
-
         HeaderMenu(
             symbol: "photo", title: "Image",
             detail: "Rotate, flip, resize, invert, or knock the background out"
@@ -1064,8 +1062,6 @@ struct ViewMenu: View {
     @Bindable var model: EditorModel
 
     var body: some View {
-        let _ = model.revision
-
         HeaderMenu(
             symbol: "slider.horizontal.3", title: "View",
             detail: "The pixel grid, snapping, and which edge the toolbar is on"
