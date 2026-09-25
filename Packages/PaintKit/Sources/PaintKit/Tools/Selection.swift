@@ -16,6 +16,9 @@ public struct FloatingSelection: Equatable, Sendable {
     /// Where the content sits and how big it currently is.
     public private(set) var frame: PixelRect
     /// `original` rendered at `frame`'s size. Cached — moving does not rebuild it.
+    ///
+    /// Behind the frame while a resize drag is in flight (see `stretch`); read
+    /// `bitmap`, which is always the right size, unless `isSettled` says it is.
     public private(set) var rendered: Bitmap
     /// Resampling used when the frame is resized.
     public var scaling: ImageTransform.Scaling
@@ -35,8 +38,17 @@ public struct FloatingSelection: Equatable, Sendable {
 
     public var origin: PixelPoint { PixelPoint(x: frame.minX, y: frame.minY) }
 
-    /// The pixels to draw and to commit.
-    public var bitmap: Bitmap { rendered }
+    /// The pixels to draw and to commit, at `frame`'s size.
+    ///
+    /// Rendered on demand while unsettled, so a commit or a copy in the middle
+    /// of a resize still gets the right pixels.
+    public var bitmap: Bitmap { isSettled ? rendered : render(at: frame) }
+
+    /// Whether `rendered` matches the frame. False only between a `stretch`
+    /// and the `settle` that follows it.
+    public var isSettled: Bool {
+        rendered.width == frame.width && rendered.height == frame.height
+    }
 
     public func contains(_ point: PixelPoint) -> Bool { frame.contains(point) }
 
@@ -57,16 +69,32 @@ public struct FloatingSelection: Equatable, Sendable {
 
     /// Resize, re-rendering from `original` only when the size actually changes.
     public mutating func resize(to newFrame: PixelRect) {
-        let clamped = PixelRect(
+        stretch(to: newFrame)
+        settle()
+    }
+
+    /// Resize the frame and leave the pixels for `settle()`.
+    ///
+    /// A resize drag calls this on every mouse move and settles once at the
+    /// end. Rendering a large paste at each new size cost tens of milliseconds
+    /// an event; the view draws `original` scaled into the frame meanwhile.
+    public mutating func stretch(to newFrame: PixelRect) {
+        frame = PixelRect(
             x: newFrame.minX, y: newFrame.minY,
             width: max(1, newFrame.width), height: max(1, newFrame.height)
         )
-        guard clamped != frame else { return }
-        let sizeChanged = clamped.width != frame.width || clamped.height != frame.height
-        frame = clamped
-        guard sizeChanged else { return }
-        rendered = ImageTransform.scaled(
-            original, to: (clamped.width, clamped.height), using: scaling
+    }
+
+    /// Render `original` at the frame's size, if a `stretch` left it behind.
+    public mutating func settle() {
+        guard !isSettled else { return }
+        rendered = render(at: frame)
+    }
+
+    private func render(at frame: PixelRect) -> Bitmap {
+        if frame.width == original.width && frame.height == original.height { return original }
+        return ImageTransform.scaled(
+            original, to: (frame.width, frame.height), using: scaling
         ) ?? original
     }
 

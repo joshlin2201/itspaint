@@ -104,6 +104,53 @@ final class DrawingDocument: NSDocument {
 
     override class var autosavesInPlace: Bool { true }
 
+    // MARK: - Landing work before it is written
+
+    /// A half-built shape or a paste still floating is on screen but not in
+    /// `model.canvas`, which is what gets written: the float not at all, and a
+    /// stray polygon's rubber band as if it were art. Closing autosaves, so a
+    /// paste left floating was lost with the window.
+    ///
+    /// Every route that writes the document lands them first, in an undo group
+    /// of their own, so the change count is settled before a save takes its
+    /// token and the window is not left marked edited after saving.
+    func landPendingWorkBeforeWriting() {
+        guard model.engine.hasPendingShape || model.floating != nil else { return }
+        undoManager?.beginUndoGrouping()
+        model.landPendingWork()
+        undoManager?.endUndoGrouping()
+    }
+
+    override func save(_ sender: Any?) {
+        landPendingWorkBeforeWriting()
+        super.save(sender)
+    }
+
+    override func saveAs(_ sender: Any?) {
+        landPendingWorkBeforeWriting()
+        super.saveAs(sender)
+    }
+
+    override func saveTo(_ sender: Any?) {
+        landPendingWorkBeforeWriting()
+        super.saveTo(sender)
+    }
+
+    override func duplicate() throws -> NSDocument {
+        landPendingWorkBeforeWriting()
+        return try super.duplicate()
+    }
+
+    /// Closing a window and quitting both come through here, and with
+    /// `autosavesInPlace` the document is written without asking.
+    override func canClose(
+        withDelegate delegate: Any, shouldClose shouldCloseSelector: Selector?,
+        contextInfo: UnsafeMutableRawPointer?
+    ) {
+        landPendingWorkBeforeWriting()
+        super.canClose(withDelegate: delegate, shouldClose: shouldCloseSelector, contextInfo: contextInfo)
+    }
+
     // `autosavingFileType` is deliberately NOT overridden.
     //
     // It used to return nil for imported images, to keep an autosave from

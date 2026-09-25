@@ -106,6 +106,19 @@ struct PixelRectTests {
 @Suite("Bitmap")
 struct BitmapTests {
 
+    @Test("Opacity is judged inside the rect only, and stops at the first clear pixel")
+    func opacityInRect() {
+        var bitmap = Bitmap(width: 40, height: 30, fill: .white)
+        #expect(bitmap.isOpaque(in: bitmap.bounds))
+        bitmap.setPixel(RGBA8(r: 0, g: 0, b: 0, a: 128), at: PixelPoint(x: 30, y: 20))
+        #expect(!bitmap.isOpaque(in: bitmap.bounds))
+        #expect(bitmap.isOpaque(in: PixelRect(x: 0, y: 0, width: 30, height: 30)), "a pixel just outside counted")
+        #expect(!bitmap.isOpaque(in: PixelRect(x: 30, y: 20, width: 1, height: 1)))
+        #expect(!bitmap.isOpaque(in: PixelRect(x: 25, y: 15, width: 100, height: 100)), "off-canvas rect not clipped")
+        #expect(bitmap.isOpaque(in: .empty))
+        #expect(bitmap.isOpaque(in: PixelRect(x: 50, y: 50, width: 5, height: 5)))
+    }
+
     @Test("The shared size budget accepts 8K and rejects hostile dimensions")
     func sizeBudget() {
         #expect(Bitmap.maximumDimension == 20_000)

@@ -250,6 +250,37 @@ final class CanvasNSView: NSView {
         context.restoreGState()
     }
 
+    /// Whole-canvas opacity for `opaqueRevision`, so the redraws that cover most
+    /// of the canvas (a zoom step, a scroll, a window resize) scan it once per
+    /// edit rather than once per frame.
+    private var opaqueRevision = -1
+    private var canvasIsOpaque = false
+
+    /// Whether every canvas pixel under `dirtyRect` is opaque.
+    ///
+    /// A small rect is scanned directly, which is what a stroke frame repaints;
+    /// a large one takes the cached whole-canvas answer. A margin of a pixel
+    /// covers what a downscaled draw samples past the rect's edge.
+    private func isCanvasOpaque(under dirtyRect: NSRect, model: EditorModel) -> Bool {
+        let canvas = model.canvas
+        guard canvas.width > 0, canvas.height > 0 else { return false }
+        let sx = bounds.width / Double(canvas.width)
+        let sy = bounds.height / Double(canvas.height)
+        guard sx > 0, sy > 0 else { return false }
+        let minX = Int((dirtyRect.minX / sx).rounded(.down)) - 1
+        let minY = Int((dirtyRect.minY / sy).rounded(.down)) - 1
+        let maxX = Int((dirtyRect.maxX / sx).rounded(.up)) + 1
+        let maxY = Int((dirtyRect.maxY / sy).rounded(.up)) + 1
+        let region = PixelRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+            .intersection(canvas.bounds)
+        guard region.area * 4 >= canvas.bounds.area else { return canvas.isOpaque(in: region) }
+        if opaqueRevision != model.revision {
+            canvasIsOpaque = canvas.isOpaque(in: canvas.bounds)
+            opaqueRevision = model.revision
+        }
+        return canvasIsOpaque
+    }
+
     /// Let go of the snapshot before the engine writes. See `cachedImage`.
     private func releaseCanvasSnapshot() {
         cachedImage = nil
@@ -272,7 +303,12 @@ final class CanvasNSView: NSView {
         }
         guard let image = cachedImage else { return }
 
-        drawTransparencyGrid(in: dirtyRect, context: context)
+        // The checkerboard only shows where the canvas lets it through. Under an
+        // opaque screenshot, which is most of them, it was fill work on every
+        // full redraw that nobody could see.
+        if !isCanvasOpaque(under: dirtyRect, model: model) {
+            drawTransparencyGrid(in: dirtyRect, context: context)
+        }
         drawCanvas(image, in: dirtyRect, context: context, canvas: model.canvas)
 
         drawFloatingContent(context: context, model: model)
@@ -436,21 +472,27 @@ final class CanvasNSView: NSView {
             return
         }
 
-        if cachedFloatingBitmap != floating.bitmap {
-            cachedFloatingImage = floating.bitmap.makeCGImage()
-            cachedFloatingBitmap = floating.bitmap
+        // A resize renders the float's pixels only when the drag ends. Until
+        // then the original is scaled into the frame here, which Core Graphics
+        // does for the cost of the blit.
+        let source = floating.isSettled ? floating.rendered : floating.original
+        if cachedFloatingBitmap != source {
+            cachedFloatingImage = source.makeCGImage()
+            cachedFloatingBitmap = source
         }
         guard let image = cachedFloatingImage else { return }
 
         let frame = CGRect(
             x: Double(floating.origin.x) * zoom,
             y: Double(floating.origin.y) * zoom,
-            width: Double(floating.bitmap.width) * zoom,
-            height: Double(floating.bitmap.height) * zoom
+            width: Double(floating.frame.width) * zoom,
+            height: Double(floating.frame.height) * zoom
         )
 
         context.saveGState()
-        context.interpolationQuality = interpolation
+        context.interpolationQuality = floating.isSettled
+            ? interpolation
+            : (floating.scaling == .nearest ? .none : .high)
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1, y: -1)
         let flipped = CGRect(
@@ -512,6 +554,18 @@ final class CanvasNSView: NSView {
 
     private func drawMarquee(context: CGContext, model: EditorModel) {
         guard model.floating == nil, let selection = model.selection, !selection.isEmpty else { return }
+
+        // An ellipse being dragged out draws as the ellipse it is. Tracing its
+        // mask walks the whole box, and the mask is new on every move; the
+        // traced outline takes over, once, at mouse-up.
+        if !selection.isRectangular, model.selectionKind == .ellipse, let box = model.engine.marqueeBox {
+            let rect = CGRect(
+                x: Double(box.minX) * zoom, y: Double(box.minY) * zoom,
+                width: Double(box.width) * zoom, height: Double(box.height) * zoom
+            )
+            drawAnts(along: CGPath(ellipseIn: rect, transform: nil), context: context)
+            return
+        }
 
         // A lasso's ants follow the outline the user actually traced. Drawing
         // its bounding box would tell them the selection is a rectangle, which
