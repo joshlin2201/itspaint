@@ -114,11 +114,20 @@ final class DrawingDocument: NSDocument {
     /// Every route that writes the document lands them first, in an undo group
     /// of their own, so the change count is settled before a save takes its
     /// token and the window is not left marked edited after saving.
+    ///
+    /// With `groupsByEvent` on, a group begun at the top level is nested inside
+    /// the event's automatic one, which only closes after the save has begun;
+    /// switching it off for the landing makes this group the top level, and it
+    /// closes here.
     func landPendingWorkBeforeWriting() {
         guard model.engine.hasPendingShape || model.floating != nil else { return }
-        undoManager?.beginUndoGrouping()
+        guard let undoManager else { return model.landPendingWork() }
+        let byEvent = undoManager.groupsByEvent
+        undoManager.groupsByEvent = false
+        undoManager.beginUndoGrouping()
         model.landPendingWork()
-        undoManager?.endUndoGrouping()
+        undoManager.endUndoGrouping()
+        undoManager.groupsByEvent = byEvent
     }
 
     override func save(_ sender: Any?) {

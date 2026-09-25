@@ -239,14 +239,18 @@ struct DrawingDocumentTests {
         #expect(document.model.floating != nil)
         #expect(!document.model.canvas.pixels.contains(.black))
         // A test has no run-loop turn to close the automatic group a paste may
-        // open, so the check is that the landing's own group is balanced.
-        let level = undo.groupingLevel
+        // open; close it the way the end of the paste's event would.
+        while undo.groupingLevel > 0 { undo.endUndoGrouping() }
 
         document.landPendingWorkBeforeWriting()
 
         #expect(document.model.floating == nil)
         #expect(document.model.canvas.pixels.contains(.black), "the paste did not reach the canvas")
-        #expect(undo.groupingLevel == level, "the landing left an undo group open")
+        // Closed now, not at the end of the event, so a save that follows
+        // counts it before taking its token.
+        #expect(undo.groupingLevel == 0, "the landing left an undo group open")
+        #expect(undo.canUndo)
+        #expect(undo.groupsByEvent, "automatic grouping was not restored")
     }
 
     @Test("The app and native document use one stable public identity")
