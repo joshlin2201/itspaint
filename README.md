@@ -8,7 +8,7 @@
 
 # ItsPaint
 
-### MS Paint for the Mac, in a 3.46 MB download
+### MS Paint for the Mac, in a 3.54 MB download
 
 Take or paste a screenshot, number the steps and drag the finished image into a bug report or a doc.
 
@@ -47,7 +47,7 @@ The engine is its own SwiftPM product. It has no AppKit and no third-party depen
 and it supports macOS 12 and later.
 
 ```swift
-.package(url: "https://github.com/joshlin2201/itspaint", from: "0.22.0")
+.package(url: "https://github.com/joshlin2201/itspaint", from: "0.23.0")
 ```
 
 [![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fjoshlin2201%2Fitspaint%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/joshlin2201/itspaint)
@@ -162,7 +162,7 @@ Or open the [disk image](https://github.com/joshlin2201/itspaint/releases) and d
 | **Requires** | macOS 14 Sonoma or later |
 | **Architecture** | Universal, for Apple silicon and Intel |
 | **Signing** | Developer ID and notarised, with the ticket stapled to the disk image and the app, so Gatekeeper can check it offline |
-| **Download** | 3.46 MB, with SHA-256 sums in `checksums.txt` |
+| **Download** | 3.54 MB, with SHA-256 sums in `checksums.txt` |
 
 ```bash
 shasum -a 256 -c checksums.txt
