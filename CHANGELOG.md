@@ -7,6 +7,16 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+### Added
+- **Take a screenshot straight into ItsPaint.** File ▸ New from Screenshot, the
+  Dock menu, or ⌃⌥⌘4 from any app once it is switched on in Settings brings up
+  the macOS crosshair: drag a region or press Space for a window, and the shot
+  opens as a new image named the way macOS names its own. ItsPaint steps aside
+  while you pick, when it was in front. macOS asks for Screen Recording the
+  first time; nothing else in the app needs it.
+- **New from Clipboard** is in the File menu and the Dock menu, beside the
+  ⌃⌥⌘V shortcut it already had.
+
 ### Fixed
 - **A large default canvas size no longer stops the app at launch.** Settings
   checked each side of a new canvas against 20,000 px but not the area, so

@@ -188,7 +188,20 @@ struct SettingsView: View {
             Section("Screenshots") {
                 ScreenshotWatcherRow()
                 Divider()
-                ClipboardHotKeyRow()
+                HotKeyRow(
+                    hotKey: GlobalHotKey.capture,
+                    title: "Take a screenshot into a new image with",
+                    caption: "Works from any app while ItsPaint is running. Drag a region or press "
+                        + "Space for a window, the same as ⇧⌘4. macOS asks for Screen Recording "
+                        + "permission the first time."
+                )
+                Divider()
+                HotKeyRow(
+                    hotKey: GlobalHotKey.clipboard,
+                    title: "Open the clipboard as a new image with",
+                    caption: "Works from any app while ItsPaint is running, even with no window open. "
+                        + "It always makes a new image, so it never pastes into what you were editing."
+                )
             }
 
             Section {
@@ -256,16 +269,18 @@ private struct ScreenshotWatcherRow: View {
     }
 }
 
-/// The other half of the screenshot workflow: `⌃⇧⌘4` copies instead of saving,
-/// and this gives that clipboard somewhere to land from any app.
-private struct ClipboardHotKeyRow: View {
-    @Bindable private var hotKey = ClipboardHotKey.shared
+/// A global shortcut's switch: taking a screenshot, or giving the clipboard
+/// somewhere to land from any app.
+private struct HotKeyRow: View {
+    @Bindable var hotKey: GlobalHotKey
+    let title: String
+    let caption: String
 
     var body: some View {
         Toggle(isOn: $hotKey.isEnabled) {
             HStack(spacing: Tokens.Space.tight) {
-                Text("Open the clipboard as a new image with")
-                Text(ClipboardHotKey.displayName)
+                Text(title)
+                Text(hotKey.displayName)
                     .monospaced()
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
@@ -273,8 +288,7 @@ private struct ClipboardHotKeyRow: View {
             }
         }
 
-        Text("Works from any app while ItsPaint is running, even with no window open. "
-             + "It always makes a new image, so it never pastes into what you were editing.")
+        Text(caption)
             .font(.caption)
             .foregroundStyle(.secondary)
 

@@ -57,10 +57,11 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
         // is off until someone turns it on, and it stays off if the folder it was
         // given has since moved.
         _ = ScreenshotWatcher.shared
-        // Same for the global clipboard shortcut: its init registers the key when
-        // it is switched on, and until something touches it a relaunch leaves
-        // ⌃⌥⌘V dead until Settings happens to be opened.
-        _ = ClipboardHotKey.shared
+        // Same for the global shortcuts: each one's init registers its key when
+        // it is switched on, and until something touches it a relaunch leaves it
+        // dead until Settings happens to be opened.
+        _ = GlobalHotKey.clipboard
+        _ = GlobalHotKey.capture
 
         // The Info.plist entry puts "Edit in ItsPaint" in the Services menu; this
         // is what makes choosing it do something. `NSUpdateDynamicServices` is
@@ -98,6 +99,20 @@ final class ItsPaintAppDelegate: NSObject, NSApplicationDelegate {
     /// on the delegate, which is the tail of every responder chain.
     @IBAction func showSettings(_ sender: Any?) {
         SettingsWindowController.show()
+    }
+
+    /// New images from outside any document, so they live here for the same
+    /// reason: they have to work with no window open.
+    @IBAction func newFromScreenshot(_ sender: Any?) { ScreenCapture.begin() }
+    @IBAction func newFromClipboard(_ sender: Any?) { NewDocument.openClipboard() }
+
+    /// Right-click on the Dock icon, the one place ItsPaint is reachable from
+    /// while another app is in front and the global shortcuts are off.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "New from Screenshot", action: #selector(newFromScreenshot(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: "New from Clipboard", action: #selector(newFromClipboard(_:)), keyEquivalent: "")
+        return menu
     }
 
     // Help, opened in the browser. `NSWorkspace.open` hands the URL to whichever app

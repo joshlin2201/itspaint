@@ -93,8 +93,10 @@ final class ImageService: NSObject {
 /// the same way: an image from somewhere else, no document to put it in, and the
 /// wrong answer is pasting it into whatever happened to be frontmost.
 enum NewDocument {
+    /// `name`, when given, titles the window and is what Save and a drag out
+    /// offer, instead of "Untitled".
     @MainActor
-    static func open(with bitmap: Bitmap) throws {
+    static func open(with bitmap: Bitmap, named name: String? = nil) throws {
         guard let document = try NSDocumentController.shared
             .openUntitledDocumentAndDisplay(false) as? DrawingDocument
         else { throw NewDocumentError.noDocument }
@@ -103,8 +105,44 @@ enum NewDocument {
         // content, not an edit to it. The undo-recording path would open a window
         // already dirty, offering to save a file that never existed.
         document.model.load(canvas: bitmap, metadata: nil)
+        if let name {
+            document.displayName = name
+            document.model.documentName = name
+        }
         document.makeWindowControllers()
         document.showWindows()
+    }
+
+    /// Open the clipboard as a new document.
+    ///
+    /// Nothing is pasted into the document you are working in. The global
+    /// shortcut fires while you are somewhere else entirely, so the only safe
+    /// target is a new window — landing a paste on top of whatever happens to be
+    /// frontmost is an edit nobody asked for, in a document they were not
+    /// looking at.
+    @MainActor
+    static func openClipboard() {
+        NSApp.activate()
+        let board = NSPasteboard.general
+        guard Bitmap.canDecode(pasteboard: board) else {
+            present("There is no image on the clipboard.",
+                    "Copy an image, or take a screenshot with ⌃⇧⌘4, and try again.")
+            return
+        }
+        do {
+            try open(with: Bitmap(pasteboard: board))
+        } catch {
+            present("That image could not be opened.", error.localizedDescription)
+        }
+    }
+
+    @MainActor
+    private static func present(_ message: String, _ detail: String?) {
+        let alert = NSAlert()
+        alert.messageText = message
+        if let detail { alert.informativeText = detail }
+        alert.alertStyle = .informational
+        alert.runModal()
     }
 }
 
