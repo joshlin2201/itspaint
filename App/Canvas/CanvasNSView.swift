@@ -259,18 +259,20 @@ final class CanvasNSView: NSView {
     /// Whether every canvas pixel under `dirtyRect` is opaque.
     ///
     /// A small rect is scanned directly, which is what a stroke frame repaints;
-    /// a large one takes the cached whole-canvas answer. A margin of a pixel
-    /// covers what a downscaled draw samples past the rect's edge.
+    /// a large one takes the cached whole-canvas answer. The margin is the one
+    /// `drawCanvas` crops with, since a downscaled draw samples that far past
+    /// the rect's edge and a transparent pixel there shows through.
     private func isCanvasOpaque(under dirtyRect: NSRect, model: EditorModel) -> Bool {
         let canvas = model.canvas
         guard canvas.width > 0, canvas.height > 0 else { return false }
         let sx = bounds.width / Double(canvas.width)
         let sy = bounds.height / Double(canvas.height)
         guard sx > 0, sy > 0 else { return false }
-        let minX = Int((dirtyRect.minX / sx).rounded(.down)) - 1
-        let minY = Int((dirtyRect.minY / sy).rounded(.down)) - 1
-        let maxX = Int((dirtyRect.maxX / sx).rounded(.up)) + 1
-        let maxY = Int((dirtyRect.maxY / sy).rounded(.up)) + 1
+        let margin = Int((4 / min(sx, 1)).rounded(.up)) + 2
+        let minX = Int((dirtyRect.minX / sx).rounded(.down)) - margin
+        let minY = Int((dirtyRect.minY / sy).rounded(.down)) - margin
+        let maxX = Int((dirtyRect.maxX / sx).rounded(.up)) + margin
+        let maxY = Int((dirtyRect.maxY / sy).rounded(.up)) + margin
         let region = PixelRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
             .intersection(canvas.bounds)
         guard region.area * 4 >= canvas.bounds.area else { return canvas.isOpaque(in: region) }

@@ -65,9 +65,9 @@ version may still carry breaking changes to the document format.
 - **Resizing a pasted image renders it once, when you let go.** It used to
   render at every size you dragged through, about 16 ms a move for a 2880 × 1800
   paste; while dragging, the image is scaled into the new frame instead.
-- **The transparency checkerboard is drawn only where the picture is
-  transparent**, so an opaque screenshot no longer pays for filling it on every
-  full redraw.
+- **The transparency checkerboard is skipped when the part being redrawn is
+  opaque**, so an opaque screenshot no longer pays for filling it on every full
+  redraw.
 - **Dragging out an elliptical selection draws the ellipse directly** instead
   of retracing its outline from the mask on every mouse move.
 - Tool and shape names are title case in the Tools menu.
