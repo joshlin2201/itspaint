@@ -12,7 +12,7 @@ runs the whole engine suite:
 ```bash
 git clone https://github.com/joshlin2201/itspaint.git
 cd itspaint
-swift test          # 361 tests
+swift test          # 366 tests
 ```
 
 On the Command Line Tools alone, Swift 6.4 needs one extra flag to find Swift

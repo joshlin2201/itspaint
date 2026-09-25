@@ -7,6 +7,8 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+## [0.23.0] — 2026-09-25
+
 ### Added
 - **Take a screenshot straight into ItsPaint.** File ▸ New from Screenshot, the
   Dock menu, or ⌃⌥⌘4 from any app once it is switched on in Settings brings up
