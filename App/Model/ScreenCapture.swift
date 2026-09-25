@@ -24,7 +24,6 @@ enum ScreenCapture {
         guard !isCapturing else { return }
         guard CGPreflightScreenCaptureAccess() else { return askForAccess() }
 
-        let taken = Date()
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("ItsPaint capture \(UUID().uuidString).png")
         let process = Process()
@@ -32,7 +31,7 @@ enum ScreenCapture {
         process.arguments = arguments(writingTo: url)
         process.terminationHandler = { _ in
             DispatchQueue.main.async {
-                MainActor.assumeIsolated { finish(url, taken: taken) }
+                MainActor.assumeIsolated { finish(url) }
             }
         }
 
@@ -54,24 +53,31 @@ enum ScreenCapture {
         ["-i", url.path]
     }
 
-    /// "Screenshot 2026-09-25 at 10.42.13", the name macOS gives its own, so the
+    /// "Screenshot 2026-09-25 at 10.42.13", or "at 10.42.13 AM" where the clock
+    /// is 12-hour, which is the shape macOS gives its own screenshots, so the
     /// window title and anything dragged out of it read the way people expect.
-    static func name(for date: Date) -> String {
+    static func name(for date: Date, twelveHour: Bool = usesTwelveHourClock) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        formatter.dateFormat = twelveHour ? "yyyy-MM-dd 'at' h.mm.ss a" : "yyyy-MM-dd 'at' HH.mm.ss"
         return "Screenshot \(formatter.string(from: date))"
+    }
+
+    /// Whether the user's clock shows AM and PM.
+    static var usesTwelveHourClock: Bool {
+        DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: .current)?.contains("a") ?? false
     }
 
     private static var steppedAside = false
 
-    private static func finish(_ url: URL, taken: Date) {
+    private static func finish(_ url: URL) {
         isCapturing = false
         defer { try? FileManager.default.removeItem(at: url) }
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            if steppedAside { NSApp.unhide(nil) }
-            return
-        }
+        // Named for when the shot was taken, which is now: picking a window can
+        // take a while after the crosshair came up.
+        let taken = Date()
+        if steppedAside { NSApp.unhide(nil) }
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
         NSApp.activate()
         do {
             try NewDocument.open(with: ImageCodec.decode(contentsOf: url), named: name(for: taken))
@@ -80,16 +86,17 @@ enum ScreenCapture {
         }
     }
 
-    /// The first time, macOS shows its own request. After that it answers no
-    /// without asking, so the way forward is the switch in System Settings, and
-    /// this says where it is and opens the pane.
+    /// macOS shows its own request while it has no answer recorded, and after
+    /// that answers no without asking. Asking every time costs nothing and puts
+    /// ItsPaint back in the Screen Recording list after the permissions have
+    /// been reset. From the second time on, this also says where the switch is
+    /// and opens the pane.
     private static func askForAccess() {
         let askedKey = "askedForScreenCapture"
-        guard UserDefaults.standard.bool(forKey: askedKey) else {
-            UserDefaults.standard.set(true, forKey: askedKey)
-            _ = CGRequestScreenCaptureAccess()
-            return
-        }
+        let askedBefore = UserDefaults.standard.bool(forKey: askedKey)
+        UserDefaults.standard.set(true, forKey: askedKey)
+        _ = CGRequestScreenCaptureAccess()
+        guard askedBefore else { return }
         NSApp.activate()
         let alert = NSAlert()
         alert.messageText = "ItsPaint needs permission to take screenshots."

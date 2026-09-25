@@ -16,13 +16,14 @@ struct ScreenCaptureTests {
         #expect(ScreenCapture.arguments(writingTo: url) == ["-i", "/private/var/folders/x/shot.png"])
     }
 
-    @Test("A capture is named the way macOS names its own screenshots")
+    @Test("A capture is named the way macOS names its own screenshots, on either clock")
     func captureName() throws {
         var parts = DateComponents()
         parts.year = 2026; parts.month = 9; parts.day = 5
-        parts.hour = 9; parts.minute = 4; parts.second = 7
-        let date = try #require(Calendar.current.date(from: parts))
-        #expect(ScreenCapture.name(for: date) == "Screenshot 2026-09-05 at 09.04.07")
+        parts.hour = 21; parts.minute = 4; parts.second = 7
+        let date = try #require(Calendar(identifier: .gregorian).date(from: parts))
+        #expect(ScreenCapture.name(for: date, twelveHour: false) == "Screenshot 2026-09-05 at 21.04.07")
+        #expect(ScreenCapture.name(for: date, twelveHour: true) == "Screenshot 2026-09-05 at 9.04.07 PM")
     }
 
     @Test("The two global shortcuts are distinct and use three modifiers")
