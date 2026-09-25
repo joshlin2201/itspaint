@@ -102,6 +102,15 @@ public final class PaintEngine {
     /// knows to land it before doing anything else.
     public var hasPendingShape: Bool { pendingCurve != nil || pendingPolygon != nil }
 
+    /// The box a marquee drag is drawing out, unclipped, or nil between drags.
+    ///
+    /// An elliptical selection's mask is rebuilt from this on every move, and the
+    /// view draws the ellipse from it too instead of tracing that mask each time.
+    public var marqueeBox: PixelRect? {
+        guard case let .region(origin, current) = gesture else { return nil }
+        return PixelRect(corners: origin, current)
+    }
+
     /// Corners placed so far, for the view's read-out.
     public var pendingPolygonCorners: Int { pendingPolygon?.points.count ?? 0 }
 
@@ -515,7 +524,8 @@ public final class PaintEngine {
         case let .resizeFloating(handle):
             guard var floating else { return .empty }
             let previous = floating.frame
-            floating.resize(to: floating.frame(draggingHandle: handle, to: point, uniform: constrained))
+            // Frame only; the pixels render once, when the drag ends.
+            floating.stretch(to: floating.frame(draggingHandle: handle, to: point, uniform: constrained))
             self.floating = floating
             activeRegionSize = (floating.frame.width, floating.frame.height)
             return previous.union(floating.frame).insetBy(-handleTolerance)
@@ -624,7 +634,12 @@ public final class PaintEngine {
         case .moveFloating, .resizeFloating:
             gesture = .idle
             activeRegionSize = nil
-            return refreshed
+            // A resize renders its pixels once, here, and the frame repaints
+            // with them in place of the scaled preview.
+            guard var floating, !floating.isSettled else { return refreshed }
+            floating.settle()
+            self.floating = floating
+            return refreshed.union(floating.frame)
         }
     }
 
@@ -687,6 +702,7 @@ public final class PaintEngine {
         case .moveFloating, .resizeFloating:
             gesture = .idle
             activeRegionSize = nil
+            floating?.settle()
             return .empty
         }
     }
@@ -1271,8 +1287,8 @@ public final class PaintEngine {
     /// Land whatever half-built shape is on the canvas as one undoable edit.
     ///
     /// Called when anything else happens: another tool, a menu command, a page
-    /// turn or an export. A preview that silently disappears because you
-    /// reached for the eraser is worse than one that commits.
+    /// turn, an export, a save or a close. A preview that silently disappears
+    /// because you reached for the eraser is worse than one that commits.
     ///
     /// Every engine command that writes pixels or resizes the canvas calls this
     /// first, so the shape is its own undo step beneath that command's, and

@@ -405,7 +405,7 @@ public enum ImageCodec {
     /// already flat and comes back as it is, rather than as a second canvas-sized
     /// copy held for the length of the save.
     public static func flattened(_ bitmap: Bitmap, onto colour: PaintColour) -> Bitmap {
-        if bitmap.pixels.allSatisfy({ $0.a == 255 }) { return bitmap }
+        if bitmap.isOpaque(in: bitmap.bounds) { return bitmap }
         var flat = Bitmap(width: bitmap.width, height: bitmap.height, fill: colour.rgba8)
         flat.composite(bitmap, at: .zero)
         return flat

@@ -300,6 +300,51 @@ struct CanvasRenderingTests {
         )
     }
 
+    /// While an ellipse is dragged out the view draws the ellipse from the box
+    /// instead of tracing the mask, which is rebuilt on every move. The ants
+    /// still have to sit on the ellipse, not on its box.
+    @Test("An ellipse marquee draws on the ellipse while it is dragged")
+    func drawsEllipseWhileDragging() throws {
+        let model = EditorModel(canvas: Bitmap(width: 160, height: 120, fill: .black))
+        model.selectionKind = .ellipse
+        model.engine.beginStroke(at: PixelPoint(x: 20, y: 20))
+        model.noteVisualChange(model.engine.continueStroke(to: PixelPoint(x: 140, y: 100)))
+        #expect(model.engine.marqueeBox != nil, "the drag ended early")
+
+        let rendered = try #require(render(makeView(model)))
+        func bright(_ xs: ClosedRange<Int>, _ ys: ClosedRange<Int>) -> Int {
+            var count = 0
+            for y in ys {
+                for x in xs {
+                    if let pixel = rendered.pixel(at: PixelPoint(x: x, y: y)), pixel.r > 150 { count += 1 }
+                }
+            }
+            return count
+        }
+        #expect(bright(75...85, 18...22) > 3, "no ants at the top of the ellipse")
+        #expect(bright(20...26, 20...26) == 0, "ants drawn on the box's corner")
+    }
+
+    /// A resize drag renders the float's pixels only at mouse-up; until then the
+    /// view scales the original into the frame, and it has to fill the frame.
+    @Test("A float being resized fills its new frame before it is rendered")
+    func drawsStretchedFloat() throws {
+        let model = EditorModel(canvas: Bitmap(width: 160, height: 120, fill: .white))
+        model.noteChange(model.engine.paste(Bitmap(width: 20, height: 20, fill: .black)))
+        let frame = try #require(model.floating?.frame)
+        let corner = PixelPoint(x: frame.maxX - 1, y: frame.maxY - 1)
+        model.noteChange(model.engine.beginStroke(at: corner))
+        model.noteChange(model.engine.continueStroke(to: PixelPoint(x: corner.x + 60, y: corner.y + 40)))
+        let stretched = try #require(model.floating)
+        #expect(!stretched.isSettled)
+
+        let rendered = try #require(render(makeView(model)))
+        let inside = try #require(rendered.pixel(at: PixelPoint(
+            x: stretched.frame.maxX - 5, y: stretched.frame.maxY - 5
+        )))
+        #expect(inside.r < 60, "the preview was drawn at the original size")
+    }
+
     @Test("Transparent pixels reveal a checkerboard")
     func transparencyIsVisible() throws {
         let view = makeView(EditorModel(canvas: Bitmap(width: 40, height: 24, fill: .clear)))

@@ -228,6 +228,31 @@ struct DrawingDocumentTests {
         #expect(!undo.canRedo, "a dropped edit left a redo behind")
     }
 
+    /// `model.canvas` is what gets written, and a paste still floating is not in
+    /// it. Every save, duplicate and close lands it first, in a closed undo
+    /// group, so it is one undoable step and nothing is left open.
+    @Test("Writing the document lands a floating paste as its own closed undo step")
+    func writingLandsFloatingPaste() throws {
+        let document = DrawingDocument()
+        let undo = try #require(document.undoManager)
+        document.model.noteChange(document.model.engine.paste(Bitmap(width: 10, height: 10, fill: .black)))
+        #expect(document.model.floating != nil)
+        #expect(!document.model.canvas.pixels.contains(.black))
+        // A test has no run-loop turn to close the automatic group a paste may
+        // open; close it the way the end of the paste's event would.
+        while undo.groupingLevel > 0 { undo.endUndoGrouping() }
+
+        document.landPendingWorkBeforeWriting()
+
+        #expect(document.model.floating == nil)
+        #expect(document.model.canvas.pixels.contains(.black), "the paste did not reach the canvas")
+        // Closed now, not at the end of the event, so a save that follows
+        // counts it before taking its token.
+        #expect(undo.groupingLevel == 0, "the landing left an undo group open")
+        #expect(undo.canUndo)
+        #expect(undo.groupsByEvent, "automatic grouping was not restored")
+    }
+
     @Test("The app and native document use one stable public identity")
     func publicIdentityIsConsistent() throws {
         #expect(Bundle.main.bundleIdentifier == "com.joshlin.itspaint")

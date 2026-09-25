@@ -423,6 +423,23 @@ struct SelectionKindTests {
         #expect(!selection.contains(PixelPoint(x: 78, y: 78)))
     }
 
+    /// The view draws an ellipse being dragged out from this box rather than
+    /// tracing its mask on every move, so it has to be the box the mask came
+    /// from, unclipped, and gone once the drag ends.
+    @Test("The marquee box is the one being dragged, and only while it is")
+    func marqueeBoxFollowsTheDrag() throws {
+        let engine = engine()
+        engine.settings.selectionKind = .ellipse
+        #expect(engine.marqueeBox == nil)
+        engine.beginStroke(at: PixelPoint(x: 60, y: 70))
+        engine.continueStroke(to: PixelPoint(x: 130, y: 20))
+        let box = try #require(engine.marqueeBox)
+        #expect(box == PixelRect(corners: PixelPoint(x: 60, y: 70), PixelPoint(x: 130, y: 20)))
+        #expect(box.maxX > 100, "the box was clipped to the canvas")
+        engine.endStroke(at: PixelPoint(x: 130, y: 20))
+        #expect(engine.marqueeBox == nil)
+    }
+
     @Test("The rectangular marquee stays a plain rectangle")
     func rectangleHasNoMask() throws {
         let engine = engine()

@@ -143,6 +143,25 @@ struct PerformanceTests {
         #expect(elapsed < 80, "eight tiny Core Graphics marks took \(Int(elapsed))ms")
     }
 
+    @Test("Resizing a large paste does not render it on every mouse move")
+    func floatingResizeThroughput() {
+        // A 2880×1800 paste took about 16 ms to re-render per event, so sixty
+        // moves were a second of dragging. Stretching the frame costs nothing.
+        let engine = PaintEngine(canvas: Bitmap(width: 4000, height: 3000))
+        engine.paste(Bitmap(width: 2880, height: 1800, fill: .black))
+        let frame = engine.floating!.frame
+        let corner = PixelPoint(x: frame.maxX - 1, y: frame.maxY - 1)
+        engine.beginStroke(at: corner)
+        let elapsed = milliseconds {
+            for step in 1...60 {
+                engine.continueStroke(to: PixelPoint(x: corner.x - step * 10, y: corner.y - step * 6))
+            }
+        }
+        engine.endStroke()
+
+        #expect(elapsed < 60, "60 resize moves took \(Int(elapsed))ms")
+    }
+
     @Test("Highlighter and clone strokes do not copy their canvas-sized coverage per event",
           arguments: [ToolKind.highlighter, .clone])
     func coverageStrokeThroughput(tool: ToolKind) {

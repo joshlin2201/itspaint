@@ -37,6 +37,10 @@ version may still carry breaking changes to the document format.
   placed by a Trim that then found nothing to trim registered none, and neither
   did a new edit on a large canvas once the history was full. Undoing past the
   oldest kept step also left a redo that replayed the wrong edit.
+- **A paste still floating is saved with the document.** Saving, duplicating
+  and closing wrote the canvas without it, and because closing saves on its
+  own, closing the window lost the paste. A polygon still being drawn is
+  landed first too, rather than written as its rubber band.
 - The Duplicate tooltip shows ⌥⇧⌘S, which is what the menu binds.
 
 ### Changed
@@ -58,6 +62,14 @@ version may still carry breaking changes to the document format.
 - The highlighter and clone brush stop copying a canvas-sized buffer on every
   mouse move, a long lasso does about half the work per move, and saving a PDF,
   or an opaque image as JPEG or BMP, holds one less full copy of it in memory.
+- **Resizing a pasted image renders it once, when you let go.** It used to
+  render at every size you dragged through, about 16 ms a move for a 2880 × 1800
+  paste; while dragging, the image is scaled into the new frame instead.
+- **The transparency checkerboard is skipped when the part being redrawn is
+  opaque**, so an opaque screenshot no longer pays for filling it on every full
+  redraw.
+- **Dragging out an elliptical selection draws the ellipse directly** instead
+  of retracing its outline from the mask on every mouse move.
 - Tool and shape names are title case in the Tools menu.
 - Removed the "Warn before very large canvases" setting, which did nothing.
 

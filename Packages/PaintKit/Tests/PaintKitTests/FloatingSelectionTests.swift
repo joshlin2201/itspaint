@@ -246,6 +246,46 @@ struct SelectionInteractionTests {
         #expect(engine.selection == nil)
     }
 
+    /// A resize drag moves the frame on every event and renders once at the
+    /// end. In between, `bitmap` still answers at the frame's size, so a commit
+    /// or a copy mid-drag gets exactly what the settled render will be.
+    @Test("A resize drag renders once, at mouse-up, and is right in between")
+    func resizeDragRendersOnce() throws {
+        let engine = PaintEngine(width: 300, height: 300)
+        var source = Bitmap(width: 40, height: 30, fill: .black)
+        source.fill(PixelRect(x: 0, y: 0, width: 20, height: 30), with: .white)
+        engine.paste(source)
+        let original = try #require(engine.floating)
+
+        let corner = PixelPoint(x: original.frame.maxX - 1, y: original.frame.maxY - 1)
+        engine.beginStroke(at: corner)
+        engine.continueStroke(to: PixelPoint(x: corner.x + 60, y: corner.y + 45))
+        let midDrag = try #require(engine.floating)
+        #expect(!midDrag.isSettled, "a mouse move rendered the float")
+        #expect(midDrag.rendered == original.rendered)
+
+        var reference = midDrag
+        reference.settle()
+        #expect(midDrag.bitmap == reference.rendered, "mid-drag pixels differ from the settled render")
+
+        let repaint = engine.endStroke()
+        let settled = try #require(engine.floating)
+        #expect(settled.isSettled)
+        #expect(settled.rendered == reference.rendered)
+        #expect(repaint.union(settled.frame) == repaint, "the settled frame was not repainted")
+    }
+
+    @Test("Resizing back to the original size gives back the original pixels")
+    func resizeBackIsExact() {
+        var source = Bitmap(width: 40, height: 30, fill: .black)
+        source.fill(PixelRect(x: 0, y: 0, width: 13, height: 30), with: .white)
+        var selection = FloatingSelection(bitmap: source, origin: PixelPoint(x: 100, y: 100))
+        let original = selection.rendered
+        selection.resize(to: PixelRect(x: 100, y: 100, width: 73, height: 19))
+        selection.resize(to: PixelRect(x: 100, y: 100, width: 40, height: 30))
+        #expect(selection.rendered == original)
+    }
+
     @Test("Escape-style cancel during a resize leaves the canvas untouched")
     func cancelDuringResize() {
         let engine = PaintEngine(width: 200, height: 200)

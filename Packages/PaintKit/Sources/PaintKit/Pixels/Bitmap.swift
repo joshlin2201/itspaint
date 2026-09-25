@@ -124,6 +124,26 @@ public struct Bitmap: Equatable, Sendable {
         return (clipped, out)
     }
 
+    /// Whether every pixel inside `rect` (clipped to bounds) is fully opaque.
+    ///
+    /// Stops at the first pixel that is not. The canvas asks this before it
+    /// draws the transparency checkerboard, which under an opaque screenshot is
+    /// fill work nobody sees, and a flatten asks it before copying a canvas that
+    /// is already flat.
+    public func isOpaque(in rect: PixelRect) -> Bool {
+        let clipped = rect.intersection(bounds)
+        guard !clipped.isEmpty else { return true }
+        return pixels.withUnsafeBufferPointer { source in
+            for row in clipped.minY..<clipped.maxY {
+                let start = row * width + clipped.minX
+                for i in start..<(start + clipped.width) where source[i].a != 255 {
+                    return false
+                }
+            }
+            return true
+        }
+    }
+
     // MARK: - Writing
 
     /// Replace the pixel at `p`, ignoring out-of-bounds writes.
