@@ -71,6 +71,12 @@ enum MainMenuBuilder {
         let menu = NSMenu(title: "File")
 
         add(to: menu, "New", #selector(NSDocumentController.newDocument(_:)), "n")
+        // The same chords the global shortcuts use, so the menu teaches them;
+        // when a global one is switched on it answers first and does the same.
+        add(to: menu, "New from Screenshot", #selector(AppCommands.newFromScreenshot(_:)), "4")
+            .keyEquivalentModifierMask = [.command, .option, .control]
+        add(to: menu, "New from Clipboard", #selector(AppCommands.newFromClipboard(_:)), "v")
+            .keyEquivalentModifierMask = [.command, .option, .control]
         add(to: menu, "Open…", #selector(NSDocumentController.openDocument(_:)), "o")
 
         // AppKit populates Open Recent automatically for any submenu that
@@ -412,6 +418,8 @@ enum MainMenuBuilder {
 /// checks the names; the responder chain supplies the real implementations.
 @objc protocol AppCommands {
     func showSettings(_ sender: Any?)
+    func newFromScreenshot(_ sender: Any?)
+    func newFromClipboard(_ sender: Any?)
     func openHelp(_ sender: Any?)
     func openShortcuts(_ sender: Any?)
     func openIssues(_ sender: Any?)

@@ -712,7 +712,12 @@ final class DrawingDocument: NSDocument {
 
         let panel = NSSavePanel()
         panel.allowedContentTypes = [options.format.utType]
-        panel.nameFieldStringValue = (displayName as NSString).deletingPathExtension
+        // Only a saved file's name has an extension to drop. An untitled capture
+        // is called "Screenshot 2026-09-25 at 10.42.13", and stripping that
+        // would take the seconds off as if ".13" were a file type.
+        panel.nameFieldStringValue = fileURL == nil
+            ? displayName
+            : (displayName as NSString).deletingPathExtension
         panel.canCreateDirectories = true
         panel.message = "Choose a format and a size."
 

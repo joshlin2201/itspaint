@@ -10,7 +10,7 @@
 
 ### MS Paint for the Mac, in a 3.46 MB download
 
-Paste a screenshot, number the steps and drag the finished image into a bug report or a doc.
+Take or paste a screenshot, number the steps and drag the finished image into a bug report or a doc.
 
 [![Release](https://img.shields.io/github/v/release/joshlin2201/itspaint?sort=semver&style=flat-square&label=release&color=2563eb)](https://github.com/joshlin2201/itspaint/releases)
 [![Mac App Store](https://img.shields.io/badge/Mac_App_Store-free-2563eb?style=flat-square)](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)
@@ -89,6 +89,7 @@ emails you about new versions and nothing else.
 
 | | |
 |---|---|
+| **Take a screenshot** | File > New from Screenshot brings up the macOS crosshair: drag a region or press Space for a window, and the shot opens as a new image. ⌃⌥⌘4 does the same from any app once it's switched on in Settings. |
 | **Drag out** | Drag the image straight into any app that accepts one, without saving a file first. |
 | **Paste** | Pasted images arrive as a floating selection. If one is bigger than the canvas, the canvas grows to fit. |
 | **Nine export formats** | PNG, JPEG, TIFF, BMP, GIF, HEIC, AVIF, PDF and ICO. Formats without alpha flatten onto Colour 2 instead of black. |
@@ -242,6 +243,7 @@ Shape, four nibs behind Brush and four modes behind Select.
 | `⌥1`–`⌥9` | Choose a shape | `⇧⌘'` | Snap to grid |
 | `⌘K` | Crop to selection | `⌘9` | Fit to window |
 | `⇧⌘E` | Export | `⌘V` | Paste as a floating image |
+| `⌃⌥⌘4` | New from Screenshot | `⌃⌥⌘V` | New from Clipboard |
 
 Pinch or `⌘`-scroll to zoom around the pointer. Hold `⌥` to sample a colour without
 switching tools, and right-drag to paint with the second colour. `Esc` cancels the
