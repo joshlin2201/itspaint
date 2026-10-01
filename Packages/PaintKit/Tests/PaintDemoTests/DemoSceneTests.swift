@@ -1,3 +1,7 @@
+// paint-demo is a command-line tool for the Mac. Xcode 16.4 cannot import an
+// executable target into a test bundle built for iOS, and the iOS CI job would
+// fail to compile this file before running a single engine test.
+#if os(macOS)
 import Foundation
 import PaintKit
 import Testing
@@ -162,3 +166,4 @@ struct DemoSceneTests {
         #expect(image.pixel(at: PixelPoint(x: 500, y: 470)) == .clear)
     }
 }
+#endif
