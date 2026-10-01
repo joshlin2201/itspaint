@@ -9,7 +9,7 @@ version may still carry breaking changes to the document format.
 
 ### Added
 - **PaintKit declares iOS 15.** It has no AppKit and always built for iOS; now the
-  manifest says so and CI runs the whole engine suite on an iPhone simulator. The
+  manifest says so and CI runs the engine's tests on an iPhone simulator. The
   app is still Mac-only.
 
 ## [0.23.0] — 2026-09-25

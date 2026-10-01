@@ -131,7 +131,7 @@ jobs:
     runs-on: macos-15
     # The engine imports nothing iOS lacks, the Swift Package Index has built it for
     # iOS since August, and the manifest declares iOS 15. This is what makes that a
-    # tested claim rather than a compiling one: the same suite, on a simulator.
+    # tested claim rather than a compiling one: the engine's tests, on a simulator.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Select Xcode
@@ -147,8 +147,12 @@ jobs:
           udid=$(xcrun simctl list devices available -j | python3 -c \
             'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for r in sorted(d, reverse=True) if "iOS" in r for x in d[r] if x["name"].startswith("iPhone")))')
           echo "simulator: $udid"
+          # PaintKitTests only. paint-demo is a command-line tool for the Mac, and
+          # Xcode 16.4 cannot build an executable's tests for iOS ("no such module
+          # 'PaintDemo'"); Xcode 27 can. The library is what the README claims.
           xcodebuild test -scheme PaintKit-Package \
-            -destination "platform=iOS Simulator,id=$udid"
+            -destination "platform=iOS Simulator,id=$udid" \
+            -only-testing:PaintKitTests
 
   app:
     name: App build and tests

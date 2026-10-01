@@ -44,7 +44,7 @@ without Xcode, and you can [use it in your own code](#paintkit-as-a-swift-packag
 ## PaintKit as a Swift package
 
 The engine is its own SwiftPM product. It has no AppKit and no third-party dependencies,
-and it supports macOS 12 and iOS 15 and later. CI runs its whole suite on an iPhone
+and it supports macOS 12 and iOS 15 and later. CI runs the engine's tests on an iPhone
 simulator as well as the Mac.
 
 ```swift
