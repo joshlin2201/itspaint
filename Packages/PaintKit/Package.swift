@@ -17,9 +17,14 @@ import PackageDescription
 // older than the dependency's, so every app on 12 or 13 got a hard error rather
 // than a warning. Raise this only for an API that genuinely needs it; the
 // consumer job in ci.yml declares .v12 and fails if it moves.
+//
+// iOS 15, because the engine has no AppKit to keep it off iOS and the full suite
+// passes on the iOS simulator. 15 is not a measured need: it is the lowest target
+// Xcode 27 will compile for, and nothing in Sources needs higher. The ios job in
+// ci.yml runs the suite on the simulator.
 let package = Package(
     name: "PaintKit",
-    platforms: [.macOS(.v12)],
+    platforms: [.macOS(.v12), .iOS(.v15)],
     products: [
         .library(name: "PaintKit", targets: ["PaintKit"]),
         // Generates sample artwork by driving the real engine. Used for

@@ -126,6 +126,30 @@ jobs:
           cat "$consumer/Sources/Consumer/main.swift"
           swift build --package-path "$consumer"
 
+  ios:
+    name: Engine tests on the iOS simulator
+    runs-on: macos-15
+    # The engine imports nothing iOS lacks, the Swift Package Index has built it for
+    # iOS since August, and the manifest declares iOS 15. This is what makes that a
+    # tested claim rather than a compiling one: the same suite, on a simulator.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+      # From the nested package: at the root, xcodebuild finds ItsPaint.xcodeproj
+      # before Package.swift and the scheme is not in it.
+      - name: Test PaintKit on an iPhone simulator
+        working-directory: Packages/PaintKit
+        run: |
+          set -euo pipefail
+          # Picked from what the runner has installed rather than named, so a
+          # runner image update cannot fail this job over a device name.
+          udid=$(xcrun simctl list devices available -j | python3 -c \
+            'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for r in sorted(d, reverse=True) if "iOS" in r for x in d[r] if x["name"].startswith("iPhone")))')
+          echo "simulator: $udid"
+          xcodebuild test -scheme PaintKit-Package \
+            -destination "platform=iOS Simulator,id=$udid"
+
   app:
     name: App build and tests
     runs-on: macos-15
