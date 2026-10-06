@@ -198,6 +198,9 @@ struct WindowCaptureTests {
         model.brushSize = 14
         model.foreground = PaintColour(hex: "EF6A5B") ?? .black
         for badge in [PixelPoint(x: 98, y: 236), PixelPoint(x: 98, y: 316), PixelPoint(x: 98, y: 396)] {
+            // What a pointer on the canvas does first (CanvasNSView.begin). An open
+            // options panel would otherwise sit over the badges and the token.
+            model.isOptionsExpanded = false
             model.noteChange(model.engine.beginStroke(at: badge))
             try snap()
         }
@@ -209,13 +212,10 @@ struct WindowCaptureTests {
         model.foreground = PaintColour(hex: "1F2A37") ?? .black
         let sweep = [PixelPoint(x: 480, y: 512), PixelPoint(x: 590, y: 512), PixelPoint(x: 700, y: 512)]
         for reach in sweep {
-            // What a pointer on the canvas does first (CanvasNSView.begin). The Shape
-            // panel is tall enough to hide all three badges otherwise.
             model.isOptionsExpanded = false
             model.noteChange(model.engine.beginStroke(at: PixelPoint(x: 368, y: 466)))
             model.noteChange(model.engine.continueStroke(to: reach))
             model.noteChange(model.engine.endStroke(at: reach))
-            model.noteChange(model.engine.commitPendingShape())
             try snap()
         }
 
