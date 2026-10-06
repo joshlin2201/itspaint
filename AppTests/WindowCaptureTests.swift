@@ -40,6 +40,13 @@ import Testing
 ///     ffmpeg -f concat -i durations.txt -vf "scale=1012:-1:flags=lanczos, \
 ///       split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse= \
 ///       dither=bayer:bayer_scale=4:diff_mode=rectangle" -loop 0 markup-reel.gif
+///
+/// `durations.txt` holds the nine frames at 0.72, 1.28, 0.76, 0.76, 0.84, 0.48,
+/// 0.52, 0.60 and 2.40 seconds, with the last file listed once more. If the shell
+/// driving this cannot read the app's container (macOS refuses another app's
+/// data with "Operation not permitted"), add `ENABLE_APP_SANDBOX=NO
+/// CODE_SIGN_ENTITLEMENTS=<an empty plist>` to the xcodebuild line and write to
+/// /tmp. The window draws the same either way.
 @Suite("Window capture", .serialized)
 @MainActor
 struct WindowCaptureTests {
@@ -178,8 +185,9 @@ struct WindowCaptureTests {
             try Self.writeWindowPNG(window, to: directory.appendingPathComponent(name))
         }
 
-        // The story the GIF tells, in the order GROWTH.md names it:
-        // paste a screenshot, drop three step badges, pixelate a token.
+        // The story the GIF tells: paste a screenshot, drop three step badges,
+        // cover the token with a filled box. It used to pixelate the token, which
+        // is the use the Pixelate hint calls "Not secure redaction".
         try snap()
 
         model.noteChange(model.engine.paste(Self.deploySettingsScreenshot()))
@@ -190,14 +198,22 @@ struct WindowCaptureTests {
         model.brushSize = 14
         model.foreground = PaintColour(hex: "EF6A5B") ?? .black
         for badge in [PixelPoint(x: 98, y: 236), PixelPoint(x: 98, y: 316), PixelPoint(x: 98, y: 396)] {
+            // What a pointer on the canvas does first (CanvasNSView.begin). An open
+            // options panel would otherwise sit over the badges and the token.
+            model.isOptionsExpanded = false
             model.noteChange(model.engine.beginStroke(at: badge))
             try snap()
         }
 
-        model.selectTool(.pixelate)
-        let sweep = [PixelPoint(x: 540, y: 506), PixelPoint(x: 670, y: 506), PixelPoint(x: 806, y: 506)]
+        model.selectTool(.shape)
+        model.shapeKind = .rectangle
+        model.shapeStyle = .filled
+        model.brushSize = 1
+        model.foreground = PaintColour(hex: "1F2A37") ?? .black
+        let sweep = [PixelPoint(x: 480, y: 512), PixelPoint(x: 590, y: 512), PixelPoint(x: 700, y: 512)]
         for reach in sweep {
-            model.noteChange(model.engine.beginStroke(at: PixelPoint(x: 372, y: 458)))
+            model.isOptionsExpanded = false
+            model.noteChange(model.engine.beginStroke(at: PixelPoint(x: 368, y: 466)))
             model.noteChange(model.engine.continueStroke(to: reach))
             model.noteChange(model.engine.endStroke(at: reach))
             try snap()

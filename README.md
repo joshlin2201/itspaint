@@ -23,7 +23,7 @@ brew install --cask joshlin2201/itspaint/itspaint
 
 Or get the **[disk image](https://github.com/joshlin2201/itspaint/releases/latest)**, or install it free from the **[Mac App Store](https://apps.apple.com/us/app/itspaint/id6796493980?mt=12)**. Needs macOS 14 or later.
 
-<img src="docs/images/markup-reel.gif" alt="Pasting a settings sheet, numbering three steps with badges, and pixelating an API token, in nine seconds">
+<img src="docs/images/markup-reel.gif" alt="Pasting a settings sheet, numbering three steps with badges, and covering an API token with a filled box, in nine seconds">
 
 </div>
 
