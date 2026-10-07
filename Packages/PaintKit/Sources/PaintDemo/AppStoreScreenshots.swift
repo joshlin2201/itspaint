@@ -28,13 +28,13 @@ enum AppStoreScreenshots {
             Scene(
                 window: "docs/images/editor-window.png",
                 headline: "A focused paint app for your Mac",
-                subtitle: "Twelve tools, fifteen shapes — no account, no cloud, no telemetry.",
+                subtitle: "No account, no cloud, and no network access at all.",
                 output: "01-hero.png"
             ),
             Scene(
                 window: reelFrame.path,
-                headline: "Number the steps. Pixelate the token.",
-                subtitle: "The markup jobs the built-in tools skip.",
+                headline: "Number the steps. Black out the token.",
+                subtitle: "Step badges count up on their own as you click.",
                 output: "02-markup.png"
             ),
             Scene(
