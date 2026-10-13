@@ -4,7 +4,7 @@ import Foundation
 /// a Paint-style app promises "the pixel I clicked is the pixel that changed",
 /// and floating-point canvas coordinates are how that promise gets broken.
 /// Floating point lives only in the view layer (zoom, scroll, pressure).
-public struct PixelPoint: Equatable, Hashable, Sendable {
+public struct PixelPoint: Equatable, Hashable, Codable, Sendable {
     public var x: Int
     public var y: Int
 
@@ -26,7 +26,7 @@ extension PixelPoint {
     }
 }
 
-public struct PixelRect: Equatable, Hashable, Sendable {
+public struct PixelRect: Equatable, Hashable, Codable, Sendable {
     public var x: Int
     public var y: Int
     public var width: Int

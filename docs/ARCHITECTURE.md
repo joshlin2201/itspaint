@@ -185,7 +185,9 @@ is the classic reason people conclude a selection "doesn't do anything".
 ## Undo
 
 `UndoStack` holds `PixelEdit`s: a name, a before `RectPatch` and an after
-`RectPatch`, both scoped to the dirty rect.
+`RectPatch`, both scoped to the dirty rect. Text edits also carry before/after
+text-object lists; a native editing session becomes one document undo step.
+While typing, the native editor owns character and formatting undo.
 
 - **Bounded by bytes, not steps.** Fifty dots and fifty full-canvas fills differ
   by four orders of magnitude; a step count is the wrong unit. `byteCount` is a
@@ -205,17 +207,28 @@ is the classic reason people conclude a selection "doesn't do anything".
 
 ```
 Sketch.itspaint/
-  canvas.png       lossless, the artwork
-  document.json    { formatVersion, width, height, foreground, background, palette }
+  canvas.png       lossless, fully rendered recovery artwork
+  base.png         paint without retained text (only when text objects exist)
+  document.json    { formatVersion: 2, width, height, foreground, background, palette, textObjects }
 ```
 
 The pixels are a PNG rather than a private blob so the artwork is recoverable
 with any image tool even if this app disappears. A package written by an older
-build, or with a damaged `document.json`, still opens — the artwork is the
-document, the rest is preference.
+build, or with damaged metadata or a missing text-free base, still opens using
+`canvas.png`. Valid version-2 documents load `base.png` with styled text objects
+and composite them for display/export, avoiding duplicate rendering. Text uses
+portable style runs and stable IDs; the AppKit editor converts native attributes
+at the canvas boundary. Raster edits bake intersecting text and overlapping
+boxes together while preserving disjoint objects; image-wide operations bake
+the complete composition. Undo includes the original text state. Commands that
+read pixels (Instant Alpha, Remove Background, the eyedropper, crop, trim, copy)
+read the composition, and a float that grows the canvas up or left moves the
+boxes with the artwork.
 
-Autosave-in-place is scoped to `.itspaint` only (`autosavingFileType`); an
-imported PNG requires an explicit Save.
+AppKit manages autosave-in-place and recovery writes. Native saves checkpoint
+the active text edit, keeping its editor, selection, and focus intact; Escape
+then restores the latest saved text. Imported images use AppKit's normal save
+and close coordination.
 
 ---
 

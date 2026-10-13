@@ -97,20 +97,45 @@ final class EditorModel {
     /// Point size of the text tool, mirrored so the options panel can bind to
     /// it like every other setting.
     var textSize: Double {
-        didSet { engine.settings.textStyle.pointSize = max(6, textSize) }
+        didSet { engine.settings.textStyle.pointSize = max(6, textSize); textStyleChanged(.size) }
     }
 
-    var textFont: String { didSet { engine.settings.textStyle.fontName = textFont } }
+    var textFont: String { didSet { engine.settings.textStyle.fontName = textFont; textStyleChanged(.font) } }
 
     var textAlignment: PaintKit.TextRenderer.Style.Alignment {
-        didSet { engine.settings.textStyle.alignment = textAlignment }
+        didSet { engine.settings.textStyle.alignment = textAlignment; textStyleChanged(.alignment) }
     }
 
-    var isTextBold: Bool { didSet { engine.settings.textStyle.isBold = isTextBold } }
-    var isTextItalic: Bool { didSet { engine.settings.textStyle.isItalic = isTextItalic } }
+    var isTextBold: Bool { didSet { engine.settings.textStyle.isBold = isTextBold; textStyleChanged(.bold) } }
+    var isTextItalic: Bool { didSet { engine.settings.textStyle.isItalic = isTextItalic; textStyleChanged(.italic) } }
     var isTextUnderlined: Bool {
-        didSet { engine.settings.textStyle.isUnderlined = isTextUnderlined }
+        didSet { engine.settings.textStyle.isUnderlined = isTextUnderlined; textStyleChanged(.underline) }
     }
+    enum TextStyleChange { case font, size, bold, italic, underline, alignment, colour }
+    @ObservationIgnored var onTextStyleChanged: ((TextStyleChange) -> Void)?
+    @ObservationIgnored var onFinishTextEditing: (() -> Void)?
+    @ObservationIgnored var onSaveTextEditing: (() -> Bool)?
+    @ObservationIgnored var onCancelTextEditing: (() -> Void)?
+    @ObservationIgnored var onTextDraftChanged: ((Bool) -> Void)?
+    @ObservationIgnored private var isSyncingTextStyle = false
+    var isEditingText = false
+
+    private func textStyleChanged(_ change: TextStyleChange) {
+        if !isSyncingTextStyle { onTextStyleChanged?(change) }
+    }
+
+    func syncTextStyle(_ style: PaintKit.TextRenderer.Style) {
+        isSyncingTextStyle = true
+        defer { isSyncingTextStyle = false }
+        textFont = style.fontName
+        textSize = style.pointSize
+        textAlignment = style.alignment
+        isTextBold = style.isBold
+        isTextItalic = style.isItalic
+        isTextUnderlined = style.isUnderlined
+        foreground = style.colour
+    }
+
     var brushSize: Int { didSet { engine.settings.brushSize = brushSize } }
     var brushShape: Brush.Shape { didSet { engine.settings.brushShape = brushShape } }
     var shapeStyle: PaintKit.ShapeStyle { didSet { engine.settings.shapeStyle = shapeStyle } }
@@ -141,7 +166,15 @@ final class EditorModel {
         isOptionsExpanded = true
     }
 
-    var foreground: PaintColour { didSet { engine.colours.foreground = foreground } }
+    var foreground: PaintColour {
+        didSet {
+            engine.colours.foreground = foreground
+            // Text is set in the foreground colour, and a box being edited
+            // recolours its selection from this style.
+            engine.settings.textStyle.colour = foreground
+            textStyleChanged(.colour)
+        }
+    }
 
     var background: PaintColour { didSet { engine.colours.background = background } }
 
@@ -334,7 +367,8 @@ final class EditorModel {
     /// and marking the document dirty for it would offer to save a file back
     /// over itself the moment it opened.
     func load(canvas: Bitmap, metadata: DocumentMetadata?) {
-        engine.reset(to: canvas)
+        onCancelTextEditing?()
+        engine.reset(to: canvas, textObjects: metadata?.textObjects ?? [])
         if let metadata {
             foreground = metadata.foreground
             background = metadata.background
@@ -343,7 +377,7 @@ final class EditorModel {
         lastKnownRecordedCount = engine.undoStack.recordedCount
         // Re-seed: an open or a revert is not a resize, and comparing against
         // the previous document's size would announce one.
-        lastKnownCanvasSize = (canvas.width, canvas.height)
+        lastKnownCanvasSize = (engine.canvas.width, engine.canvas.height)
         pointerPosition = nil
         syncBadgeNumber()
         revision &+= 1
@@ -351,7 +385,7 @@ final class EditorModel {
 
     // MARK: - Canvas access
 
-    var canvas: Bitmap { engine.canvas }
+    var canvas: Bitmap { engine.renderedCanvas() }
     var canvasSize: (width: Int, height: Int) { (engine.canvas.width, engine.canvas.height) }
     var canUndo: Bool { engine.canUndo }
     var canRedo: Bool { engine.canRedo }
@@ -447,7 +481,7 @@ final class EditorModel {
     /// Notice a size change and tell whoever is listening. Called from the one
     /// place every pixel change already funnels through.
     private func noteCanvasSizeIfChanged() {
-        let size = (width: canvas.width, height: canvas.height)
+        let size = (width: engine.canvas.width, height: engine.canvas.height)
         guard lastKnownCanvasSize != size else { return }
         lastKnownCanvasSize = size
         onCanvasResized?(size.width, size.height)
@@ -467,6 +501,7 @@ final class EditorModel {
 
     /// Pick a tool, or toggle its options when it is already active.
     func selectTool(_ kind: ToolKind) {
+        if isEditingText, kind != .text, !finishTextEditing() { return }
         if tool == kind {
             isOptionsExpanded.toggle()
         } else {
@@ -478,6 +513,7 @@ final class EditorModel {
     /// Pick a shape and arm the shape tool in one move — the shape grid in the
     /// options panel is also how you *reach* the shape tool.
     func selectShape(_ kind: ShapeKind) {
+        guard !isEditingText || finishTextEditing() else { return }
         shapeKind = kind
         tool = .shape
         isOptionsExpanded = true
@@ -526,8 +562,15 @@ final class EditorModel {
 
     enum ColourRole { case foreground, background }
 
-    func undo() { noteChange(engine.undo()); syncFromEngine() }
-    func redo() { noteChange(engine.redo()) }
+    /// A rejected draft remains tracked until the user fixes or cancels it.
+    @discardableResult
+    func finishTextEditing() -> Bool {
+        onFinishTextEditing?()
+        return !isEditingText
+    }
+
+    func undo() { guard finishTextEditing() else { return }; noteChange(engine.undo()); syncFromEngine() }
+    func redo() { guard finishTextEditing() else { return }; noteChange(engine.redo()) }
 
     /// True once the user has chosen a zoom themselves. Until then the view is
     /// free to shrink-to-fit as the window settles.
@@ -559,8 +602,8 @@ final class EditorModel {
         guard viewport.width > 16, viewport.height > 16 else { return }
         let margin: Double = 2
         let scale = min(
-            (viewport.width - margin) / Double(canvas.width),
-            (viewport.height - margin) / Double(canvas.height)
+            (viewport.width - margin) / Double(engine.canvas.width),
+            (viewport.height - margin) / Double(engine.canvas.height)
         )
         setZoomExact(min(scale, 1))
     }
@@ -573,19 +616,22 @@ final class EditorModel {
     // MARK: - Selection and clipboard
 
     func selectAll() {
+        guard finishTextEditing() else { return }
         engine.selectAll()
         tool = .select
-        noteChange(canvas.bounds)
+        noteChange(engine.canvas.bounds)
     }
 
     func deselect() { noteChange(engine.deselect()) }
 
-    func deleteSelection() { noteChange(engine.deleteSelection()) }
+    func deleteSelection() {
+        guard finishTextEditing() else { return }; noteChange(engine.deleteSelection()) }
 
-    func makeSelectionTransparent() { noteChange(engine.makeSelectionTransparent()) }
+    func makeSelectionTransparent() {
+        guard finishTextEditing() else { return }; noteChange(engine.makeSelectionTransparent()) }
 
     /// Copy the entire canvas, selection or not — the "send me that" case.
-    func copyWholeImage() { writeToPasteboard(canvas) }
+    func copyWholeImage() { guard finishTextEditing() else { return }; writeToPasteboard(canvas) }
 
     /// The current image as something another app can accept from a drag.
     ///
@@ -603,11 +649,13 @@ final class EditorModel {
     }
 
     func copySelection() {
+        guard finishTextEditing() else { return }
         guard let content = engine.selectedContent() else { return }
         writeToPasteboard(content)
     }
 
     func cutSelection() {
+        guard finishTextEditing() else { return }
         // Before the pixels are copied, so the clipboard never holds a stray
         // polygon's rubber band that the delete below would then drop.
         landPendingShape()
@@ -648,11 +696,13 @@ final class EditorModel {
     /// selection handles already on it means positioning it is the same gesture as
     /// positioning a paste, and clicking away commits it.
     func insertSignature(_ bitmap: Bitmap) {
+        guard finishTextEditing() else { return }
         noteChange(engine.stamp(bitmap))
         syncFromEngine()
     }
 
     func paste() {
+        guard finishTextEditing() else { return }
         do {
             let bitmap = try readPasteboardBitmap()
             noteChange(engine.paste(bitmap))
@@ -668,11 +718,12 @@ final class EditorModel {
     /// Dropping a 3× retina screenshot onto a small canvas and silently losing
     /// three quarters of it is the failure this avoids.
     func dropImage(_ bitmap: Bitmap, centredOn point: PixelPoint) {
+        guard finishTextEditing() else { return }
         landPendingWork()
-        if bitmap.width > canvas.width || bitmap.height > canvas.height {
+        if bitmap.width > engine.canvas.width || bitmap.height > engine.canvas.height {
             let target = (
-                width: max(canvas.width, bitmap.width),
-                height: max(canvas.height, bitmap.height)
+                width: max(engine.canvas.width, bitmap.width),
+                height: max(engine.canvas.height, bitmap.height)
             )
             guard Bitmap.isSizeSupported(width: target.width, height: target.height) else {
                 presentUnsupportedImageSize(width: target.width, height: target.height)
@@ -692,8 +743,8 @@ final class EditorModel {
         // Re-centre on the drop point, clamped so it cannot land entirely
         // off-canvas where the user could not reach it again.
         let origin = PixelPoint(
-            x: min(max(0, point.x - bitmap.width / 2), max(0, canvas.width - bitmap.width)),
-            y: min(max(0, point.y - bitmap.height / 2), max(0, canvas.height - bitmap.height))
+            x: min(max(0, point.x - bitmap.width / 2), max(0, engine.canvas.width - bitmap.width)),
+            y: min(max(0, point.y - bitmap.height / 2), max(0, engine.canvas.height - bitmap.height))
         )
         noteChange(engine.moveFloating(to: origin))
         syncFromEngine()
@@ -836,6 +887,7 @@ final class EditorModel {
     }
 
     func cropToSelection() {
+        guard finishTextEditing() else { return }
         // Captured *before* the attempt, because cropping commits any floating
         // content and so changes the answer. Reading it afterwards is how this
         // ended up reporting "select an area first" immediately after pasting —
@@ -844,13 +896,13 @@ final class EditorModel {
         landPendingShape()  // As in `trimBorders`.
 
         if engine.cropToSelection() {
-            noteChange(canvas.bounds)
+            noteChange(engine.canvas.bounds)
             return
         }
 
         // The float was still placed even when there was nothing to crop to, so
         // the canvas may have changed regardless.
-        noteChange(canvas.bounds)
+        noteChange(engine.canvas.bounds)
 
         guard !hadRegion else {
             // Already the whole canvas — which is the *normal* outcome of
@@ -875,6 +927,7 @@ final class EditorModel {
     /// and a zero-tolerance trim silently does nothing on exactly the images
     /// people most want to trim.
     func trimBorders() {
+        guard finishTextEditing() else { return }
         // Landed and reported here, shape and float, because the engine lands
         // both too and then may decline, and a declined trim notes nothing below.
         landPendingWork()
@@ -885,7 +938,7 @@ final class EditorModel {
             )
             return
         }
-        noteChange(canvas.bounds)
+        noteChange(engine.canvas.bounds)
     }
 
     /// Key the page out from behind the subject in one command.
@@ -895,6 +948,7 @@ final class EditorModel {
     /// nothing. Instant Alpha is the answer when it declines and you still want
     /// the region gone, so the message names it.
     func removeBackground() {
+        guard finishTextEditing() else { return }
         landPendingWork()  // As in `trimBorders`.
         guard engine.removeBackground() else {
             present(
@@ -905,26 +959,31 @@ final class EditorModel {
             )
             return
         }
-        noteChange(canvas.bounds)
+        noteChange(engine.canvas.bounds)
         syncFromEngine()
     }
 
     // MARK: - Image menu
 
-    func clearImage() { noteChange(engine.clearCanvas()) }
-    func invertColours() { noteChange(engine.invertColours()) }
+    func clearImage() {
+        guard finishTextEditing() else { return }; noteChange(engine.clearCanvas()) }
+    func invertColours() {
+        guard finishTextEditing() else { return }; noteChange(engine.invertColours()) }
 
     func flipHorizontally() {
+        guard finishTextEditing() else { return }
         landPendingWork()
         replace(ImageTransform.flippedHorizontally(canvas), named: "Flip horizontal")
     }
 
     func flipVertically() {
+        guard finishTextEditing() else { return }
         landPendingWork()
         replace(ImageTransform.flippedVertically(canvas), named: "Flip vertical")
     }
 
     func rotate(_ rotation: ImageTransform.Rotation) {
+        guard finishTextEditing() else { return }
         landPendingWork()
         replace(ImageTransform.rotated(canvas, by: rotation), named: rotation.displayName)
     }
@@ -936,6 +995,7 @@ final class EditorModel {
     /// because cropping the picture someone asked to straighten is the one
     /// outcome nobody wants.
     func rotate(degrees: Double) {
+        guard finishTextEditing() else { return }
         guard degrees.truncatingRemainder(dividingBy: 360) != 0 else { return }
         landPendingWork()
         guard let rotated = ImageTransform.rotated(canvas, degrees: degrees, fill: background) else {
@@ -961,6 +1021,7 @@ final class EditorModel {
     var isDuplicateConfirmationPresented: Bool = false
 
     func resizeCanvas(width: Int, height: Int) {
+        guard finishTextEditing() else { return }
         guard Bitmap.isSizeSupported(width: width, height: height) else {
             presentUnsupportedImageSize(width: width, height: height)
             return
@@ -973,6 +1034,7 @@ final class EditorModel {
     }
 
     func scaleImage(width: Int, height: Int, using scaling: ImageTransform.Scaling) {
+        guard finishTextEditing() else { return }
         guard Bitmap.isSizeSupported(width: width, height: height) else {
             presentUnsupportedImageSize(width: width, height: height)
             return
@@ -1004,6 +1066,7 @@ final class EditorModel {
     }
 
     private func replace(_ bitmap: Bitmap, named name: String) {
+        guard finishTextEditing() else { return }
         engine.replaceCanvas(with: bitmap, actionName: name)
         noteChange(engine.canvas.bounds)
     }

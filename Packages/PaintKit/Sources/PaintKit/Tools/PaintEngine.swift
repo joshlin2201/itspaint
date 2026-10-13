@@ -21,6 +21,12 @@ public final class PaintEngine {
     public var colours: ColourPair
     public private(set) var undoStack: UndoStack
 
+    /// Re-editable text, painted above the bitmap at render/export time.
+    /// Existing raster tools keep their simple bitmap model; an operation that
+    /// needs pixels (selection, transform, or a legacy raster text commit)
+    /// bakes this list into the same undo record before it proceeds.
+    public private(set) var textObjects: [TextObject] = []
+
     /// The selected region, if any — a bounding box plus an optional per-pixel
     /// mask. Rectangular marquees carry no mask; the lasso fills one in.
     public private(set) var selection: Selection?
@@ -36,6 +42,12 @@ public final class PaintEngine {
     public private(set) var lastSampledColour: PaintColour?
 
     private var gesture: Gesture = .idle
+    /// Text baked for the duration of a raster gesture. Keeping its baseline
+    /// outside `Gesture` avoids duplicating it across the highlighter, shape,
+    /// curve, and freehand state cases, while still making Cancel lossless.
+    private var gestureTextBefore: [TextObject]?
+    private var gestureTextDirty: PixelRect = .empty
+    private var gestureBaseCanvas: Bitmap?
 
     /// The brush resolved at gesture start.
     ///
@@ -168,6 +180,75 @@ public final class PaintEngine {
     public var canRedo: Bool { undoStack.canRedo }
     public var hasSelection: Bool { selection != nil || floating != nil }
 
+    /// The document's visible artwork, with retained text composited over the
+    /// base paint layer. A live editor can exclude its own object and provide
+    /// the native preview without ghost glyphs underneath.
+    public func renderedCanvas(excluding objectID: UUID? = nil) -> Bitmap {
+        var rendered = canvas
+        for object in textObjects where object.id != objectID {
+            _ = TextRenderer.draw(object.runs, in: object.frame, into: &rendered)
+        }
+        return rendered
+    }
+
+    /// Insert or replace one retained text object. Set `registerUndo` to false
+    /// while a native editor is producing live preview, then call
+    /// `recordTextEdit(from:)` once when that editor commits.
+    @discardableResult
+    public func upsertTextObject(_ object: TextObject, registerUndo: Bool = true) -> PixelRect {
+        guard object.isValid else { return .empty }
+        // A chord waiting to be bent holds the text list it baked, and settling it
+        // later would put that list back over this edit. Land it first.
+        let landed = commitPendingShape()
+        let before = textObjects
+        if let index = textObjects.firstIndex(where: { $0.id == object.id }) {
+            let old = textObjects[index]
+            guard old != object else { return landed }
+            textObjects[index] = object
+            let dirty = old.frame.union(object.frame)
+            if registerUndo { recordTextEdit(from: before, actionName: "Text") }
+            return landed.union(dirty)
+        }
+        textObjects.append(object)
+        if registerUndo { recordTextEdit(from: before, actionName: "Text") }
+        return landed.union(object.frame)
+    }
+
+    @discardableResult
+    public func removeTextObject(id: UUID, registerUndo: Bool = true) -> PixelRect {
+        let landed = commitPendingShape()  // As in `upsertTextObject`.
+        guard let index = textObjects.firstIndex(where: { $0.id == id }) else { return landed }
+        let before = textObjects
+        let removed = textObjects.remove(at: index)
+        if registerUndo { recordTextEdit(from: before, actionName: "Delete text") }
+        return landed.union(removed.frame)
+    }
+
+    /// Restore an editor's captured baseline without creating history. Used by
+    /// Escape after a live native text session.
+    @discardableResult
+    public func restoreTextObjects(_ objects: [TextObject]) -> PixelRect {
+        let dirty = textBounds(textObjects).union(textBounds(objects))
+        textObjects = objects
+        return dirty
+    }
+
+    /// Make one undoable text edit from the state captured before a live edit.
+    @discardableResult
+    public func recordTextEdit(from before: [TextObject], actionName: String = "Text") -> PixelRect {
+        guard before != textObjects else { return .empty }
+        let dirty = textBounds(before).union(textBounds(textObjects))
+        undoStack.record(
+            PixelEdit(
+                name: actionName, before: RectPatch(rect: .empty, pixels: []),
+                after: RectPatch(rect: .empty, pixels: []),
+                textBefore: before, textAfter: textObjects, textDirtyRect: dirty
+            ),
+            canvasBytes: canvas.byteCount
+        )
+        return dirty
+    }
+
     // MARK: - Gesture lifecycle
 
     @discardableResult
@@ -284,7 +365,9 @@ public final class PaintEngine {
             let previous = selectionOverlayRect()
             selection = nil
             if tool == .pixelate || tool == .spotlight {
+                let prepared = prepareTextForRasterGesture()
                 gesture = .shape(before: canvas, origin: snapped(point), dirty: .empty, button: button)
+                return dirty.union(previous).union(prepared)
             } else if settings.selectionKind.isFreeform {
                 gesture = .lasso(points: [point])
             } else {
@@ -293,6 +376,7 @@ public final class PaintEngine {
             return dirty.union(previous)
         }
 
+        let prepared = prepareTextForRasterGesture()
         let before = canvas
         activeBrush = settings.brush
 
@@ -302,7 +386,8 @@ public final class PaintEngine {
             if settings.cloneMode == .clone && (cloneSource == nil || button == .secondary) {
                 cloneSource = point
                 cloneOffset = nil
-                return dirty
+                // Nothing will paint, so the text baked for a stroke goes back.
+                return dirty.union(restoreRasterGestureText())
             }
             if settings.cloneMode == .clone, let source = cloneSource, cloneOffset == nil {
                 cloneOffset = PixelPoint(x: source.x - point.x, y: source.y - point.y)
@@ -312,7 +397,7 @@ public final class PaintEngine {
             gesture = .clone(
                 before: before, coverage: coverage, last: point, dirty: stepDirty, origin: point
             )
-            return dirty.union(stepDirty)
+            return dirty.union(prepared).union(stepDirty)
         }
 
         if tool == .highlighter {
@@ -324,7 +409,7 @@ public final class PaintEngine {
             gesture = .highlight(
                 before: before, coverage: coverage, last: point, dirty: stepDirty, colour: colour
             )
-            return dirty.union(stepDirty)
+            return dirty.union(prepared).union(stepDirty)
         }
 
         if tool.isFreehand {
@@ -344,11 +429,11 @@ public final class PaintEngine {
                     into: &canvas
                   )
             gesture = .freehand(before: before, tail: [point], dirty: stepDirty, button: button)
-            return dirty.union(stepDirty)
+            return dirty.union(prepared).union(stepDirty)
         }
 
         gesture = .shape(before: before, origin: snapped(point), dirty: .empty, button: button)
-        return dirty
+        return dirty.union(prepared)
     }
 
     @discardableResult
@@ -567,12 +652,12 @@ public final class PaintEngine {
             // same rule the shape case below follows, where a rectangle undoes
             // as "Rectangle" rather than as "Shape". A spray stroke is a spray.
             let name = settings.isSpraying ? "Spray" : settings.tool.displayName
-            recordEdit(name: name, before: before, dirty: flushed)
+            recordRasterGesture(name: name, before: before, dirty: flushed)
             return refreshed.union(flushed)
 
         case let .highlight(before, _, _, dirty, _):
             gesture = .idle
-            recordEdit(name: "Highlighter", before: before, dirty: dirty)
+            recordRasterGesture(name: "Highlighter", before: before, dirty: dirty)
             return refreshed.union(dirty)
 
         case let .clone(before, _, _, dirty, _):
@@ -580,7 +665,7 @@ public final class PaintEngine {
             // `recordEdit` already declines an empty rect, which is what keeps an
             // aim-only gesture and a stroke whose source was entirely out of bounds
             // off the undo stack.
-            recordEdit(name: settings.cloneMode.displayName, before: before, dirty: dirty)
+            recordRasterGesture(name: settings.cloneMode.displayName, before: before, dirty: dirty)
             return refreshed.union(dirty)
 
         case let .shape(before, origin, dirty, _):
@@ -594,12 +679,12 @@ public final class PaintEngine {
             let name = settings.tool.isRegionEffect
                 ? settings.tool.displayName
                 : settings.shapeKind.displayName
-            recordEdit(name: name, before: before, dirty: dirty)
+            recordRasterGesture(name: name, before: before, dirty: dirty)
             return refreshed.union(dirty)
 
         case let .bend(before, _, _, dirty, _):
             gesture = .idle
-            recordEdit(name: "Curve", before: before, dirty: dirty)
+            recordRasterGesture(name: "Curve", before: before, dirty: dirty)
             return refreshed.union(dirty)
 
         case .region:
@@ -652,8 +737,9 @@ public final class PaintEngine {
             pendingCurve = nil
             pendingPolygon = nil
             canvas = before
+            let textDirty = restoreRasterGestureText()
             gesture = .idle
-            return canvas.bounds
+            return canvas.bounds.union(textDirty)
         }
 
         switch gesture {
@@ -670,26 +756,29 @@ public final class PaintEngine {
              let .shape(before, _, dirty, _),
              let .bend(before, _, _, dirty, _):
             gesture = .idle
-            guard !dirty.isEmpty else { return .empty }
-            let patch = before.extract(dirty)
-            canvas.restore(patch.pixels, to: patch.rect)
-            return dirty
+            if !dirty.isEmpty {
+                let patch = before.extract(dirty)
+                canvas.restore(patch.pixels, to: patch.rect)
+            }
+            return dirty.union(restoreRasterGestureText())
 
         case let .highlight(before, _, _, dirty, _):
             gesture = .idle
-            guard !dirty.isEmpty else { return .empty }
-            let patch = before.extract(dirty)
-            canvas.restore(patch.pixels, to: patch.rect)
-            return dirty
+            if !dirty.isEmpty {
+                let patch = before.extract(dirty)
+                canvas.restore(patch.pixels, to: patch.rect)
+            }
+            return dirty.union(restoreRasterGestureText())
 
         case let .clone(before, _, _, dirty, _):
             gesture = .idle
             // The pairing is session state and survives Escape. Cancelling a stroke
             // means undoing the paint, not making you re-pick the source.
-            guard !dirty.isEmpty else { return .empty }
-            let patch = before.extract(dirty)
-            canvas.restore(patch.pixels, to: patch.rect)
-            return dirty
+            if !dirty.isEmpty {
+                let patch = before.extract(dirty)
+                canvas.restore(patch.pixels, to: patch.rect)
+            }
+            return dirty.union(restoreRasterGestureText())
 
         case .region, .lasso:
             gesture = .idle
@@ -722,7 +811,7 @@ public final class PaintEngine {
         let incoming = Raster.floodSelection(
             from: point,
             tolerance: settings.selectionTolerance,
-            in: canvas
+            in: renderedCanvas()
         )
         selection = combinedSelection(with: incoming, operation: operation)
         lassoPath = []
@@ -830,7 +919,7 @@ public final class PaintEngine {
         guard let selection, !selection.isEmpty else { return nil }
         // Goes through the masked extract, so a lasso yields its actual shape
         // with everything outside it transparent — not its bounding box.
-        return canvas.extract(selection)
+        return renderedCanvas().extract(selection)
     }
 
     /// Lift the selection into floating content, backfilling with the
@@ -844,8 +933,19 @@ public final class PaintEngine {
         else { return landed }
 
         let before = canvas
+        let textBefore = textObjects
+        _ = flattenTextObjects()
         canvas.fill(selection, with: colours.background.rgba8)
-        recordEdit(name: "Cut", before: before, dirty: selection.bounds)
+        let settled = settleTextAfterRasterEdit(
+            original: textBefore, base: before, actualDirty: selection.bounds
+        )
+        let dirty = selection.bounds.union(settled.bakedDirty)
+        recordEdit(
+            name: "Cut", before: before, dirty: dirty,
+            textBefore: textBefore.isEmpty ? nil : textBefore,
+            textAfter: textBefore.isEmpty ? nil : settled.retained,
+            textDirtyRect: settled.bakedDirty
+        )
 
         floating = FloatingSelection(
             bitmap: content,
@@ -853,7 +953,7 @@ public final class PaintEngine {
         )
         self.selection = nil
         lassoPath = []
-        return landed.union(selection.bounds)
+        return landed.union(dirty)
     }
 
     @discardableResult
@@ -914,6 +1014,9 @@ public final class PaintEngine {
         _ = commitPendingShape()  // Before the flood reads the canvas, as in `trimBorders`.
         _ = commitFloating()
         guard !canvas.bounds.isEmpty else { return false }
+        // What is on screen, text included: a box over the page is subject, and
+        // flooding the paint beneath it would key its letters out with the page.
+        let shown = renderedCanvas()
 
         let corners = [
             PixelPoint(x: 0, y: 0),
@@ -934,10 +1037,10 @@ public final class PaintEngine {
         selection = nil
         var repeatsEarlierCorner = [Bool](repeating: false, count: corners.count)
         for (index, corner) in corners.enumerated() where !repeatsEarlierCorner[index] {
-            let region = Raster.floodSelection(from: corner, tolerance: tolerance, in: canvas)
-            let colour = canvas.unsafePixel(at: corner)
+            let region = Raster.floodSelection(from: corner, tolerance: tolerance, in: shown)
+            let colour = shown.unsafePixel(at: corner)
             for later in (index + 1)..<corners.count
-            where canvas.unsafePixel(at: corners[later]) == colour
+            where shown.unsafePixel(at: corners[later]) == colour
                 && region?.contains(corners[later]) == true {
                 repeatsEarlierCorner[later] = true
             }
@@ -997,7 +1100,7 @@ public final class PaintEngine {
             for x in page.bounds.minX...max(page.bounds.minX, page.bounds.maxX - 1) {
                 let point = PixelPoint(x: x, y: y)
                 guard page.contains(point) else { continue }
-                if (canvas.pixel(at: point)?.a ?? 0) > 0 {
+                if (shown.pixel(at: point)?.a ?? 0) > 0 {
                     clearsSomething = true
                     break scan
                 }
@@ -1144,6 +1247,13 @@ public final class PaintEngine {
                 x: floating.origin.x + grown.offset.dx,
                 y: floating.origin.y + grown.offset.dy
             )
+            // Growing up or left moves every pixel, so the text boxes over them
+            // move by the same offset or they would land on the wrong artwork.
+            let textBefore = textObjects
+            for index in textObjects.indices {
+                textObjects[index].frame.x += grown.offset.dx
+                textObjects[index].frame.y += grown.offset.dy
+            }
             // Any surviving selection now names the wrong pixels — the artwork
             // moved underneath it. Dropping it is honest; silently leaving a
             // marquee pointing somewhere else is not.
@@ -1154,7 +1264,7 @@ public final class PaintEngine {
                 x: placement.x, y: placement.y,
                 width: floating.frame.width, height: floating.frame.height
             )
-            recordResize(name: "Paste", from: before)
+            recordResize(name: "Paste", from: before, textBefore: textBefore)
             return canvas.bounds
         }
 
@@ -1239,7 +1349,7 @@ public final class PaintEngine {
 
         guard let selection, !selection.isEmpty,
               selection.bounds != canvas.bounds || !selection.isRectangular,
-              var cropped = ImageTransform.cropped(canvas, to: selection.bounds)
+              var cropped = ImageTransform.cropped(renderedCanvas(), to: selection.bounds)
         else { return false }
 
         if let mask = selection.mask {
@@ -1267,7 +1377,7 @@ public final class PaintEngine {
         // canvas would keep it as content.
         _ = commitPendingShape()
         _ = commitFloating()
-        guard let trimmed = ImageTransform.trimmingUniformBorder(canvas, tolerance: tolerance)
+        guard let trimmed = ImageTransform.trimmingUniformBorder(renderedCanvas(), tolerance: tolerance)
         else { return false }
         replaceCanvas(with: trimmed, actionName: "Trim borders")
         selection = nil
@@ -1298,7 +1408,7 @@ public final class PaintEngine {
     public func commitPendingShape() -> PixelRect {
         if let pending = pendingCurve {
             pendingCurve = nil
-            recordEdit(name: "Curve", before: pending.before, dirty: pending.drawn)
+            recordRasterGesture(name: "Curve", before: pending.before, dirty: pending.drawn)
             return pending.drawn
         }
         if let pending = pendingPolygon {
@@ -1306,9 +1416,9 @@ public final class PaintEngine {
             // Fewer than three corners is a stray click, not a shape.
             guard pending.points.count > 2 else {
                 canvas.restore(pending.drawn, from: pending.before)
-                return pending.drawn
+                return pending.drawn.union(restoreRasterGestureText())
             }
-            recordEdit(name: "Polygon", before: pending.before, dirty: pending.drawn)
+            recordRasterGesture(name: "Polygon", before: pending.before, dirty: pending.drawn)
             return pending.drawn
         }
         return .empty
@@ -1320,6 +1430,10 @@ public final class PaintEngine {
     private func addPolygonCorner(at point: PixelPoint, button: PointerButton) -> PixelRect {
         // A new polygon is a new shape, so a chord still waiting to be bent lands.
         let landed = pendingPolygon == nil ? commitPendingShape() : .empty
+        // After the landing, which settles the chord's text. The preview is redrawn
+        // from `before`, so it has to hold the baked text or the box under the
+        // polygon would lose its letters.
+        let prepared = prepareTextForRasterGesture()
         let before = pendingPolygon?.before ?? canvas
         var points = pendingPolygon?.points ?? []
         let drawn = pendingPolygon?.drawn ?? .empty
@@ -1328,12 +1442,12 @@ public final class PaintEngine {
         // the classic tool used, and the only one that needs no instruction.
         if let first = points.first, points.count > 2, first.isNear(point, within: closeTolerance) {
             pendingPolygon = (before: before, points: points, drawn: drawn)
-            return commitPendingShape()
+            return prepared.union(commitPendingShape())
         }
 
         points.append(point)
         pendingPolygon = (before: before, points: points, drawn: drawn)
-        return landed.union(redrawPendingPolygon(preview: point, button: button))
+        return landed.union(prepared).union(redrawPendingPolygon(preview: point, button: button))
     }
 
     /// Close the polygon where it stands. Bound to Return and a double-click.
@@ -1480,8 +1594,10 @@ public final class PaintEngine {
             clearCloneSource()
         }
         let before = canvas
+        let textBefore = textObjects
         let resized = newCanvas.width != canvas.width || newCanvas.height != canvas.height
         canvas = newCanvas
+        textObjects.removeAll()
 
         if resized {
             // A selection or lasso path names coordinates that no longer mean
@@ -1489,9 +1605,14 @@ public final class PaintEngine {
             // pixels.
             selection = nil
             lassoPath = []
-            recordResize(name: actionName, from: before)
+            recordResize(name: actionName, from: before, textBefore: textBefore)
         } else {
-            recordEdit(name: actionName, before: before, dirty: canvas.bounds)
+            recordEdit(
+                name: actionName, before: before, dirty: canvas.bounds,
+                textBefore: textBefore.isEmpty ? nil : textBefore,
+                textAfter: textBefore.isEmpty ? nil : textObjects,
+                textDirtyRect: textBounds(textBefore)
+            )
         }
 
         floating = nil
@@ -1503,13 +1624,19 @@ public final class PaintEngine {
     /// Opening or reverting a document lands here: history is addressed in
     /// canvas coordinates, so replaying it against a different image would
     /// restore pixels into the wrong places.
-    public func reset(to newCanvas: Bitmap) {
+    public func reset(to newCanvas: Bitmap, textObjects: [TextObject] = []) {
         clearCloneSource()
         canvas = newCanvas
+        self.textObjects = textObjects.filter(\.isValid)
         // A half-built shape belongs to the old canvas and its history, which
         // are both gone; drawing its preview again would paint the old image back.
         pendingCurve = nil
         pendingPolygon = nil
+        // Likewise the text a pending chord baked: settled against the new
+        // document, it would swap the old boxes in for the ones just loaded.
+        gestureTextBefore = nil
+        gestureTextDirty = .empty
+        gestureBaseCanvas = nil
         undoStack.removeAll()
         selection = nil
         lassoPath = []
@@ -1528,6 +1655,7 @@ public final class PaintEngine {
         // A badge is a counter as well as some pixels. Undoing one hands its
         // number back, so the next stamp reuses it instead of skipping it.
         if let number = edit.badgeNumber { nextBadgeNumber = number }
+        if let textBefore = edit.textBefore { textObjects = textBefore }
         return edit.dirtyRect.union(floatingDirty)
     }
 
@@ -1536,13 +1664,16 @@ public final class PaintEngine {
         let cancelled = cancelStroke()
         guard let edit = undoStack.redo(on: &canvas) else { return cancelled }
         if let number = edit.badgeNumber { nextBadgeNumber = number + 1 }
+        if let textAfter = edit.textAfter { textObjects = textAfter }
         return edit.dirtyRect.union(cancelled)
     }
 
     // MARK: - Internals
 
     private func recordEdit(
-        name: String, before: Bitmap, dirty: PixelRect, badgeNumber: Int? = nil
+        name: String, before: Bitmap, dirty: PixelRect, badgeNumber: Int? = nil,
+        textBefore: [TextObject]? = nil, textAfter: [TextObject]? = nil,
+        textDirtyRect: PixelRect = .empty
     ) {
         guard !dirty.isEmpty else { return }
         undoStack.record(
@@ -1550,19 +1681,68 @@ public final class PaintEngine {
                 name: name,
                 before: RectPatch(capturing: dirty, from: before),
                 after: RectPatch(capturing: dirty, from: canvas),
-                badgeNumber: badgeNumber
+                badgeNumber: badgeNumber,
+                textBefore: textBefore, textAfter: textAfter, textDirtyRect: textDirtyRect
             ),
             canvasBytes: canvas.byteCount
         )
+    }
+
+    /// Flatten retained text once a raster gesture starts. A gesture can span
+    /// many pointer events, so the original object list is held until it either
+    /// commits into the same history entry or is restored on Escape.
+    @discardableResult
+    private func prepareTextForRasterGesture() -> PixelRect {
+        guard gestureTextBefore == nil else { return .empty }
+        guard !textObjects.isEmpty else { return .empty }
+        gestureTextBefore = textObjects
+        gestureBaseCanvas = canvas
+        gestureTextDirty = flattenTextObjects()
+        return gestureTextDirty
+    }
+
+    private func recordRasterGesture(name: String, before: Bitmap, dirty: PixelRect) {
+        let textBefore = gestureTextBefore
+        let baseCanvas = gestureBaseCanvas ?? before
+        let settled = settleTextAfterRasterEdit(
+            original: textBefore ?? [], base: baseCanvas, actualDirty: dirty
+        )
+        gestureTextBefore = nil
+        gestureTextDirty = .empty
+        gestureBaseCanvas = nil
+        recordEdit(
+            name: name, before: baseCanvas, dirty: dirty.union(settled.bakedDirty),
+            textBefore: textBefore, textAfter: textBefore == nil ? nil : settled.retained,
+            textDirtyRect: settled.bakedDirty
+        )
+    }
+
+    @discardableResult
+    private func restoreRasterGestureText() -> PixelRect {
+        let dirty = gestureTextDirty
+        if let base = gestureBaseCanvas { canvas = base }
+        if let textBefore = gestureTextBefore { textObjects = textBefore }
+        gestureTextBefore = nil
+        gestureTextDirty = .empty
+        gestureBaseCanvas = nil
+        return dirty
     }
 
     /// Record an edit that changed the canvas's size.
     ///
     /// Whole-canvas rather than a patch, because a patch is addressed in canvas
     /// coordinates and cannot describe an edit that moved every coordinate.
-    private func recordResize(name: String, from before: Bitmap) {
+    private func recordResize(name: String, from before: Bitmap, textBefore: [TextObject] = []) {
         undoStack.record(
-            PixelEdit.resizing(name, from: before, to: canvas),
+            PixelEdit(
+                name: name,
+                before: RectPatch(rect: .empty, pixels: []),
+                after: RectPatch(rect: .empty, pixels: []),
+                resize: .init(before: before, after: canvas),
+                textBefore: textBefore.isEmpty ? nil : textBefore,
+                textAfter: textBefore.isEmpty ? nil : textObjects,
+                textDirtyRect: textBounds(textBefore)
+            ),
             // The larger of the two, so shrinking to a thumbnail cannot budget
             // the history that still holds the full-size canvas as if it were
             // thumbnail-sized.
@@ -1575,14 +1755,76 @@ public final class PaintEngine {
     ) -> PixelRect {
         let landed = commitPendingShape()
         let before = canvas
-        let dirty = body(&canvas)
+        let textBefore = textObjects
+        _ = flattenTextObjects()
+        let actualDirty = body(&canvas)
+        let settled = settleTextAfterRasterEdit(
+            original: textBefore, base: before, actualDirty: actualDirty
+        )
+        let dirty = actualDirty.union(settled.bakedDirty)
         guard !dirty.isEmpty else { return landed }
-        recordEdit(name: name, before: before, dirty: dirty, badgeNumber: badgeNumber)
+        recordEdit(
+            name: name, before: before, dirty: dirty, badgeNumber: badgeNumber,
+            textBefore: textBefore.isEmpty ? nil : textBefore,
+            textAfter: textBefore.isEmpty ? nil : settled.retained,
+            textDirtyRect: settled.bakedDirty
+        )
         return landed.union(dirty)
     }
 
+    /// Bake retained text for a raster-only operation. The caller records the
+    /// old object list in the same history entry, so Undo restores editability.
+    @discardableResult
+    private func flattenTextObjects() -> PixelRect {
+        guard !textObjects.isEmpty else { return .empty }
+        let dirty = textBounds(textObjects).intersection(canvas.bounds)
+        for object in textObjects {
+            _ = TextRenderer.draw(object.runs, in: object.frame, into: &canvas)
+        }
+        textObjects.removeAll()
+        return dirty
+    }
+
+    /// Keep boxes that are disjoint from a completed raster edit editable.
+    /// Text begins a gesture baked so preview drawing has a normal bitmap; once
+    /// the final dirty rect is known, untouched boxes are restored from the
+    /// pre-gesture base. Any overlapping chain is baked together, preventing a
+    /// restored box from drawing over a baked sibling in the wrong order.
+    private func settleTextAfterRasterEdit(
+        original: [TextObject], base: Bitmap, actualDirty: PixelRect
+    ) -> (retained: [TextObject], bakedDirty: PixelRect) {
+        guard !original.isEmpty else { return ([], .empty) }
+
+        var baked = Set(
+            original.lazy.filter { !$0.frame.intersection(actualDirty).isEmpty }.map(\.id)
+        )
+        var expanded = true
+        while expanded {
+            expanded = false
+            let bakedFrames = original.lazy.filter { baked.contains($0.id) }.map(\.frame)
+            for object in original where !baked.contains(object.id)
+                && bakedFrames.contains(where: { !$0.intersection(object.frame).isEmpty })
+            {
+                baked.insert(object.id)
+                expanded = true
+            }
+        }
+
+        let retained = original.filter { !baked.contains($0.id) }
+        for object in retained {
+            let patch = base.extract(object.frame)
+            canvas.restore(patch.pixels, to: patch.rect)
+        }
+        textObjects = retained
+        return (retained, textBounds(original.filter { baked.contains($0.id) }))
+    }
+
+    private func textBounds(_ objects: [TextObject]) -> PixelRect {
+        objects.reduce(.empty) { $0.union($1.frame) }
+    }
+
     private func performReadOnly(_ tool: ToolKind, at point: PixelPoint) -> PixelRect {
-        if tool == .eyedropper, let pixel = canvas.pixel(at: point) {
+        if tool == .eyedropper, let pixel = renderedCanvas().pixel(at: point) {
             let sampled = PaintColour(pixel)
             lastSampledColour = sampled
             colours.foreground = sampled

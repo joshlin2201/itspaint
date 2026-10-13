@@ -20,6 +20,7 @@
 		3730BD1749571A4B4FB81494 /* ScreenCaptureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3EE99F4D39197DF532C9278 /* ScreenCaptureTests.swift */; };
 		382566FBB983772559BF672D /* ToolbarGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C78F7D1A8AE0254D405787 /* ToolbarGeometryTests.swift */; };
 		397D8480B03F1D4E483412F6 /* CanvasRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CCE83773644C45A0171C62 /* CanvasRenderingTests.swift */; };
+		39CB4B6A630D28F4B4FFF123 /* TextContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D81E0EE2C97A61EA306E083 /* TextContent.swift */; };
 		4385DB4520BD7B7E7F98D05D /* SignatureSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA6F6F30090979763C866F84 /* SignatureSheet.swift */; };
 		43DF040CF6A5A908A865E871 /* CanvasScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DC85A97B97F5CFF1EEBFE4 /* CanvasScrollView.swift */; };
 		4865D8A8471B873E6AC768C7 /* DraggedImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5838B6603DAE5E9838603224 /* DraggedImage.swift */; };
@@ -104,6 +105,7 @@
 		8468DB5919B3A21F63903298 /* CanvasOverlays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasOverlays.swift; sourceTree = "<group>"; };
 		86C35AB5A1478944CF8934D3 /* RotateSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotateSheet.swift; sourceTree = "<group>"; };
 		8D10B48F97C15A6294B5737E /* Tooltip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tooltip.swift; sourceTree = "<group>"; };
+		9D81E0EE2C97A61EA306E083 /* TextContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextContent.swift; sourceTree = "<group>"; };
 		A0C20D1B4B16258328D4D9D1 /* SelectionBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionBarTests.swift; sourceTree = "<group>"; };
 		A822F8D017517676617751C9 /* Mark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mark.swift; sourceTree = "<group>"; };
 		B063B5E24D6EBB4CEB198E5B /* PasteGrowthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteGrowthTests.swift; sourceTree = "<group>"; };
@@ -249,6 +251,7 @@
 			children = (
 				06D86C72CBA19ADE0DD74D35 /* CanvasNSView.swift */,
 				60DC85A97B97F5CFF1EEBFE4 /* CanvasScrollView.swift */,
+				9D81E0EE2C97A61EA306E083 /* TextContent.swift */,
 			);
 			path = Canvas;
 			sourceTree = "<group>";
@@ -409,6 +412,7 @@
 				144EB815F72638E3A405C5CC /* SignatureStore.swift in Sources */,
 				28DF3938409E7E6B4A4C1AF7 /* SigningStrip.swift in Sources */,
 				D00A7C03ECFC7BC4575AF104 /* SizeSheet.swift in Sources */,
+				39CB4B6A630D28F4B4FFF123 /* TextContent.swift in Sources */,
 				2966C26A04977F9BD83536E9 /* ToolOptions.swift in Sources */,
 				530689DA33232E54BB8DFD63 /* ToolRail.swift in Sources */,
 				A75FAC3C0CD78F3C12737311 /* Tooltip.swift in Sources */,

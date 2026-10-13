@@ -304,6 +304,7 @@ enum MainMenuBuilder {
         // has exactly one text tool, and a whole menu bar item for three
         // toggles would be the ribbon mistake in menu form.
         let text = NSMenu(title: "Text")
+        add(to: text, "Show Fonts", #selector(NSFontManager.orderFrontFontPanel(_:)), "t")
         add(to: text, "Bold", #selector(AppCommands.toggleBold(_:)), "b")
         add(to: text, "Italic", #selector(AppCommands.toggleItalic(_:)), "i")
         add(to: text, "Underline", #selector(AppCommands.toggleUnderline(_:)), "u")

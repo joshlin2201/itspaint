@@ -19,7 +19,7 @@ comparing us will compare us to.
 | Pencil / brush / eraser | ✅ | ✅ | |
 | Pen, highlighter | ✅ | ✅ | Plus a spray tip on the brush, the airbrush Paint dropped |
 | Shapes | ✅ ~23 | ✅ 15 | Plus dash styles and per-shape fill mode |
-| Text | ✅ revamped, own sub-toolbar | ✅ + bold / italic / underline, resize handles | Ours rasterises on commit; theirs stays editable in a layer |
+| Text | ✅ revamped, own sub-toolbar | ✅ + bold / italic / underline, resize handles | Both stay editable: theirs in a layer, ours as text boxes in `.itspaint` |
 | Fill | ✅ | ✅ + tolerance | Paint's bucket has no tolerance control |
 | Colour picker | ✅ | ✅ + `⌥` from any tool | |
 | Crop / resize / rotate / flip | ✅ | ✅ | |
