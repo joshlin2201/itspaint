@@ -289,6 +289,17 @@ struct DrawingDocumentTests {
         #expect(document.isDocumentEdited)
     }
 
+    @Test("The title's edited state follows native asynchronous save completion")
+    func savedChangeTokenUpdatesTitle() {
+        let document = DrawingDocument()
+        document.updateChangeCount(.changeDone)
+        #expect(document.model.isEdited)
+        let token = document.changeCountToken(for: .saveOperation)
+        document.updateChangeCount(withToken: token, for: .saveOperation)
+        #expect(!document.isDocumentEdited)
+        #expect(!document.model.isEdited)
+    }
+
     @Test("A .itspaint package round-trips its pixels and colours")
     func packageRoundTrip() throws {
         let document = DrawingDocument()
@@ -969,4 +980,60 @@ struct RatingRequestTests {
         try document.writeSafely(to: url, ofType: "public.png", for: .saveOperation)
         #expect(defaults.integer(forKey: RatingRequest.exportsKey) == 41, "save did not count")
     }
+}
+
+@Suite("Editable text documents", .serialized)
+@MainActor
+struct EditableTextDocumentTests {
+    @Test("The native writer enforces the reader's text-box limit")
+    func excessiveBoxesCannotSaveUneditableText() {
+        let document = DrawingDocument()
+        let objects = (0...DrawingDocument.PackagePolicy.maximumTextObjects).map { _ in
+            TextObject(frame: PixelRect(x: 1, y: 1, width: 20, height: 30), runs: [TextRun(text: "x", style: .init(pointSize: 12))])
+        }
+        _ = document.model.engine.restoreTextObjects(objects)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("excessive-text-\(UUID().uuidString).itspaint")
+        #expect(throws: NSError.self) { try document.write(to: url, ofType: DrawingDocument.packageType) }
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test("Native save reopens mixed fonts and a clean base; PNG contains the visible text")
+    func textRoundTrip() throws {
+        let document = DrawingDocument()
+        let object = TextObject(frame: PixelRect(x: 20, y: 20, width: 400, height: 100), runs: [
+            TextRun(text: "Hello ", style: .init(fontName: "Helvetica", pointSize: 24)),
+            TextRun(text: "world", style: .init(fontName: "Georgia", pointSize: 36, isBold: true)),
+        ])
+        document.model.noteChange(document.model.engine.upsertTextObject(object))
+        let visible = document.model.canvas
+        let base = document.model.engine.canvas
+        #expect(visible != base)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("editable-\(UUID().uuidString).itspaint")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try document.write(to: url, ofType: DrawingDocument.packageType)
+        let reopened = DrawingDocument()
+        try reopened.read(from: url, ofType: DrawingDocument.packageType)
+        #expect(reopened.model.engine.textObjects == [object])
+        #expect(reopened.model.engine.canvas == base)
+        #expect(reopened.model.canvas == visible, "native reopen drew text twice")
+        let recovery = try ImageCodec.decode(contentsOf: url.appendingPathComponent("canvas.png"))
+        #expect(recovery == visible)
+        try FileManager.default.removeItem(at: url.appendingPathComponent("base.png"))
+        let recovered = DrawingDocument()
+        try recovered.read(from: url, ofType: DrawingDocument.packageType)
+        #expect(recovered.model.canvas == visible, "missing text base lost the artwork")
+        #expect(recovered.model.engine.textObjects.isEmpty)
+    }
+
+    @Test("Unmodified tool shortcuts are disabled during native text editing")
+    func toolShortcutsDoNotEatTyping() {
+        let document = DrawingDocument()
+        document.model.isEditingText = true
+        let menu = NSMenuItem(title: "Text", action: #selector(AppCommands.selectToolFromMenu(_:)), keyEquivalent: "t")
+        menu.representedObject = ToolKind.text.rawValue
+        #expect(!document.validateMenuItem(menu))
+        document.model.isEditingText = false
+        #expect(document.validateMenuItem(menu))
+    }
+
 }

@@ -67,6 +67,9 @@ final class DrawingDocument: NSDocument {
         model.onCanvasChanged = { [weak self] _ in
             self?.updateChangeCount(.changeDone)
         }
+        model.onTextDraftChanged = { [weak self] isChanged in
+            self?.updateChangeCount(isChanged ? .changeDone : .changeUndone)
+        }
         model.onEditCommitted = { [weak self] name in
             self?.registerUndoAction(named: name)
         }
@@ -89,6 +92,11 @@ final class DrawingDocument: NSDocument {
 
     override func updateChangeCount(_ change: NSDocument.ChangeType) {
         super.updateChangeCount(change)
+        MainActor.assumeIsolated { model.isEdited = isDocumentEdited }
+    }
+
+    override func updateChangeCount(withToken token: Any, for saveOperation: NSDocument.SaveOperationType) {
+        super.updateChangeCount(withToken: token, for: saveOperation)
         MainActor.assumeIsolated { model.isEdited = isDocumentEdited }
     }
 
@@ -173,7 +181,8 @@ final class DrawingDocument: NSDocument {
     // Nothing here sets `NSDocumentController.autosavingDelay`, so there is no
     // periodic autosave to degrade a lossy file: the only automatic write
     // happens when the document closes, which is the moment the user would have
-    // pressed Save anyway.
+    // pressed Save anyway. A write while a text box is open checkpoints it
+    // without closing the editor or losing the selection.
 
     override var windowNibName: NSNib.Name? { nil }
 
@@ -193,7 +202,7 @@ final class DrawingDocument: NSDocument {
         // The chrome floats *over* the canvas in this direction, so it claims
         // no space of its own; the gap below is a hairline, not a reservation.
         let sized = Self.windowFit(
-            forCanvas: (model.canvas.width, model.canvas.height),
+            forCanvas: (model.engine.canvas.width, model.engine.canvas.height),
             on: NSScreen.main
         )
         model.setZoomExact(sized.zoom)
@@ -432,9 +441,8 @@ final class DrawingDocument: NSDocument {
         )
         let canvas = try ImageCodec.decode(data: canvasData, sourceURL: canvasURL)
 
-        // Metadata is preference, not artwork. Missing, damaged, oversized or
-        // non-regular metadata therefore falls back to the defaults, while the
-        // required canvas remains fail-closed above.
+        // Missing or damaged editing metadata falls back to the complete
+        // recovery artwork; the required canvas remains fail-closed above.
         let metadata: DocumentMetadata?
         do {
             let data = try readRegularEntry(
@@ -446,7 +454,22 @@ final class DrawingDocument: NSDocument {
         } catch {
             metadata = nil
         }
-        return (canvas, metadata)
+        if let metadata, metadata.formatVersion == DocumentMetadata.currentVersion,
+           let objects = metadata.textObjects, !objects.isEmpty {
+            // The recovery PNG includes text. Reopen the separate base only
+            // with intact text metadata, otherwise recover the visible artwork.
+            if let baseData = try? readRegularEntry(named: PackageEntry.baseImage, in: packageDescriptor,
+                                                    maximumBytes: PackagePolicy.maximumCanvasBytes),
+               let base = try? ImageCodec.decode(data: baseData, sourceURL: url.appendingPathComponent(PackageEntry.baseImage)),
+               base.width == canvas.width, base.height == canvas.height,
+               objects.count <= PackagePolicy.maximumTextObjects,
+               Set(objects.map(\.id)).count == objects.count,
+               objects.allSatisfy({ $0.isValid && !$0.frame.intersection(base.bounds).isEmpty }) {
+                return (base, metadata)
+            }
+            return (canvas, nil)
+        }
+        return (canvas, metadata?.textObjects == nil || metadata?.textObjects?.isEmpty == true ? metadata : nil)
     }
 
     /// Open the package once and resolve both fixed child names relative to
@@ -527,6 +550,8 @@ final class DrawingDocument: NSDocument {
     /// Everything writing needs, lifted off the main actor in one hop.
     private struct WriteSnapshot: Sendable {
         let canvas: Bitmap
+        let baseCanvas: Bitmap
+        let textObjects: [TextObject]
         let foreground: PaintColour
         let background: PaintColour
         let palette: Palette
@@ -534,10 +559,15 @@ final class DrawingDocument: NSDocument {
         let pdfSource: PDFCodec.Source?
     }
 
-    nonisolated private func makeWriteSnapshot() -> WriteSnapshot {
-        MainActor.assumeIsolated {
-            WriteSnapshot(
+    nonisolated private func makeWriteSnapshot() throws -> WriteSnapshot {
+        try MainActor.assumeIsolated {
+            guard model.onSaveTextEditing?() ?? !model.isEditingText else {
+                throw NSError(domain: "ItsPaint", code: 3, userInfo: [NSLocalizedDescriptionKey: "Finish or simplify the open text box before saving."])
+            }
+            return WriteSnapshot(
                 canvas: model.canvas,
+                baseCanvas: model.engine.canvas,
+                textObjects: model.engine.textObjects,
                 foreground: model.foreground,
                 background: model.background,
                 palette: model.palette,
@@ -560,7 +590,7 @@ final class DrawingDocument: NSDocument {
     }
 
     override func write(to url: URL, ofType typeName: String) throws {
-        let snapshot = makeWriteSnapshot()
+        let snapshot = try makeWriteSnapshot()
 
         if typeName == Self.packageType || url.pathExtension.lowercased() == "itspaint" {
             try Self.writePackage(snapshot, to: url)
@@ -586,6 +616,10 @@ final class DrawingDocument: NSDocument {
     /// means the artwork is recoverable with any image tool even if this app
     /// disappears — a document format should never hold work hostage.
     nonisolated private static func writePackage(_ snapshot: WriteSnapshot, to url: URL) throws {
+        guard snapshot.textObjects.count <= PackagePolicy.maximumTextObjects else {
+            throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError,
+                          userInfo: [NSLocalizedDescriptionKey: "This document contains too many editable text boxes to save. Split it into smaller documents."])
+        }
         let fileManager = FileManager.default
         let temporary = fileManager.temporaryDirectory
             .appendingPathComponent("itspaint-write-\(UUID().uuidString)", isDirectory: true)
@@ -598,18 +632,26 @@ final class DrawingDocument: NSDocument {
             as: .png
         )
 
+        if !snapshot.textObjects.isEmpty {
+            try ImageCodec.write(snapshot.baseCanvas, to: temporary.appendingPathComponent(PackageEntry.baseImage), as: .png)
+        }
         let metadata = DocumentMetadata(
             formatVersion: DocumentMetadata.currentVersion,
             width: snapshot.canvas.width,
             height: snapshot.canvas.height,
             foreground: snapshot.foreground,
             background: snapshot.background,
-            palette: snapshot.palette
+            palette: snapshot.palette,
+            textObjects: snapshot.textObjects.isEmpty ? nil : snapshot.textObjects
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(metadata)
-            .write(to: temporary.appendingPathComponent(PackageEntry.metadata))
+        let metadataData = try encoder.encode(metadata)
+        guard metadataData.count <= PackagePolicy.maximumMetadataBytes else {
+            throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError,
+                          userInfo: [NSLocalizedDescriptionKey: "This document contains too much editable text to save."])
+        }
+        try metadataData.write(to: temporary.appendingPathComponent(PackageEntry.metadata))
 
         if fileManager.fileExists(atPath: url.path) {
             try fileManager.removeItem(at: url)
@@ -623,14 +665,16 @@ final class DrawingDocument: NSDocument {
 
     enum PackageEntry {
         nonisolated static let image = "canvas.png"
+        nonisolated static let baseImage = "base.png"
         nonisolated static let metadata = "document.json"
     }
 
     enum PackagePolicy {
-        /// Metadata written by the app is only a few kilobytes. A 256 KiB cap
-        /// leaves ample format-growth room without exposing JSON decoding to an
-        /// attacker-controlled allocation.
-        nonisolated static let maximumMetadataBytes = 256 * 1024
+        nonisolated static let maximumTextObjects = 1_024
+        /// Text runs live in metadata, with a bounded read before JSON decoding.
+        /// Four MiB leaves room for substantial annotations without an unbounded
+        /// allocation from an untrusted package.
+        nonisolated static let maximumMetadataBytes = 4 * 1024 * 1024
 
         /// A maximum-size decoded canvas can produce a roughly 128 MiB PNG in
         /// the incompressible case. Twice that size preserves legitimate work
@@ -701,6 +745,7 @@ final class DrawingDocument: NSDocument {
     // MARK: - Export
 
     @IBAction func exportImage(_ sender: Any?) {
+        guard model.finishTextEditing() else { return }
         guard let window = windowControllers.first?.window else { return }
         model.landPendingWork()
 
@@ -726,7 +771,7 @@ final class DrawingDocument: NSDocument {
         // has, and the scale is applied before encoding, so "export at 2×"
         // does not mean "resize the document and undo it afterwards".
         let accessory = NSHostingView(
-            rootView: ExportAccessory(options: options, canvas: (canvas: model.canvas.width, model.canvas.height)) { format in
+            rootView: ExportAccessory(options: options, canvas: (canvas: model.engine.canvas.width, model.engine.canvas.height)) { format in
                 panel.allowedContentTypes = [format.utType]
             }
         )
@@ -804,7 +849,7 @@ private enum PackageReadError: LocalizedError {
 
 /// Editing state stored alongside the pixels in a `.itspaint` package.
 struct DocumentMetadata: Codable {
-    static let currentVersion = 1
+    static let currentVersion = 2
 
     let formatVersion: Int
     let width: Int
@@ -812,6 +857,7 @@ struct DocumentMetadata: Codable {
     let foreground: PaintColour
     let background: PaintColour
     let palette: Palette
+    var textObjects: [TextObject]? = nil
 }
 
 /// Everything an export needs, captured when the save panel closes.

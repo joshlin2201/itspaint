@@ -86,15 +86,27 @@ public struct PixelEdit: Equatable, Sendable {
     /// that are still on screen.
     public let badgeNumber: Int?
 
+    /// Retained text state travels with the pixel edit that flattened or
+    /// replaced it. `nil` means this edit did not touch retained text; an empty
+    /// array means it deliberately removed every object.
+    public let textBefore: [TextObject]?
+    public let textAfter: [TextObject]?
+    public let textDirtyRect: PixelRect
+
     public init(
         name: String, before: RectPatch, after: RectPatch,
-        resize: Resize? = nil, badgeNumber: Int? = nil
+        resize: Resize? = nil, badgeNumber: Int? = nil,
+        textBefore: [TextObject]? = nil, textAfter: [TextObject]? = nil,
+        textDirtyRect: PixelRect = .empty
     ) {
         self.name = name
         self.before = before
         self.after = after
         self.resize = resize
         self.badgeNumber = badgeNumber
+        self.textBefore = textBefore
+        self.textAfter = textAfter
+        self.textDirtyRect = textDirtyRect
     }
 
     /// An edit that replaces the whole canvas, size and all.
@@ -129,6 +141,7 @@ public struct PixelEdit: Equatable, Sendable {
 
     public var byteCount: Int {
         before.byteCount + after.byteCount + (resize?.byteCount ?? 0)
+            + textStateByteCount(textBefore) + textStateByteCount(textAfter)
     }
 
     /// The area a caller has to repaint after undoing or redoing this edit.
@@ -139,8 +152,10 @@ public struct PixelEdit: Equatable, Sendable {
     /// never repainted, and never told anyone the size had changed either. The
     /// union of both canvases covers the shrink and the grow directions alike.
     public var dirtyRect: PixelRect {
-        guard let resize else { return before.rect }
-        return resize.before.bounds.union(resize.after.bounds)
+        guard let resize else {
+            return before.rect.union(after.rect).union(textDirtyRect)
+        }
+        return resize.before.bounds.union(resize.after.bounds).union(textDirtyRect)
     }
 
     public func undo(on bitmap: inout Bitmap) {
@@ -149,5 +164,17 @@ public struct PixelEdit: Equatable, Sendable {
 
     public func redo(on bitmap: inout Bitmap) {
         if let resize { bitmap = resize.after } else { after.apply(to: &bitmap) }
+    }
+
+    private func textStateByteCount(_ objects: [TextObject]?) -> Int {
+        // A bounded-history estimate only: UTF-8 payload dominates, with a
+        // conservative fixed allowance for UUID, frame, style fields, and
+        // Swift collection overhead per object and run.
+        guard let objects else { return 0 }
+        return objects.reduce(0) { total, object in
+            total + 128 + object.runs.reduce(0) { runTotal, run in
+                runTotal + 96 + run.text.utf8.count + run.style.fontName.utf8.count
+            }
+        }
     }
 }

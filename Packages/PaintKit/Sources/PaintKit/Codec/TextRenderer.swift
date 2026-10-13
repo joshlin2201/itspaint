@@ -8,13 +8,11 @@ import Foundation
 /// a running app — the same reason the rest of the engine avoids `NSImage` and
 /// friends.
 ///
-/// Text is **rasterised on commit**, not kept as an editable object. That is the
-/// honest model for a paint app: once you click away, the letters are pixels
-/// like everything else, and pretending otherwise would mean a document format
-/// carrying live text that the PNG export silently flattens anyway.
+/// Retained styled text uses this renderer for canvas compositing and flattened
+/// image exports. Native documents keep the text objects separately.
 public enum TextRenderer {
 
-    public struct Style: Equatable, Sendable {
+    public struct Style: Codable, Equatable, Sendable {
         public var fontName: String
         public var pointSize: Double
         public var colour: PaintColour
@@ -93,6 +91,19 @@ public enum TextRenderer {
             self.haloWidth = max(0, haloWidth)
         }
 
+        public var isValid: Bool {
+            pointSize.isFinite && pointSize >= 6 && pointSize <= 4_096
+                && colour.red.isFinite && colour.green.isFinite
+                && colour.blue.isFinite && colour.alpha.isFinite
+                && (0...1).contains(colour.red) && (0...1).contains(colour.green)
+                && (0...1).contains(colour.blue) && (0...1).contains(colour.alpha)
+                && !fontName.isEmpty && fontName.utf8.count <= 256
+                && haloWidth.isFinite && (0...1).contains(haloWidth)
+                && (haloColour.map {
+                    [$0.red, $0.green, $0.blue, $0.alpha].allSatisfy { (0...1).contains($0) }
+                } ?? true)
+        }
+
         /// The font these settings resolve to, traits and all.
         ///
         /// Shared with the app so the live editor and the rasteriser cannot
@@ -115,6 +126,47 @@ public enum TextRenderer {
         ]
     }
 
+    /// One uniformly styled span in a retained text object. Runs are ordered
+    /// and adjacent runs are intentionally not merged: selection formatting is
+    /// an editing concern, not a serialisation optimisation.
+    public struct TextRun: Codable, Equatable, Sendable {
+        public var text: String
+        public var style: Style
+
+        public init(text: String, style: Style) {
+            self.text = text
+            self.style = style
+        }
+    }
+
+    /// Text retained separately from the paint bitmap. Keeping its stable ID
+    /// lets a live native editor update one box without touching its siblings.
+    public struct TextObject: Codable, Equatable, Sendable, Identifiable {
+        public var id: UUID
+        public var frame: PixelRect
+        public var runs: [TextRun]
+
+        public init(id: UUID = UUID(), frame: PixelRect, runs: [TextRun]) {
+            self.id = id
+            self.frame = frame
+            self.runs = runs
+        }
+
+        /// Structural validation for untrusted document data. Canvas-relative
+        /// bounds belong to the document reader, which knows the canvas size.
+        public var isValid: Bool {
+            frame.width > 0 && frame.height > 0 && frame.x >= 0 && frame.y >= 0
+                && frame.width <= Bitmap.maximumDimension && frame.height <= Bitmap.maximumDimension
+                && frame.x <= Bitmap.maximumDimension - frame.width
+                && frame.y <= Bitmap.maximumDimension - frame.height
+                && !runs.isEmpty && runs.count <= 64 * 1024
+                && runs.reduce(0, { $0 + $1.text.utf8.count }) <= 64 * 1024
+                && runs.allSatisfy {
+                    !$0.text.isEmpty && $0.text.utf8.count <= 64 * 1024 && $0.style.isValid
+                }
+        }
+    }
+
     /// Draw `string` inside `rect`, returning the rect actually touched.
     @discardableResult
     public static func draw(
@@ -124,51 +176,37 @@ public enum TextRenderer {
         into bitmap: inout Bitmap
     ) -> PixelRect {
         guard !string.isEmpty, !rect.isEmpty else { return .empty }
+        return draw([TextRun(text: string, style: style)], in: rect, into: &bitmap)
+    }
 
-        let path = CGPath(rect: CGRect(x: 0, y: 0, width: rect.width, height: rect.height), transform: nil)
+    /// Draw styled runs without collapsing their font, colour, or traits.
+    @discardableResult
+    public static func draw(
+        _ runs: [TextRun], in rect: PixelRect, into bitmap: inout Bitmap
+    ) -> PixelRect {
+        guard !runs.isEmpty, !rect.isEmpty else { return .empty }
 
-        func frame(isHaloPass: Bool) -> CTFrame {
-            let attributed = attributedString(string, style: style, isHaloPass: isHaloPass)
-            return CTFramesetterCreateFrame(
-                CTFramesetterCreateWithAttributedString(attributed), CFRangeMake(0, 0), path, nil
-            )
-        }
+        let layout = layout(runs, width: rect.width)
+        guard !layout.lines.isEmpty else { return .empty }
 
-        // **Two passes, rim then body.** The rim is stroke-only and therefore
-        // hollow; drawing the filled text over it leaves the stroke showing on
-        // the outside only, which is the whole point — a rim that ate the letter
-        // it was meant to make legible would be worse than no rim.
-        // **Text set in a transparent colour cuts the letters out of the picture.**
+        // **Up to three passes over one layout: rim, body, then cut-out.** Each run
+        // takes part only in the passes its own style asks for, so one box can
+        // mix a rimmed word, a plain one and a transparent one.
         //
+        // The rim is stroke-only and therefore hollow; drawing the filled text
+        // over it leaves the stroke showing on the outside only, which is the
+        // whole point — a rim that ate the letter it was meant to make legible
+        // would be worse than no rim.
+        //
+        // **Text set in a transparent colour cuts the letters out of the picture.**
         // Core Graphics cannot express that as a colour: source-over with a zero
         // alpha source is a no-op, so typing in a clear colour changed nothing and
         // said nothing — the same silence every other tool used to keep. The
         // letterforms are drawn opaque and the blend mode does the erasing, which
         // is what `destination-out` is: it takes the *source's* alpha away from
-        // the destination and ignores the source's colour entirely.
-        //
-        // The halo goes with it. A rim around a hole is a rim around nothing.
-        let erases = style.colour.alpha == 0
-        var opaque = style
-        if erases {
-            opaque.colour = PaintColour(red: 0, green: 0, blue: 0, alpha: 1)
-            opaque.haloColour = nil
-        }
-        func erasingFrame() -> CTFrame {
-            let attributed = attributedString(string, style: opaque, isHaloPass: false)
-            return CTFramesetterCreateFrame(
-                CTFramesetterCreateWithAttributedString(attributed), CFRangeMake(0, 0), path, nil
-            )
-        }
-
-        let wantsHalo = !erases && style.haloColour != nil && style.haloWidth > 0
-        let passes = if erases {
-            [erasingFrame()]
-        } else if wantsHalo {
-            [frame(isHaloPass: true), frame(isHaloPass: false)]
-        } else {
-            [frame(isHaloPass: false)]
-        }
+        // the destination and ignores the source's colour entirely. The halo goes
+        // with it. A rim around a hole is a rim around nothing.
+        let passes = Pass.allCases.filter { pass in runs.contains { pass.includes($0.style) } }
 
         bitmap.drawWithCoreGraphics { context in
             // A bitmap `CGContext` does not turn these on for you, and without them
@@ -189,24 +227,42 @@ public enum TextRenderer {
             context.setShouldSubpixelPositionFonts(true)
             context.setAllowsFontSubpixelQuantization(false)
             context.setShouldSubpixelQuantizeFonts(false)
-            if erases { context.setBlendMode(.destinationOut) }
             for pass in passes {
+                // Colour and stroke do not move glyphs, so each pass re-sets the
+                // body's own line ranges and lands on the body's own positions.
+                let typesetter = pass == .body
+                    ? nil : CTTypesetterCreateWithAttributedString(attributedString(runs, pass: pass))
                 context.saveGState()
+                if pass == .erase { context.setBlendMode(.destinationOut) }
                 // The surrounding context is flipped so canvas coordinates work;
                 // CoreText draws glyphs in its own y-up space, so flip back inside
                 // the text box or every line renders mirrored.
                 context.translateBy(x: CGFloat(rect.minX), y: CGFloat(rect.minY + rect.height))
                 context.scaleBy(x: 1, y: -1)
+                // Kept inside the box, because the box is what a retained object
+                // repaints and what its undo restores.
+                context.clip(to: CGRect(x: 0, y: 0, width: rect.width, height: rect.height))
                 context.textMatrix = .identity
-                CTFrameDraw(pass, context)
+                for line in layout.lines {
+                    // NSTextView only lays a line into a fragment that can hold
+                    // its full typographic bounds. Skipping an incomplete fragment
+                    // avoids drawing the top sliver of the next line at the box
+                    // edge when a caller has not grown the editor yet.
+                    guard line.fragmentBottom <= CGFloat(rect.height) else { continue }
+                    // Core Text uses y-up; our layout deliberately uses the same
+                    // top-down baseline and line advance as NSTextView/TextKit.
+                    context.textPosition = CGPoint(
+                        x: xOffset(for: line, in: rect.width),
+                        y: CGFloat(rect.height) - line.baseline
+                    )
+                    CTLineDraw(typesetter.map { CTTypesetterCreateLine($0, line.range) } ?? line.line, context)
+                }
                 context.restoreGState()
             }
         }
         return rect.intersection(bitmap.bounds)
     }
 
-    /// The size `string` needs at this style, for auto-growing the text box as
-    /// the user types.
     /// One line of this style, in pixels, from the font rather than from a guess.
     ///
     /// This used to be four different guesses at the same quantity: `pointSize * 1.3`
@@ -215,15 +271,11 @@ public enum TextRenderer {
     /// editor. So the box the caret sat in and the box the text landed in were sized
     /// by two numbers that had never agreed, and a new line moved them further apart.
     ///
-    /// Measured by laying out one line through the same framesetter that draws them,
-    /// because every other way of computing it is a different answer.
-    ///
-    /// The first repair here replaced the multipliers with the font's own metrics,
-    /// `CTFontGetAscent + Descent + Leading`, which sounds authoritative and is not
-    /// the number CoreText uses to stack lines. For Helvetica those three sum to
-    /// exactly the point size while the framesetter lays a line out 25% taller, so a
-    /// box sized from the font metrics was a quarter of a line short at every size.
-    /// Swapping one guess for a more official-looking guess is not measuring.
+    /// Measured by laying out one line through the same layout that draws them,
+    /// because every other way of computing it is a different answer. While the
+    /// renderer drew through a framesetter, the font's own metrics came out a
+    /// quarter of a line short of what it stacked; lines are now stacked the way
+    /// NSTextView stacks them, so this and the editor agree by construction.
     public static func lineHeight(for style: Style) -> Int {
         // A wide-but-sane constraint. `Int.max / 2` reaches CoreText as ~4.6e18 and,
         // while finite, is the kind of number that turns into an infinity the first
@@ -231,20 +283,115 @@ public enum TextRenderer {
         max(1, measure("H", style: style, maxWidth: 100_000).height)
     }
 
+    /// The size `string` needs at this style, for auto-growing the text box as
+    /// the user types.
     public static func measure(_ string: String, style: Style, maxWidth: Int) -> (width: Int, height: Int) {
         guard !string.isEmpty else { return (0, lineHeight(for: style)) }
-        let attributed = attributedString(string, style: style)
-        let framesetter = CTFramesetterCreateWithAttributedString(attributed)
-        let constraint = CGSize(width: Double(maxWidth), height: .greatestFiniteMagnitude)
-        let size = CTFramesetterSuggestFrameSizeWithConstraints(
-            framesetter, CFRangeMake(0, 0), nil, constraint, nil
-        )
-        return (Int(size.width.rounded(.up)), Int(size.height.rounded(.up)))
+        return measure([TextRun(text: string, style: style)], maxWidth: maxWidth)
     }
 
-    private static func attributedString(
-        _ string: String, style: Style, isHaloPass: Bool = false
-    ) -> CFAttributedString {
+    /// The frame needed for styled runs. The caller owns the width; this only
+    /// answers the resulting wrapped height and intrinsic line width.
+    public static func measure(_ runs: [TextRun], maxWidth: Int) -> (width: Int, height: Int) {
+        guard !runs.isEmpty, maxWidth > 0 else { return (0, 0) }
+        let layout = layout(runs, width: maxWidth)
+        let widest = layout.lines.map(\.width).max() ?? 0
+        return (
+            min(maxWidth, Int(widest.rounded(.up))),
+            Int(layout.height.rounded(.up))
+        )
+    }
+
+    private enum Pass: CaseIterable {
+        case halo, body, erase
+
+        func includes(_ style: Style) -> Bool {
+            let erases = style.colour.alpha == 0
+            return switch self {
+            case .halo: !erases && style.haloColour != nil && style.haloWidth > 0
+            case .body: !erases
+            case .erase: erases
+            }
+        }
+    }
+
+    private struct LineLayout {
+        let line: CTLine
+        let range: CFRange
+        let width: CGFloat
+        let baseline: CGFloat
+        let fragmentBottom: CGFloat
+        let alignment: Style.Alignment
+    }
+
+    private struct Layout {
+        let lines: [LineLayout]
+        let height: CGFloat
+    }
+
+    /// `CTFrameDraw` inserts Core Text's paragraph leading (Helvetica 36: 43px)
+    /// while NSTextView advances its default line fragments by the font's
+    /// typographic height (36px). Building and drawing `CTLine`s directly
+    /// gives the renderer and the native editor the same baseline: ceil(ascent)
+    /// for line one, then ceil(ascent + descent + leading) per line.
+    private static func layout(_ runs: [TextRun], width: Int) -> Layout {
+        let attributed = attributedString(runs, pass: .body)
+        let typesetter = CTTypesetterCreateWithAttributedString(attributed)
+        let length = CFAttributedStringGetLength(attributed)
+        guard length > 0 else {
+            return Layout(lines: [], height: 0)
+        }
+
+        var lines: [LineLayout] = []
+        var start = 0
+        var top: CGFloat = 0
+        var runIndex = 0
+        var runEnd = runs[0].text.utf16.count
+        while start < length {
+            let count = CTTypesetterSuggestLineBreak(typesetter, start, CGFloat(width))
+            guard count > 0 else { break }
+            let range = CFRange(location: start, length: count)
+            let line = CTTypesetterCreateLine(typesetter, range)
+            var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+            let lineWidth = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, &leading))
+            let baseline = top + ceil(ascent)
+            let fragmentBottom = top + max(1, ceil(ascent + descent + leading))
+            while start >= runEnd, runIndex + 1 < runs.count {
+                runIndex += 1
+                runEnd += runs[runIndex].text.utf16.count
+            }
+            lines.append(LineLayout(
+                line: line, range: range, width: lineWidth, baseline: baseline,
+                fragmentBottom: fragmentBottom, alignment: runs[runIndex].style.alignment
+            ))
+            top = fragmentBottom
+            start += count
+        }
+        return Layout(lines: lines, height: top)
+    }
+
+    private static func xOffset(for line: LineLayout, in width: Int) -> CGFloat {
+        let flush: CGFloat = switch line.alignment {
+        case .left: 0
+        case .centre: 0.5
+        case .right: 1
+        }
+        // This also handles trailing whitespace the way CTFrameDraw did;
+        // subtracting typographic width by hand does not.
+        return CTLineGetPenOffsetForFlush(line.line, flush, CGFloat(width))
+    }
+
+    private static func attributedString(_ runs: [TextRun], pass: Pass) -> CFAttributedString {
+        let result = NSMutableAttributedString()
+        for run in runs {
+            result.append(NSAttributedString(
+                string: run.text, attributes: attributes(for: run.style, pass: pass)
+            ))
+        }
+        return result as CFAttributedString
+    }
+
+    private static func attributes(for style: Style, pass: Pass) -> [NSAttributedString.Key: Any] {
         let font = style.makeFont()
 
         // The setting borrows the pointer, so it has to stay valid for the
@@ -271,20 +418,39 @@ public enum TextRenderer {
             attributes[kCTUnderlineStyleAttributeName as NSAttributedString.Key] =
                 CTUnderlineStyle.single.rawValue
         }
-        // The rim is its own pass (see `draw`). CoreText's negative stroke width
-        // looks like the shortcut for this and is not: measured on Helvetica, a
-        // negative width centres the stroke on the glyph outline and eats inward,
-        // so at 8% of the point size the *entire* body of "Il", "W" and "Step 1"
-        // was consumed at both 18pt and 40pt — 290 dark pixels became 0. Half of
-        // the stroke lands inside the letter, and thin stems are thinner than
-        // half a rim.
-        if isHaloPass, let halo = style.haloColour {
-            attributes[kCTForegroundColorAttributeName as NSAttributedString.Key] = halo.cgColor
-            attributes[kCTStrokeColorAttributeName as NSAttributedString.Key] = halo.cgColor
+        // A run that sits a pass out still occupies its place in the line, in a
+        // colour that draws nothing.
+        guard pass.includes(style) else {
+            attributes[kCTForegroundColorAttributeName as NSAttributedString.Key] =
+                PaintColour.clear.cgColor
+            return attributes
+        }
+        switch pass {
+        case .body:
+            break
+        case .erase:
+            attributes[kCTForegroundColorAttributeName as NSAttributedString.Key] =
+                PaintColour(red: 0, green: 0, blue: 0, alpha: 1).cgColor
+        case .halo:
+            // The rim is its own pass (see `draw`). CoreText's negative stroke width
+            // looks like the shortcut for this and is not: measured on Helvetica, a
+            // negative width centres the stroke on the glyph outline and eats inward,
+            // so at 8% of the point size the *entire* body of "Il", "W" and "Step 1"
+            // was consumed at both 18pt and 40pt — 290 dark pixels became 0. Half of
+            // the stroke lands inside the letter, and thin stems are thinner than
+            // half a rim.
+            let halo = (style.haloColour ?? .white).cgColor
+            attributes[kCTForegroundColorAttributeName as NSAttributedString.Key] = halo
+            attributes[kCTStrokeColorAttributeName as NSAttributedString.Key] = halo
             // Positive: stroke only. The body arrives with the second pass.
             attributes[kCTStrokeWidthAttributeName as NSAttributedString.Key] =
                 style.haloWidth * 100
         }
-        return NSAttributedString(string: string, attributes: attributes) as CFAttributedString
+        return attributes
     }
 }
+
+/// Convenience names for document and UI code. The renderer remains the
+/// namespace for layout, while retained content reads naturally in models.
+public typealias TextRun = TextRenderer.TextRun
+public typealias TextObject = TextRenderer.TextObject

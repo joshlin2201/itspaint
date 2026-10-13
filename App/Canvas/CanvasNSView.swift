@@ -13,6 +13,10 @@ final class CanvasNSView: NSView {
         didSet {
             guard model !== oldValue else { return }
             paintedRevision = -1
+            model?.onTextStyleChanged = { [weak self] change in self?.applyTextStyle(change) }
+            model?.onFinishTextEditing = { [weak self] in _ = self?.commitText() }
+            model?.onSaveTextEditing = { [weak self] in self?.checkpointText() ?? true }
+            model?.onCancelTextEditing = { [weak self] in self?.cancelText() }
             invalidateCanvasSize()
         }
     }
@@ -101,9 +105,15 @@ final class CanvasNSView: NSView {
     var zoom: Double = 1 {
         didSet {
             guard zoom != oldValue else { return }
-            // The text box is positioned in screen points, so a zoom underneath
-            // it would leave it pointing at the wrong pixels. Land it instead.
-            commitText()
+            if let editor = textEditor, let box = textBox {
+                let runs = TextContent.runs(editor.attributedString(), zoom: oldValue)
+                editor.contentZoom = zoom
+                let selection = editor.selectedRange()
+                editor.textStorage?.setAttributedString(TextContent.attributed(runs, zoom: zoom))
+                editor.typingAttributes = TextContent.attributes(model?.engine.settings.textStyle ?? .init(), zoom: zoom)
+                editor.setSelectedRange(selection)
+                setEditorFrame(editor, box: box)
+            }
             invalidateCanvasSize()
         }
     }
@@ -111,8 +121,8 @@ final class CanvasNSView: NSView {
     func invalidateCanvasSize() {
         guard let model else { return }
         let size = NSSize(
-            width: Double(model.canvas.width) * zoom,
-            height: Double(model.canvas.height) * zoom
+            width: Double(model.engine.canvas.width) * zoom,
+            height: Double(model.engine.canvas.height) * zoom
         )
         guard frame.size != size else { return }
         setFrameSize(size)
@@ -263,7 +273,11 @@ final class CanvasNSView: NSView {
     /// `drawCanvas` crops with, since a downscaled draw samples that far past
     /// the rect's edge and a transparent pixel there shows through.
     private func isCanvasOpaque(under dirtyRect: NSRect, model: EditorModel) -> Bool {
-        let canvas = model.canvas
+        // Text only ever adds paint, unless a run is set in a clear colour and
+        // cuts a hole. Short of that the paint layer answers, without a render.
+        guard !model.engine.textObjects.contains(where: { $0.runs.contains { $0.style.colour.alpha == 0 } })
+        else { return false }
+        let canvas = model.engine.canvas
         guard canvas.width > 0, canvas.height > 0 else { return false }
         let sx = bounds.width / Double(canvas.width)
         let sy = bounds.height / Double(canvas.height)
@@ -300,7 +314,7 @@ final class CanvasNSView: NSView {
         else { return }
 
         if cachedRevision != model.revision || cachedImage == nil {
-            cachedImage = model.canvas.makeCGImage()
+            cachedImage = model.engine.renderedCanvas(excluding: textEditor == nil ? nil : editingTextID).makeCGImage()
             cachedRevision = model.revision
         }
         guard let image = cachedImage else { return }
@@ -311,7 +325,7 @@ final class CanvasNSView: NSView {
         if !isCanvasOpaque(under: dirtyRect, model: model) {
             drawTransparencyGrid(in: dirtyRect, context: context)
         }
-        drawCanvas(image, in: dirtyRect, context: context, canvas: model.canvas)
+        drawCanvas(image, in: dirtyRect, context: context, canvas: model.engine.canvas)
 
         drawFloatingContent(context: context, model: model)
 
@@ -852,14 +866,14 @@ final class CanvasNSView: NSView {
             context.setStrokeColor(NSColor.separatorColor.withAlphaComponent(alpha).cgColor)
             context.beginPath()
             var column = max(0, Int(dirtyRect.minX / zoom) / step * step)
-            while column <= min(model.canvas.width, Int(dirtyRect.maxX / zoom) + step) {
+            while column <= min(model.engine.canvas.width, Int(dirtyRect.maxX / zoom) + step) {
                 let x = Double(column) * zoom
                 context.move(to: CGPoint(x: x, y: dirtyRect.minY))
                 context.addLine(to: CGPoint(x: x, y: dirtyRect.maxY))
                 column += step
             }
             var row = max(0, Int(dirtyRect.minY / zoom) / step * step)
-            while row <= min(model.canvas.height, Int(dirtyRect.maxY / zoom) + step) {
+            while row <= min(model.engine.canvas.height, Int(dirtyRect.maxY / zoom) + step) {
                 let y = Double(row) * zoom
                 context.move(to: CGPoint(x: dirtyRect.minX, y: y))
                 context.addLine(to: CGPoint(x: dirtyRect.maxX, y: y))
@@ -886,9 +900,9 @@ final class CanvasNSView: NSView {
         context.setStrokeColor(NSColor.separatorColor.cgColor)
 
         let firstColumn = max(0, Int(dirtyRect.minX / zoom))
-        let lastColumn = min(model.canvas.width, Int(dirtyRect.maxX / zoom) + 1)
+        let lastColumn = min(model.engine.canvas.width, Int(dirtyRect.maxX / zoom) + 1)
         let firstRow = max(0, Int(dirtyRect.minY / zoom))
-        let lastRow = min(model.canvas.height, Int(dirtyRect.maxY / zoom) + 1)
+        let lastRow = min(model.engine.canvas.height, Int(dirtyRect.maxY / zoom) + 1)
 
         context.beginPath()
         for column in firstColumn...max(firstColumn, lastColumn) {
@@ -987,10 +1001,10 @@ final class CanvasNSView: NSView {
 
     private func begin(at viewPoint: NSPoint, button: PointerButton, modifiers: NSEvent.ModifierFlags) {
         guard let model else { return }
-        // Touching the canvas puts the options panel away.
-        model.isOptionsExpanded = false
+        // Text formatting remains visible while the box is being edited.
+        model.isOptionsExpanded = model.tool == .text
         // A click anywhere lands an open text box before doing anything else.
-        commitText()
+        guard commitText() else { return }
         window?.makeFirstResponder(self)
 
         if isSpaceHeld {
@@ -1014,6 +1028,19 @@ final class CanvasNSView: NSView {
 
         // Left button only: right-drag means "paint the background colour",
         // and a text box on the right button would be a second, secret binding.
+        if button == .primary,
+           (model.tool == .text || (NSApp.currentEvent?.clickCount ?? 1) > 1),
+           let object = model.engine.textObjects.last(where: { $0.frame.contains(point) }) {
+            model.tool = .text
+            model.isOptionsExpanded = true
+            openTextEditor(in: object.frame, object: object)
+            if let editor = textEditor {
+                let index = editor.characterIndex(at: convert(viewPoint, to: nil))
+                editor.setSelectedRange(NSRange(location: index, length: 0))
+                textSelectionAnchor = index
+            }
+            return
+        }
         if model.tool == .text, button == .primary {
             textOrigin = point
             textBox = nil
@@ -1095,6 +1122,11 @@ final class CanvasNSView: NSView {
     }
 
     private func extend(_ event: NSEvent) {
+        if let anchor = textSelectionAnchor, let editor = textEditor {
+            let index = editor.characterIndex(at: event.locationInWindow)
+            editor.setSelectedRange(NSRange(location: min(anchor, index), length: abs(index - anchor)))
+            return
+        }
         if panOrigin != nil {
             continuePan(to: convert(event.locationInWindow, from: nil))
             return
@@ -1116,6 +1148,7 @@ final class CanvasNSView: NSView {
     }
 
     private func finish(_ event: NSEvent) {
+        if textSelectionAnchor != nil { textSelectionAnchor = nil; return }
         stopSpraying()
         if panOrigin != nil { return endPan() }
         if let origin = textOrigin {
@@ -1161,16 +1194,22 @@ final class CanvasNSView: NSView {
     private var textOrigin: PixelPoint?
     private var textBox: PixelRect?
     private var textEditor: TextEntryView?
+    private var editingTextID: UUID?
+    private var textSelectionAnchor: Int?
+    private var textBaseline: [TextObject] = []
+    private var textSessionChanged = false
+    private var isApplyingTextStyle = false
 
     /// Put a real editor in the box so what you type is what lands — same font,
     /// same size, same colour, positioned on the same pixels. Typing into a
     /// panel and hoping is how the classic tool got text wrong.
-    private func openTextEditor(in box: PixelRect) {
+    private func openTextEditor(in box: PixelRect, object: TextObject? = nil) {
         guard let model else { return }
-        let style = model.engine.settings.textStyle
+        var style = model.engine.settings.textStyle
+        style.colour = model.foreground
 
-        // A click rather than a drag still gets a usable box: one line tall,
-        // running to the right edge, which is what every paint app does.
+        // A click rather than a drag still gets a usable box: one line tall and
+        // a few words wide.
         //
         // Pulled back inside the canvas if the click was near an edge — a box
         // shorter than the line it holds renders nothing at all, so clicking
@@ -1178,46 +1217,39 @@ final class CanvasNSView: NSView {
         var rect = box
         if rect.width < 8 || rect.height < 8 {
             let lineHeight = TextRenderer.lineHeight(for: style)
-            let minWidth = min(model.canvas.width, Int((style.pointSize * 4).rounded()))
-            let x = min(box.minX, max(0, model.canvas.width - minWidth))
-            let y = min(box.minY, max(0, model.canvas.height - lineHeight))
-            rect = PixelRect(x: x, y: y, width: model.canvas.width - x, height: lineHeight)
+            let canvasWidth = model.engine.canvas.width
+            let minWidth = min(canvasWidth, Int((style.pointSize * 4).rounded()))
+            let x = min(box.minX, max(0, canvasWidth - minWidth))
+            let y = min(box.minY, max(0, model.engine.canvas.height - lineHeight))
+            // Not to the right edge: the box outlives the session now, and a box
+            // running off to the edge would claim every later click along its row.
+            rect = PixelRect(x: x, y: y, width: min(canvasWidth - x, max(minWidth, 240)), height: lineHeight)
         }
-        rect = rect.intersection(model.canvas.bounds)
+        rect = rect.intersection(model.engine.canvas.bounds)
         guard rect.width > 1, rect.height > 1 else { textBox = nil; return }
         textBox = rect
 
         let editor = TextEntryView(frame: .zero)
-        // The editor renders through the *same* font resolution the rasteriser
-        // uses, traits and all, so what is on screen while you type is what
-        // lands. A live editor showing an upright face and committing an italic
-        // one is worse than no preview at all.
-        var scaled = style
-        scaled.pointSize = style.pointSize * zoom
-        editor.font = scaled.makeFont() as NSFont
-        editor.textColor = NSColor(cgColor: model.foreground.cgColor) ?? .textColor
-        editor.typingAttributes[.underlineStyle] =
-            style.isUnderlined ? NSUnderlineStyle.single.rawValue : 0
-        editor.alignment = switch style.alignment {
-        case .left: .left
-        case .centre: .center
-        case .right: .right
-        }
+        editor.contentZoom = zoom
         editor.drawsBackground = false
-        editor.isRichText = false
-        // Sized last, because the frame carries the handle margin and the text
-        // container has to be configured against it. Vertically unbounded too:
-        // a container fixed at the frame height let the caret move to a second
-        // line whose text was then clipped — so Return appeared to work and
-        // everything after it was invisible, in the editor and in the committed
-        // pixels alike.
-        editor.setBoxFrame(NSRect(
-            x: Double(rect.minX) * zoom, y: Double(rect.minY) * zoom,
-            width: Double(rect.width) * zoom, height: Double(rect.height) * zoom
-        ))
+        editor.isRichText = true
+        editor.importsGraphics = false
+        editor.allowsUndo = true
+        editor.isAutomaticQuoteSubstitutionEnabled = false
+        editor.isAutomaticDashSubstitutionEnabled = false
+        editor.typingAttributes = TextContent.attributes(style, zoom: zoom)
+        if let object {
+            editor.textStorage?.setAttributedString(TextContent.attributed(object.runs, zoom: zoom))
+        }
+        setEditorFrame(editor, box: rect)
+        textBaseline = model.engine.textObjects
+        editingTextID = object?.id ?? UUID()
+        textSessionChanged = false
+        model.isEditingText = true
+        model.isOptionsExpanded = true
         editor.delegate = self
         editor.onCancel = { [weak self] in self?.cancelText() }
-        editor.onCommit = { [weak self] in self?.commitText() }
+        editor.onCommit = { [weak self] in _ = self?.commitText() }
         editor.onMove = { [weak self] delta in self?.moveTextBox(by: delta) }
         editor.onResize = { [weak self] handle, point in
             self?.resizeTextBox(handle, to: point)
@@ -1229,6 +1261,9 @@ final class CanvasNSView: NSView {
         addSubview(editor)
         textEditor = editor
         window?.makeFirstResponder(editor)
+        editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
+        syncSelectedTextStyle()
+        cachedRevision = -1
         invalidate(rect.insetBy(-handleInset))
     }
 
@@ -1239,11 +1274,11 @@ final class CanvasNSView: NSView {
     /// would fight the wrap they asked for.
     private func growTextBoxToFit() {
         guard let editor = textEditor, let box = textBox, let model else { return }
-        var style = model.engine.settings.textStyle
-        style.colour = model.foreground
-
-        let needed = TextRenderer.measure(editor.string, style: style, maxWidth: box.width)
-        let lineHeight = TextRenderer.lineHeight(for: style)
+        // The renderer's own measure of the runs, so the box is the height the
+        // text will be drawn at, mixed sizes and all.
+        let runs = TextContent.runs(editor.attributedString(), zoom: zoom)
+        let needed = runs.isEmpty ? 0 : TextRenderer.measure(runs, maxWidth: box.width).height
+        let lineHeight = TextRenderer.lineHeight(for: model.engine.settings.textStyle)
 
         // CoreText drops exactly one trailing empty line, so pressing Return at the
         // end of the text measured the same height it did before the keystroke: the
@@ -1255,7 +1290,7 @@ final class CanvasNSView: NSView {
         // measured, so counting them all made a box three times too tall after three
         // Returns — which a test caught, having been written to the wrong rule first.
         let endsOnEmptyLine = editor.string.last?.isNewline == true
-        let height = max(lineHeight, needed.height + (endsOnEmptyLine ? lineHeight : 0))
+        let height = max(lineHeight, needed + (endsOnEmptyLine ? lineHeight : 0))
         guard height != box.height else { return }
 
         let grown = PixelRect(x: box.minX, y: box.minY, width: box.width, height: height)
@@ -1272,12 +1307,14 @@ final class CanvasNSView: NSView {
     private func resizeTextBox(_ handle: PixelRect.Handle, to windowPoint: NSPoint) {
         guard let editor = textEditor, let box = textBox, let model else { return }
         let point = pixelPoint(from: convert(windowPoint, from: nil))
-        let resized = box.dragging(handle, to: point, uniform: false)
+        let constrained = PixelPoint(x: max(0, min(model.engine.canvas.width, point.x)),
+                                     y: max(0, min(model.engine.canvas.height, point.y)))
+        let resized = box.dragging(handle, to: constrained, uniform: false)
 
         // A box narrower than one character renders nothing, and a box dragged
         // off-canvas can never be typed into again.
         guard resized.width >= 8, resized.height >= 8,
-              resized.intersection(model.canvas.bounds).width > 4 else { return }
+              resized.intersection(model.engine.canvas.bounds).width > 4 else { return }
 
         let previous = box
         textBox = resized
@@ -1286,28 +1323,104 @@ final class CanvasNSView: NSView {
             width: Double(resized.width) * zoom, height: Double(resized.height) * zoom
         ))
         invalidate(previous.union(resized).insetBy(-handleInset))
-        // Rewrapping at the new width can need more or fewer lines than before.
+        // Rewrapping at the new width can need more lines than before.
         growTextBoxToFit()
+        updateLiveText()
     }
 
     /// Room around the box for its handles, in canvas pixels.
     private var handleInset: Int { max(2, Int((Self.handleScreenSize / max(zoom, 0.01)).rounded())) }
 
-    /// Rasterise the open box. Called on ⌘↩, on a click elsewhere, on a tool or
-    /// zoom change, and whenever the editor loses focus — text that vanished
-    /// because you clicked the wrong thing would be the worst kind of loss.
-    func commitText() {
-        guard let editor = textEditor, let model, let box = textBox else { return }
+    /// Finish a session as one document undo step; the box remains editable.
+    @discardableResult
+    func commitText() -> Bool {
+        guard let editor = textEditor, let model, let box = textBox, editingTextID != nil else { return true }
+        guard checkpointText() else { return false }
         textEditor = nil
         textBox = nil
-        let string = editor.string
+        editingTextID = nil
+        model.isEditingText = false
+        editor.delegate = nil
         editor.removeFromSuperview()
         if window?.firstResponder === editor { window?.makeFirstResponder(self) }
+        textBaseline = []
+        cachedRevision = -1
+        invalidate(box.insetBy(-handleInset))
+        return true
+    }
 
-        var style = model.engine.settings.textStyle
-        style.colour = model.foreground
-        commit(model.engine.drawText(string, in: box, style: style))
-        invalidate(box.insetBy(-2))
+    /// Save/autosave checkpoints the current text without interrupting typing.
+    /// Rebase cancellation at the saved state and record one document undo step.
+    @discardableResult
+    func checkpointText() -> Bool {
+        guard textEditor != nil, let model else { return true }
+        guard updateLiveText(markChanged: false) else {
+            model.present(message: "This text box can't be saved yet",
+                          recovery: "Reduce its length, size, or formatting, or split it into smaller boxes. Your text is still open for editing.")
+            return false
+        }
+        if textSessionChanged { model.onTextDraftChanged?(false); textSessionChanged = false }
+        let dirty = model.engine.recordTextEdit(from: textBaseline)
+        textBaseline = model.engine.textObjects
+        commit(dirty)
+        return true
+    }
+
+    private func setEditorFrame(_ editor: TextEntryView, box: PixelRect) {
+        editor.setBoxFrame(NSRect(x: Double(box.minX) * zoom, y: Double(box.minY) * zoom,
+                                 width: Double(box.width) * zoom, height: Double(box.height) * zoom))
+    }
+
+    @discardableResult
+    private func updateLiveText(markChanged: Bool = true) -> Bool {
+        guard let editor = textEditor, let model, let box = textBox, let id = editingTextID else { return true }
+        let runs = TextContent.runs(editor.attributedString(), zoom: zoom)
+        let object = TextObject(id: id, frame: box, runs: runs)
+        guard editor.string.isEmpty || object.isValid else {
+            if markChanged, !textSessionChanged {
+                textSessionChanged = true
+                model.onTextDraftChanged?(true)
+            }
+            return false
+        }
+        let dirty: PixelRect
+        if editor.string.isEmpty {
+            dirty = model.engine.removeTextObject(id: id, registerUndo: false)
+        } else {
+            dirty = model.engine.upsertTextObject(object, registerUndo: false)
+        }
+        model.noteVisualChange(dirty)
+        if markChanged, !textSessionChanged, !dirty.isEmpty {
+            textSessionChanged = true
+            model.onTextDraftChanged?(true)
+        }
+        cachedRevision = -1
+        invalidate(dirty.insetBy(-handleInset))
+        return true
+    }
+
+    private func syncSelectedTextStyle() {
+        guard !isApplyingTextStyle, let editor = textEditor, let model else { return }
+        let range = editor.selectedRange()
+        let attributes = range.length > 0 && range.location < editor.attributedString().length
+            ? editor.attributedString().attributes(at: range.location, effectiveRange: nil)
+            : editor.typingAttributes
+        model.syncTextStyle(TextContent.style(attributes, zoom: zoom))
+    }
+
+    private func applyTextStyle(_ change: EditorModel.TextStyleChange) {
+        guard let editor = textEditor, let model, !isApplyingTextStyle else { return }
+        isApplyingTextStyle = true
+        defer { isApplyingTextStyle = false }
+        editor.applyStyle(model.engine.settings.textStyle, change: change, zoom: zoom)
+        growTextBoxToFit()
+        updateLiveText()
+        // Formatting buttons may own focus briefly, but the selection survives.
+        // Return it after their event so the next keystroke reaches the editor.
+        DispatchQueue.main.async { [weak self, weak editor] in
+            guard let self, let editor, self.textEditor === editor else { return }
+            self.window?.makeFirstResponder(editor)
+        }
     }
 
     /// Drag the box around while it is still being typed into.
@@ -1317,13 +1430,14 @@ final class CanvasNSView: NSView {
     private func moveTextBox(by delta: NSPoint) {
         guard let editor = textEditor, let box = textBox, let model else { return }
         let moved = PixelRect(
-            x: box.minX + Int((delta.x / zoom).rounded()),
-            y: box.minY + Int((delta.y / zoom).rounded()),
+            x: max(0, min(model.engine.canvas.width - 8, box.minX + Int((delta.x / zoom).rounded()))),
+            y: max(0, min(model.engine.canvas.height - 8, box.minY + Int((delta.y / zoom).rounded()))),
             width: box.width, height: box.height
         )
         // Kept reachable: a box dragged entirely off-canvas could never be
         // typed into again.
-        guard moved.intersection(model.canvas.bounds).width > 4 else { return }
+        guard moved.intersection(model.engine.canvas.bounds).width > 4,
+              moved.intersection(model.engine.canvas.bounds).height > 4 else { return }
         let previous = box
         textBox = moved
         editor.setBoxFrame(NSRect(
@@ -1334,6 +1448,7 @@ final class CanvasNSView: NSView {
         // and the handles are drawn by the canvas and stayed where they were, so
         // dragging the box looked like dragging the text and caret out of it.
         invalidate(previous.union(moved).insetBy(-handleInset))
+        updateLiveText()
     }
 
     /// Escape: throw the box away without marking the canvas.
@@ -1342,14 +1457,24 @@ final class CanvasNSView: NSView {
         let box = textBox
         textEditor = nil
         textBox = nil
+        editingTextID = nil
+        editor.delegate = nil
         editor.removeFromSuperview()
+        if let model {
+            if textSessionChanged { model.onTextDraftChanged?(false); textSessionChanged = false }
+            let dirty = model.engine.restoreTextObjects(textBaseline)
+            model.noteVisualChange(dirty)
+            model.isEditingText = false
+        }
+        textBaseline = []
+        cachedRevision = -1
         window?.makeFirstResponder(self)
-        if let box { invalidate(box.insetBy(-2)) }
+        if let box { invalidate(box.insetBy(-handleInset)) }
     }
 
     /// Switching tools lands an open box rather than dropping it.
     func commitText(unless tool: ToolKind) {
-        if tool != .text { commitText() }
+        if tool != .text, !commitText() { model?.tool = .text }
     }
 
     // MARK: - Hover read-out
@@ -1908,15 +2033,18 @@ final class CanvasNSView: NSView {
 }
 
 extension CanvasNSView: NSTextViewDelegate {
-    /// Losing focus lands the text — clicking the chrome must not silently
-    /// discard what was typed.
-    func textDidEndEditing(_ notification: Notification) {
-        commitText()
-    }
+    /// Formatting controls may take focus without ending the text session.
+    func textDidEndEditing(_ notification: Notification) {}
 
     /// Every keystroke can change how many lines the text needs.
     func textDidChange(_ notification: Notification) {
         growTextBoxToFit()
+        updateLiveText()
+        syncSelectedTextStyle()
+    }
+
+    func textViewDidChangeSelection(_ notification: Notification) {
+        syncSelectedTextStyle()
     }
 }
 
@@ -1927,6 +2055,44 @@ extension CanvasNSView: NSTextViewDelegate {
 /// else — selection, editing, dictation, the emoji palette — comes for free by
 /// using the real text view rather than drawing a fake caret.
 final class TextEntryView: NSTextView {
+    // Own the TextKit 1 graph explicitly. Layout uses NSLayoutManager, and a
+    // delayed TextKit migration can outlive a removed in-canvas editor.
+    private let ownedTextStorage = NSTextStorage()
+
+    override init(frame frameRect: NSRect) {
+        let manager = NSLayoutManager()
+        let container = NSTextContainer(size: frameRect.size)
+        ownedTextStorage.addLayoutManager(manager)
+        manager.addTextContainer(container)
+        super.init(frame: frameRect, textContainer: container)
+    }
+
+    required init?(coder: NSCoder) { super.init(coder: coder) }
+
+    private let textUndoManager = UndoManager()
+    override var undoManager: UndoManager? { textUndoManager }
+    var contentZoom: Double = 1
+
+    // Explicit responder actions keep the Edit menu's undo/redo in this native
+    // typing session instead of reaching the document's canvas undo commands.
+    @objc func undo(_ sender: Any?) { textUndoManager.undo() }
+    @objc func redo(_ sender: Any?) { textUndoManager.redo() }
+
+    override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        switch menuItem.action {
+        case #selector(undo(_:)): textUndoManager.canUndo
+        case #selector(redo(_:)): textUndoManager.canRedo
+        default: super.validateMenuItem(menuItem)
+        }
+    }
+
+    private enum BoxDrag {
+        case resize(PixelRect.Handle)
+        case move(NSPoint)
+    }
+    private var boxDrag: BoxDrag?
+    private var didDragBox = false
+
     var onCancel: (() -> Void)?
     var onCommit: (() -> Void)?
     var onMove: ((NSPoint) -> Void)?
@@ -1935,6 +2101,137 @@ final class TextEntryView: NSTextView {
     /// Grab radius in this view's own points, supplied by the canvas so it
     /// tracks zoom the same way the floating selection's does.
     var handleTolerance: (() -> CGFloat)?
+
+    func applyStyle(_ style: TextRenderer.Style, change: EditorModel.TextStyleChange, zoom: Double) {
+        breakUndoCoalescing()
+        let selection = selectedRange()
+        let before = NSAttributedString(attributedString: attributedString())
+        let oldTyping = typingAttributes
+        var range = selection
+        if change == .alignment, let storage = textStorage, storage.length > 0 {
+            range = (storage.string as NSString).paragraphRange(for: selection)
+        }
+        if range.length > 0 {
+            textUndoManager.beginUndoGrouping()
+            textUndoManager.registerUndo(withTarget: self) { view in
+                MainActor.assumeIsolated { view.restoreFormatting(before, typing: oldTyping, selection: selection) }
+            }
+            textUndoManager.setActionName("Text format")
+            textUndoManager.endUndoGrouping()
+            textStorage?.beginEditing()
+            before.enumerateAttributes(in: range) { attributes, span, _ in
+                let updated = changedAttributes(attributes, style: style, change: change, zoom: zoom)
+                textStorage?.setAttributes(updated, range: span)
+            }
+            textStorage?.endEditing()
+            setSelectedRange(selection)
+        }
+        typingAttributes = changedAttributes(typingAttributes, style: style, change: change, zoom: zoom)
+        didChangeText()
+    }
+
+    private func changedAttributes(_ attributes: [NSAttributedString.Key: Any], style: TextRenderer.Style,
+                                   change: EditorModel.TextStyleChange, zoom: Double) -> [NSAttributedString.Key: Any] {
+        var current = TextContent.style(attributes, zoom: zoom)
+        switch change {
+        case .font: current.fontName = style.fontName
+        case .size: current.pointSize = style.pointSize
+        case .bold: current.isBold = style.isBold
+        case .italic: current.isItalic = style.isItalic
+        case .underline: current.isUnderlined = style.isUnderlined
+        case .alignment: current.alignment = style.alignment
+        case .colour: current.colour = style.colour
+        }
+        var updated = attributes
+        updated.merge(TextContent.attributes(current, zoom: zoom)) { _, new in new }
+        return updated
+    }
+
+    private func restoreFormatting(_ text: NSAttributedString, typing: [NSAttributedString.Key: Any], selection: NSRange) {
+        let inverse = NSAttributedString(attributedString: attributedString())
+        let inverseTyping = typingAttributes
+        let inverseSelection = selectedRange()
+        textUndoManager.registerUndo(withTarget: self) { view in
+            MainActor.assumeIsolated { view.restoreFormatting(inverse, typing: inverseTyping, selection: inverseSelection) }
+        }
+        textStorage?.setAttributedString(text)
+        setSelectedRange(selection)
+        typingAttributes = typing
+        didChangeText()
+    }
+
+    override func readSelection(from pasteboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        let replaced = selectedRange()
+        let previousLength = attributedString().length
+        guard super.readSelection(from: pasteboard, type: type) else { return false }
+        let inserted = NSRange(location: replaced.location,
+                               length: attributedString().length - previousLength + replaced.length)
+        let rich = [NSPasteboard.PasteboardType.rtf, .rtfd, .html].contains(type)
+        normalizeImportedText(in: inserted, sourceZoom: rich ? 1 : contentZoom)
+        return true
+    }
+
+    override func writeSelection(to pasteboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        let format: NSAttributedString.DocumentType
+        switch type {
+        case .rtf: format = .rtf
+        case .rtfd: format = .rtfd
+        case .html: format = .html
+        default: return super.writeSelection(to: pasteboard, type: type)
+        }
+        let selected = attributedString().attributedSubstring(from: selectedRange())
+        let runs = TextContent.runs(selected, zoom: contentZoom)
+        let unscaled = TextContent.attributed(runs, zoom: 1)
+        guard let data = try? unscaled.data(from: NSRange(location: 0, length: unscaled.length),
+                                            documentAttributes: [.documentType: format]) else { return false }
+        return pasteboard.setData(data, forType: type)
+    }
+
+    override func changeFont(_ sender: Any?) {
+        guard let manager = sender as? NSFontManager else { super.changeFont(sender); return }
+        breakUndoCoalescing()
+        let selection = selectedRange()
+        let before = NSAttributedString(attributedString: attributedString())
+        let oldTyping = typingAttributes
+        func converted(_ attributes: [NSAttributedString.Key: Any]) -> [NSAttributedString.Key: Any] {
+            let documentStyle = TextContent.style(attributes, zoom: contentZoom)
+            var documentAttributes = attributes
+            documentAttributes[.font] = manager.convert(documentStyle.makeFont() as NSFont)
+            var updated = attributes
+            updated.merge(TextContent.attributes(TextContent.style(documentAttributes, zoom: 1), zoom: contentZoom)) { _, new in new }
+            return updated
+        }
+        if selection.length > 0 {
+            textUndoManager.beginUndoGrouping()
+            textUndoManager.registerUndo(withTarget: self) { view in
+                MainActor.assumeIsolated { view.restoreFormatting(before, typing: oldTyping, selection: selection) }
+            }
+            textUndoManager.setActionName("Text font")
+            textUndoManager.endUndoGrouping()
+            textStorage?.beginEditing()
+            before.enumerateAttributes(in: selection) { attributes, range, _ in
+                textStorage?.setAttributes(converted(attributes), range: range)
+            }
+            textStorage?.endEditing()
+            setSelectedRange(selection)
+        }
+        typingAttributes = converted(typingAttributes)
+        didChangeText()
+    }
+
+    /// AppKit-created NSFonts can use different line metrics from their
+    /// equivalent Core Text fonts. Canonicalize at import/Font-panel boundaries
+    /// so the native preview, saved text, and export agree; leave typing/IME alone.
+    private func normalizeImportedText(in range: NSRange, sourceZoom: Double) {
+        let selection = selectedRange()
+        let typing = TextContent.style(typingAttributes, zoom: sourceZoom)
+        let imported = attributedString().attributedSubstring(from: range)
+        let runs = TextContent.runs(imported, zoom: sourceZoom)
+        textStorage?.replaceCharacters(in: range, with: TextContent.attributed(runs, zoom: contentZoom))
+        setSelectedRange(selection)
+        typingAttributes = TextContent.attributes(typing, zoom: contentZoom)
+        didChangeText()
+    }
 
     override func cancelOperation(_ sender: Any?) { onCancel?() }
 
@@ -1975,7 +2272,7 @@ final class TextEntryView: NSTextView {
         // than where the enlarged view is.
         textContainerInset = NSSize(width: handleMargin, height: handleMargin)
         textContainer?.lineFragmentPadding = 0
-        textContainer?.widthTracksTextView = true
+        textContainer?.widthTracksTextView = false
         textContainer?.containerSize = NSSize(
             width: max(1, boxBounds.width), height: .greatestFiniteMagnitude
         )
@@ -1993,6 +2290,13 @@ final class TextEntryView: NSTextView {
         return layoutManager.usedRect(for: textContainer).height
     }
 
+    func characterIndex(at windowPoint: NSPoint) -> Int {
+        guard let layoutManager, let textContainer else { return string.utf16.count }
+        let local = convert(windowPoint, from: nil)
+        let point = NSPoint(x: local.x - textContainerInset.width, y: local.y - textContainerInset.height)
+        return min(string.utf16.count, layoutManager.characterIndex(for: point, in: textContainer, fractionOfDistanceBetweenInsertionPoints: nil))
+    }
+
     /// A handle drag, a ⌘-drag to move, or ordinary text selection.
     ///
     /// The handles are hit-tested **here** rather than on the canvas because
@@ -2001,11 +2305,19 @@ final class TextEntryView: NSTextView {
     /// floating selection resolve a grab through the same
     /// `PixelRect.handle(at:tolerance:)` — one tolerance, one tie-break, one
     /// set of edge-crossing rules.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // NSTextView excludes the inset outside its text container. That inset
+        // carries our handles, so explicitly keep those clicks in the editor.
+        if !isHidden, isOnBorder(convert(point, from: superview)) { return self }
+        return super.hitTest(point)
+    }
+
     override func mouseDown(with event: NSEvent) {
         let local = convert(event.locationInWindow, from: nil)
+        didDragBox = false
 
         if let handle = handle(at: local) {
-            track(event) { [weak self] point in self?.onResize?(handle, point) }
+            boxDrag = .resize(handle)
             return
         }
 
@@ -2017,11 +2329,7 @@ final class TextEntryView: NSTextView {
         // border is the only region that can carry it: the interior has to keep
         // meaning "select text", or the box stops being a text field.
         if isOnBorder(local) || event.modifierFlags.contains(.command) {
-            var last = event.locationInWindow
-            track(event) { [weak self] point in
-                self?.onMove?(NSPoint(x: point.x - last.x, y: last.y - point.y))
-                last = point
-            }
+            boxDrag = .move(event.locationInWindow)
             return
         }
 
@@ -2029,23 +2337,28 @@ final class TextEntryView: NSTextView {
     }
 
     /// Whether a point is in the draggable frame around the editable area.
-    private func isOnBorder(_ point: NSPoint) -> Bool {
-        let inner = boxBounds.insetBy(dx: handleMargin, dy: handleMargin)
-        // An inset that has eaten the whole box would make every click a drag
-        // and leave no way to type into a short one.
-        guard inner.width > 4, inner.height > 4 else { return false }
-        return bounds.contains(point) && !inner.contains(point)
+    func isOnBorder(_ point: NSPoint) -> Bool {
+        // Only the outer margin moves the box. Letters near an edge still
+        // receive caret and selection gestures.
+        return bounds.contains(point) && !boxBounds.contains(point)
     }
 
-    /// Follow a drag to its mouse-up, reporting each position in window space.
-    ///
-    /// Tracked here rather than through the responder chain: the text view
-    /// would otherwise be selecting text with the same gesture.
-    private func track(_ event: NSEvent, _ step: (NSPoint) -> Void) {
-        while let next = window?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
-            if next.type == .leftMouseUp { break }
-            step(next.locationInWindow)
+    override func mouseDragged(with event: NSEvent) {
+        if boxDrag != nil { didDragBox = true }
+        switch boxDrag {
+        case .resize(let handle): onResize?(handle, event.locationInWindow)
+        case .move(let last):
+            let point = event.locationInWindow
+            onMove?(NSPoint(x: point.x - last.x, y: last.y - point.y))
+            boxDrag = .move(point)
+        case nil: super.mouseDragged(with: event)
         }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard boxDrag != nil else { super.mouseUp(with: event); return }
+        if didDragBox { mouseDragged(with: event) }
+        boxDrag = nil
     }
 
     /// The handle under a point in this view's coordinates.
@@ -2053,7 +2366,8 @@ final class TextEntryView: NSTextView {
     /// The box's own geometry is its bounds, so the shared rectangle model is
     /// asked in points and the answer is in the same handle vocabulary the
     /// canvas already draws and picks cursors for.
-    private func handle(at point: NSPoint) -> PixelRect.Handle? {
+    func handle(at point: NSPoint) -> PixelRect.Handle? {
+        guard isOnBorder(point) else { return nil }
         let box = boxBounds
         let rect = PixelRect(
             x: 0, y: 0,
@@ -2080,7 +2394,7 @@ final class TextEntryView: NSTextView {
         let box = boxBounds
 
         // I-beam only where you can actually type.
-        let typing = box.insetBy(dx: handleMargin, dy: handleMargin)
+        let typing = box
         if typing.width > 4, typing.height > 4 {
             addCursorRect(typing, cursor: .iBeam)
         }
@@ -2088,15 +2402,15 @@ final class TextEntryView: NSTextView {
         // The draggable frame: everything from the view's edge in to the typing
         // area, as four strips because a cursor rect cannot have a hole.
         let frameStrips = [
-            NSRect(x: 0, y: 0, width: bounds.width, height: box.minY + handleMargin),
+            NSRect(x: 0, y: 0, width: bounds.width, height: box.minY),
             NSRect(
-                x: 0, y: box.maxY - handleMargin,
-                width: bounds.width, height: bounds.maxY - box.maxY + handleMargin
+                x: 0, y: box.maxY,
+                width: bounds.width, height: bounds.maxY - box.maxY
             ),
-            NSRect(x: 0, y: 0, width: box.minX + handleMargin, height: bounds.height),
+            NSRect(x: 0, y: 0, width: box.minX, height: bounds.height),
             NSRect(
-                x: box.maxX - handleMargin, y: 0,
-                width: bounds.maxX - box.maxX + handleMargin, height: bounds.height
+                x: box.maxX, y: 0,
+                width: bounds.maxX - box.maxX, height: bounds.height
             ),
         ]
         for strip in frameStrips {
@@ -2117,8 +2431,22 @@ final class TextEntryView: NSTextView {
                 width: handleMargin * 2, height: handleMargin * 2
             ).intersection(bounds)
             guard !spot.isEmpty else { continue }
-            addCursorRect(spot, cursor: CanvasNSView.cursor(for: handle))
+            for strip in frameStrips {
+                let outside = spot.intersection(strip)
+                if !outside.isEmpty { addCursorRect(outside, cursor: CanvasNSView.cursor(for: handle)) }
+            }
         }
+    }
+
+    override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        if let replacementString {
+            let current = string as NSString
+            guard affectedCharRange.location <= current.length,
+                  affectedCharRange.length <= current.length - affectedCharRange.location else { return false }
+            let result = current.replacingCharacters(in: affectedCharRange, with: replacementString)
+            guard result.utf8.count <= 64 * 1024 else { NSSound.beep(); return false }
+        }
+        return super.shouldChangeText(in: affectedCharRange, replacementString: replacementString)
     }
 
     override func keyDown(with event: NSEvent) {

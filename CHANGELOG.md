@@ -8,6 +8,16 @@ version may still carry breaking changes to the document format.
 ## [Unreleased]
 
 ### Added
+- **Text stays editable after it lands.** Click a text box with the Text tool, or
+  double-click it with any tool, and it opens again with the caret where you
+  clicked. Highlight a word to retype it or give it its own font, size, colour,
+  bold, italic or underline; `⌘T` brings up the Fonts panel. Save, autosave and
+  zoom leave the box open while you type. An `.itspaint` file keeps the boxes
+  editable and still carries a flattened PNG any image tool can open; every image
+  format and export flattens them. Painting over a box turns that box into
+  pixels and leaves the others editable, and Undo brings it back. Remove Background, Instant Alpha and the eyedropper see the
+  text the way you do, and a paste dragged off the top-left moves the boxes with
+  the picture.
 - **PaintKit declares iOS 15.** It has no AppKit and always built for iOS; now the
   manifest says so and CI runs the engine's tests on an iPhone simulator. The
   app is still Mac-only.

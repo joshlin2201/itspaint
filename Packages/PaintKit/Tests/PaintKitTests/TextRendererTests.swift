@@ -27,6 +27,13 @@ struct TextRendererTests {
         return count
     }
 
+    private func leftmostInk(_ bitmap: Bitmap, rows: Range<Int>) -> Int? {
+        let white = PaintColour.white.rgba8
+        return (0..<bitmap.width).first { x in
+            rows.contains { y in bitmap.pixel(at: PixelPoint(x: x, y: y)) != white }
+        }
+    }
+
     @Test("A box too short for the text loses the lines that do not fit")
     func shortBoxClipsLaterLines() {
         let style = TextRenderer.Style(pointSize: 20, colour: .black)
@@ -53,7 +60,7 @@ struct TextRendererTests {
 
         // This is exactly what the editor now does on every keystroke.
         let needed = TextRenderer.measure(text, style: style, maxWidth: width)
-        let grown = PixelRect(x: 10, y: 10, width: width, height: needed.height + 8)
+        let grown = PixelRect(x: 10, y: 10, width: width, height: needed.height)
 
         var one = canvas()
         TextRenderer.draw("First", in: grown, style: style, into: &one)
@@ -71,6 +78,51 @@ struct TextRendererTests {
         let one = TextRenderer.measure("First", style: style, maxWidth: 300)
         let three = TextRenderer.measure("First\nSecond\nThird", style: style, maxWidth: 300)
         #expect(three.height > one.height * 2)
+    }
+
+    @Test("Helvetica multiline measurement uses native 36px line fragments")
+    func nativeMultilineMetrics() {
+        let style = TextRenderer.Style(fontName: "Helvetica", pointSize: 36)
+        let measured = TextRenderer.measure("Edit\nme\nlive", style: style, maxWidth: 240)
+
+        // NSTextView's line fragments are 36px with baselines at 28, 64, and
+        // 100. CTFrameDraw instead adds its paragraph spacing (43px), which
+        // made the committed artwork descend seven pixels per line.
+        #expect(measured.height == 108)
+    }
+
+    @Test("An exact measured box draws its single or final line")
+    func exactMeasuredHeightKeepsFinalLine() {
+        let style = TextRenderer.Style(fontName: "Helvetica", pointSize: 36)
+        for text in ["Edit", "Edit\nme\nlive"] {
+            let measured = TextRenderer.measure(text, style: style, maxWidth: 240)
+            var bitmap = canvas()
+            let frame = PixelRect(x: 10, y: 10, width: 240, height: measured.height)
+            TextRenderer.draw(text, in: frame, style: style, into: &bitmap)
+            #expect(leftmostInk(bitmap, rows: (frame.maxY - 36)..<frame.maxY) != nil,
+                    "the final measured line was clipped")
+        }
+    }
+
+    @Test("Styled paragraphs keep their own left centre and right alignment")
+    func perParagraphAlignment() {
+        let left = TextRenderer.Style(pointSize: 20, alignment: .left)
+        let centre = TextRenderer.Style(pointSize: 20, alignment: .centre)
+        let right = TextRenderer.Style(pointSize: 20, alignment: .right)
+        let runs = [
+            TextRun(text: "L\n", style: left),
+            TextRun(text: "C\n", style: centre),
+            TextRun(text: "R", style: right),
+        ]
+        var bitmap = canvas()
+        TextRenderer.draw(runs, in: PixelRect(x: 10, y: 10, width: 180, height: 70), into: &bitmap)
+
+        let first = try! #require(leftmostInk(bitmap, rows: 10..<30))
+        let second = try! #require(leftmostInk(bitmap, rows: 30..<50))
+        let third = try! #require(leftmostInk(bitmap, rows: 50..<70))
+        #expect(first < 30)
+        #expect(second > 80 && second < 120)
+        #expect(third > 160)
     }
 
     @Test("A narrow box wraps rather than truncating")

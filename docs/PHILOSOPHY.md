@@ -77,8 +77,9 @@ export.
 
 The same rule elsewhere:
 
-- **Text rasterises on commit.** A document format carrying live text that the
-  PNG export silently flattens is a lie about what you saved.
+- **Text stays editable in `.itspaint`.** Image exports flatten it, as their
+  formats require. Painting over a box and whole-image transforms turn affected
+  text into pixels; Undo restores the editable original.
 - **Autosave-in-place is scoped to `.itspaint` documents only.** An imported PNG
   is *your* file; re-encoding it in the background is data loss waiting to
   happen.

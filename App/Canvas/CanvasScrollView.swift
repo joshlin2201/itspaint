@@ -80,8 +80,8 @@ struct CanvasScrollView: NSViewRepresentable {
         guard viewport.width > 120, viewport.height > 120 else { return }
 
         let scale = min(
-            viewport.width / Double(model.canvas.width),
-            viewport.height / Double(model.canvas.height)
+            viewport.width / Double(model.engine.canvas.width),
+            viewport.height / Double(model.engine.canvas.height)
         )
         // A hair under, so rounding never leaves a one-pixel overflow that
         // brings a scroller back.

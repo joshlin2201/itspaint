@@ -146,7 +146,7 @@ struct ToolOptions: View {
         // all. A hint is exactly the right size for a fact that changes under you.
         case .eraser:
             model.background.alpha == 0 ? "Rubs through to nothing" : "Rubs back to Colour 2"
-        case .text: "⌘↩ places it"
+        case .text: "Click text to edit · ⌘↩ finishes"
         case .eyedropper: "⌥ from any tool"
         case .select where model.selectionKind == .lasso: "Closes itself"
         case .select where model.selectionKind == .instantAlpha: "⇧ add · ⌥ subtract"

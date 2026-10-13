@@ -156,6 +156,7 @@ extension DrawingDocument {
     /// The file goes to a temporary directory the sandbox already grants, and
     /// the system copies it into whichever service the user picks.
     @IBAction func shareImage(_ sender: Any?) {
+        guard model.finishTextEditing() else { return }
         guard let window = windowControllers.first?.window,
               let view = window.contentView
         else { return }
@@ -245,6 +246,7 @@ extension DrawingDocument {
             return model.canPaste
 
         case #selector(selectShapeFromMenu(_:)):
+            if model.isEditingText { return false }
             menuItem.state = (menuItem.representedObject as? String) == model.shapeKind.rawValue ? .on : .off
             return true
 
@@ -253,13 +255,18 @@ extension DrawingDocument {
             return true
 
         case #selector(selectToolFromMenu(_:)):
+            // Unmodified tool letters must reach the native text editor.
+            if model.isEditingText { return false }
             // Tick the active tool, so the menu is also where you check which
             // of thirteen unlabelled glyphs is currently armed.
             menuItem.state = (menuItem.representedObject as? String) == model.tool.rawValue ? .on : .off
             return true
 
+        case #selector(swapColours(_:)):
+            return !model.isEditingText
+
         case #selector(increaseBrush(_:)), #selector(decreaseBrush(_:)):
-            return model.tool.usesBrushSize
+            return model.tool.usesBrushSize && !model.isEditingText
 
         // Ticked when armed, whichever tool is in hand — pressing ⌘B with the
         // brush selected arms bold text, so the menu has to say so.
