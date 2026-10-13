@@ -7,6 +7,8 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+## [0.24.0] — 2026-10-13
+
 ### Added
 - **Text stays editable after it lands.** Click a text box with the Text tool, or
   double-click it with the Select tool, and it opens again with the caret where
@@ -1090,7 +1092,9 @@ First public beta.
   one would be a dependency this app does not have. AVIF covers the same need.
 - Text is pixels once committed; re-editing means undo and retype.
 
-[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/joshlin2201/itspaint/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/joshlin2201/itspaint/compare/v0.23.0...v0.24.0
+[0.23.0]: https://github.com/joshlin2201/itspaint/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/joshlin2201/itspaint/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/joshlin2201/itspaint/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/joshlin2201/itspaint/compare/v0.19.0...v0.20.0

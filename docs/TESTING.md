@@ -33,9 +33,9 @@ again before it will build a tag.
 
 | Suite | Where | Covers |
 |---|---|---|
-| **Engine** (358) | `Packages/PaintKit/Tests/PaintKitTests/` | pixels, tools, selection, undo, codecs, transforms |
+| **Engine** (377) | `Packages/PaintKit/Tests/PaintKitTests/` | pixels, tools, selection, undo, codecs, transforms |
 | **Throughput** (9 of the engine tests; budgets in release) | `PerformanceTests.swift` | stamp / stroke / fill / preview / encode budgets |
-| **App** (195) | `AppTests/` | the model, the document, the menus, and what the canvas actually *draws* |
+| **App** (211) | `AppTests/` | the model, the document, the menus, and what the canvas actually *draws* |
 
 Most coverage belongs in the **engine** suite: it needs no window, no app host
 and no main actor, and it runs in milliseconds. Only reach for the app suite when
