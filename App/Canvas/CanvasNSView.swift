@@ -1028,8 +1028,12 @@ final class CanvasNSView: NSView {
 
         // Left button only: right-drag means "paint the background colour",
         // and a text box on the right button would be a second, secret binding.
-        if button == .primary,
-           (model.tool == .text || (NSApp.currentEvent?.clickCount ?? 1) > 1),
+        // `clickCount` raises on anything but a mouse event, as the polygon's
+        // double-click below already knows, so only a press is asked.
+        let isDoubleClick = NSApp.currentEvent.map {
+            [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains($0.type) && $0.clickCount > 1
+        } ?? false
+        if button == .primary, model.tool == .text || isDoubleClick,
            let object = model.engine.textObjects.last(where: { $0.frame.contains(point) }) {
             model.tool = .text
             model.isOptionsExpanded = true

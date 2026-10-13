@@ -9,8 +9,8 @@ version may still carry breaking changes to the document format.
 
 ### Added
 - **Text stays editable after it lands.** Click a text box with the Text tool, or
-  double-click it with any tool, and it opens again with the caret where you
-  clicked. Highlight a word to retype it or give it its own font, size, colour,
+  double-click it with the Select tool, and it opens again with the caret where
+  you clicked. Highlight a word to retype it or give it its own font, size, colour,
   bold, italic or underline; `⌘T` brings up the Fonts panel. Save, autosave and
   zoom leave the box open while you type. An `.itspaint` file keeps the boxes
   editable and still carries a flattened PNG any image tool can open; every image

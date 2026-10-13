@@ -177,6 +177,46 @@ struct RetainedTextTests {
         #expect(engine.canvas.pixels.allSatisfy { $0 == .white })
     }
 
+    @Test("Loading a document while a curve's chord is pending keeps the loaded text")
+    func resetForgetsPendingChordText() {
+        let engine = PaintEngine(canvas: Bitmap(width: 200, height: 80, fill: .white))
+        _ = engine.upsertTextObject(object("Old"), registerUndo: false)
+        engine.settings.tool = .shape
+        engine.settings.shapeKind = .curve
+        _ = engine.beginStroke(at: PixelPoint(x: 150, y: 10))
+        _ = engine.endStroke(at: PixelPoint(x: 190, y: 70))
+
+        let loaded = object("Loaded")
+        engine.reset(to: Bitmap(width: 200, height: 80, fill: .white), textObjects: [loaded])
+        engine.settings.tool = .pencil
+        _ = engine.beginStroke(at: PixelPoint(x: 12, y: 20))
+        _ = engine.endStroke(at: PixelPoint(x: 12, y: 20))
+
+        // The stroke overlaps the loaded box, so it bakes; Undo has to bring
+        // back the loaded box, not the one from before the reset.
+        #expect(engine.textObjects.isEmpty)
+        engine.undo()
+        #expect(engine.textObjects == [loaded])
+    }
+
+    @Test("Adding text while a chord is pending keeps the new box")
+    func upsertLandsPendingChord() {
+        let engine = PaintEngine(canvas: Bitmap(width: 200, height: 80, fill: .white))
+        _ = engine.upsertTextObject(object("A"), registerUndo: false)
+        engine.settings.tool = .shape
+        engine.settings.shapeKind = .curve
+        _ = engine.beginStroke(at: PixelPoint(x: 150, y: 10))
+        _ = engine.endStroke(at: PixelPoint(x: 190, y: 70))
+
+        let added = TextObject(
+            frame: PixelRect(x: 140, y: 40, width: 50, height: 30),
+            runs: [TextRun(text: "B", style: .init(pointSize: 18))]
+        )
+        _ = engine.upsertTextObject(added, registerUndo: false)
+        _ = engine.commitPendingShape()
+        #expect(engine.textObjects.contains(added))
+    }
+
     @Test("Placing a paste off the top-left moves text boxes with the artwork")
     func growingCanvasMovesText() {
         let engine = PaintEngine(canvas: Bitmap(width: 160, height: 70, fill: .white))

@@ -197,27 +197,31 @@ public final class PaintEngine {
     @discardableResult
     public func upsertTextObject(_ object: TextObject, registerUndo: Bool = true) -> PixelRect {
         guard object.isValid else { return .empty }
+        // A chord waiting to be bent holds the text list it baked, and settling it
+        // later would put that list back over this edit. Land it first.
+        let landed = commitPendingShape()
         let before = textObjects
         if let index = textObjects.firstIndex(where: { $0.id == object.id }) {
             let old = textObjects[index]
-            guard old != object else { return .empty }
+            guard old != object else { return landed }
             textObjects[index] = object
             let dirty = old.frame.union(object.frame)
             if registerUndo { recordTextEdit(from: before, actionName: "Text") }
-            return dirty
+            return landed.union(dirty)
         }
         textObjects.append(object)
         if registerUndo { recordTextEdit(from: before, actionName: "Text") }
-        return object.frame
+        return landed.union(object.frame)
     }
 
     @discardableResult
     public func removeTextObject(id: UUID, registerUndo: Bool = true) -> PixelRect {
-        guard let index = textObjects.firstIndex(where: { $0.id == id }) else { return .empty }
+        let landed = commitPendingShape()  // As in `upsertTextObject`.
+        guard let index = textObjects.firstIndex(where: { $0.id == id }) else { return landed }
         let before = textObjects
         let removed = textObjects.remove(at: index)
         if registerUndo { recordTextEdit(from: before, actionName: "Delete text") }
-        return removed.frame
+        return landed.union(removed.frame)
     }
 
     /// Restore an editor's captured baseline without creating history. Used by
@@ -1628,6 +1632,11 @@ public final class PaintEngine {
         // are both gone; drawing its preview again would paint the old image back.
         pendingCurve = nil
         pendingPolygon = nil
+        // Likewise the text a pending chord baked: settled against the new
+        // document, it would swap the old boxes in for the ones just loaded.
+        gestureTextBefore = nil
+        gestureTextDirty = .empty
+        gestureBaseCanvas = nil
         undoStack.removeAll()
         selection = nil
         lassoPath = []

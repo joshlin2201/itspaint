@@ -230,10 +230,10 @@ change has to prove before it lands.
 Thirteen rail buttons. Variants live inside their tool, so the fifteen shapes sit behind
 Shape, four nibs behind Brush and four modes behind Select.
 
-Text stays editable. Click a text box with the Text tool, or double-click it with any
-tool, and it opens again with the caret where you clicked. Highlight a word to retype it
-or give it its own font, size, colour, bold, italic or underline. `⌘↩` finishes, and
-`Esc` drops whatever you changed since you opened it or last saved.
+Text stays editable. Click a text box with the Text tool, or double-click it with the
+Select tool, and it opens again with the caret where you clicked. Highlight a word to
+retype it or give it its own font, size, colour, bold, italic or underline. `⌘↩`
+finishes, and `Esc` drops whatever you changed since you opened it or last saved.
 
 | Shortcut | Action | Shortcut | Action |
 |---|---|---|---|
@@ -265,7 +265,7 @@ then **Make transparent** clears them.
 
 <br>
 
-An `.itspaint` document is a package holding a lossless PNG and JSON for the canvas,
+An `.itspaint` document is a package holding lossless PNGs and JSON for the canvas,
 colours, palette and text boxes, so text is still editable when you open it again.
 Painting over a box turns that box into pixels, and Undo brings it back.
 

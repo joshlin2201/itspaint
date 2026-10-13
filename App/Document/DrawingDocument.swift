@@ -128,12 +128,18 @@ final class DrawingDocument: NSDocument {
     /// switching it off for the landing makes this group the top level, and it
     /// closes here.
     func landPendingWorkBeforeWriting() {
-        guard model.engine.hasPendingShape || model.floating != nil else { return }
-        guard let undoManager else { return model.landPendingWork() }
+        guard model.engine.hasPendingShape || model.floating != nil || model.isEditingText else { return }
+        // An open text box is checkpointed here too, for the same token. The editor
+        // stays open; the write checkpoints again and finds nothing left to record.
+        let land = { [model] in
+            model.landPendingWork()
+            _ = model.onSaveTextEditing?()
+        }
+        guard let undoManager else { return land() }
         let byEvent = undoManager.groupsByEvent
         undoManager.groupsByEvent = false
         undoManager.beginUndoGrouping()
-        model.landPendingWork()
+        land()
         undoManager.endUndoGrouping()
         undoManager.groupsByEvent = byEvent
     }
@@ -443,22 +449,23 @@ final class DrawingDocument: NSDocument {
 
         // Missing or damaged editing metadata falls back to the complete
         // recovery artwork; the required canvas remains fail-closed above.
-        let metadata: DocumentMetadata?
+        let decoded: DocumentMetadata?
         do {
             let data = try readRegularEntry(
                 named: PackageEntry.metadata,
                 in: packageDescriptor,
                 maximumBytes: PackagePolicy.maximumMetadataBytes
             )
-            metadata = try? JSONDecoder().decode(DocumentMetadata.self, from: data)
+            decoded = try? JSONDecoder().decode(DocumentMetadata.self, from: data)
         } catch {
-            metadata = nil
+            decoded = nil
         }
-        if let metadata, metadata.formatVersion == DocumentMetadata.currentVersion,
-           let objects = metadata.textObjects, !objects.isEmpty {
+        guard var metadata = decoded else { return (canvas, nil) }
+        if let objects = metadata.textObjects, !objects.isEmpty {
             // The recovery PNG includes text. Reopen the separate base only
             // with intact text metadata, otherwise recover the visible artwork.
-            if let baseData = try? readRegularEntry(named: PackageEntry.baseImage, in: packageDescriptor,
+            if metadata.formatVersion == DocumentMetadata.currentVersion,
+               let baseData = try? readRegularEntry(named: PackageEntry.baseImage, in: packageDescriptor,
                                                     maximumBytes: PackagePolicy.maximumCanvasBytes),
                let base = try? ImageCodec.decode(data: baseData, sourceURL: url.appendingPathComponent(PackageEntry.baseImage)),
                base.width == canvas.width, base.height == canvas.height,
@@ -467,9 +474,11 @@ final class DrawingDocument: NSDocument {
                objects.allSatisfy({ $0.isValid && !$0.frame.intersection(base.bounds).isEmpty }) {
                 return (base, metadata)
             }
-            return (canvas, nil)
+            // Drawn over a canvas that already shows them, the boxes would double.
+            // The colours and palette are still good.
+            metadata.textObjects = nil
         }
-        return (canvas, metadata?.textObjects == nil || metadata?.textObjects?.isEmpty == true ? metadata : nil)
+        return (canvas, metadata)
     }
 
     /// Open the package once and resolve both fixed child names relative to
