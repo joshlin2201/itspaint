@@ -65,9 +65,9 @@ try ImageCodec.encode(engine.canvas, as: .png).write(to: output)
 ```
 
 CI compiles that snippet on every push from a separate package that declares macOS 12,
-so the floor can't creep up unnoticed, and it checks the output by counting transparent
-pixels. Every target builds in Swift 6 language mode with strict concurrency on, and the
-Swift Package Index reports [zero data-race errors](https://swiftpackageindex.com/joshlin2201/itspaint/builds).
+so the floor can't creep up unnoticed. The engine's own tests count the transparent pixels
+`removeBackground()` leaves, so a call that cleared one corner would fail. Every target
+builds in Swift 6 language mode with strict concurrency on.
 
 Until 1.0 a minor release can still change the document format, and
 [CHANGELOG.md](CHANGELOG.md) says so at the top when one does. **Watch > Custom > Releases**
