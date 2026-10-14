@@ -220,8 +220,9 @@ distribution needs.
    |---|---|
    | `MACOS_CERTIFICATE_P12` | base64 of a `.p12` holding the certificate **and** its private key |
    | `MACOS_CERTIFICATE_PASSWORD` | the password that `.p12` was exported with |
-   | `NOTARY_APPLE_ID` | the Apple ID holding the membership |
-   | `NOTARY_PASSWORD` | an app-specific password, **not** the account password |
+   | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY` | an App Store Connect API key (the `.p8` base64-encoded); notarisation uses it first |
+   | `NOTARY_APPLE_ID` | fallback when there is no API key: the Apple ID holding the membership |
+   | `NOTARY_PASSWORD` | fallback: an app-specific password, **not** the account password |
    | `NOTARY_TEAM_ID` | optional; derived from the certificate when unset |
 
    Both stages degrade rather than lie. With no certificate the build is

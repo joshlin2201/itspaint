@@ -230,6 +230,13 @@ jobs:
           EXPECTED_BUNDLE_VERSION: ${{ steps.release.outputs.bundle_version }}
           SIGNED: ${{ steps.signing.outputs.signed }}
           SIGN_TEAM: ${{ steps.signing.outputs.team }}
+          # The App Store Connect API key the App Store workflow already uses.
+          # Preferred: an Apple ID's app-specific password can be revoked
+          # without anything here noticing, which is how 0.24.0's first run
+          # ended on HTTP 401.
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
           NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
           NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
@@ -319,13 +326,22 @@ jobs:
           # image's own hash, and the image needs a ticket for *its* hash. Once
           # the account is warm each submission takes about a minute, so the
           # second one is cheap.
+          HAVE_NOTARY=false
+          if [[ -n "${ASC_KEY_ID:-}" && -n "${ASC_ISSUER_ID:-}" && -n "${ASC_PRIVATE_KEY:-}" ]]; then
+            NOTARY_KEY="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+            printf '%s' "$ASC_PRIVATE_KEY" | base64 --decode > "$NOTARY_KEY"
+            NOTARY_AUTH=(--key "$NOTARY_KEY" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID")
+            HAVE_NOTARY=true
+          elif [[ -n "${NOTARY_APPLE_ID:-}" && -n "${NOTARY_PASSWORD:-}" ]]; then
+            NOTARY_AUTH=(--apple-id "$NOTARY_APPLE_ID" --password "$NOTARY_PASSWORD"
+                         --team-id "${NOTARY_TEAM_ID:-$SIGN_TEAM}")
+            HAVE_NOTARY=true
+          fi
+
           notarise() {
             local target="$1" log="$RUNNER_TEMP/notarytool-$(basename "$target").log"
             set +e
-            xcrun notarytool submit "$target" \
-              --apple-id "$NOTARY_APPLE_ID" \
-              --password "$NOTARY_PASSWORD" \
-              --team-id "${NOTARY_TEAM_ID:-$SIGN_TEAM}" \
+            xcrun notarytool submit "$target" "${NOTARY_AUTH[@]}" \
               --wait --timeout 75m 2>&1 | tee "$log"
             local code=${PIPESTATUS[0]}
             set -e
@@ -342,7 +358,7 @@ jobs:
           }
 
           NOTARISED=false
-          if [[ "$SIGNED" == "true" && -n "${NOTARY_APPLE_ID:-}" && -n "${NOTARY_PASSWORD:-}" ]]; then
+          if [[ "$SIGNED" == "true" && "$HAVE_NOTARY" == "true" ]]; then
             APP_ARCHIVE="$RUNNER_TEMP/ItsPaint-notarise.zip"
             ditto -c -k --keepParent "$APP" "$APP_ARCHIVE"
             notarise "$APP_ARCHIVE"
@@ -396,6 +412,7 @@ jobs:
                 -ov -format UDZO "$DMG"
             fi
           fi
+          rm -f "${NOTARY_KEY:-}"
           echo "NOTARISED=$NOTARISED" >> "$GITHUB_ENV"
 
           # Built after stapling so the archive carries the ticket too.
