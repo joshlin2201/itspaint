@@ -1071,9 +1071,13 @@ enum RatingRequest {
         guard shouldAsk(afterExportCount: count) else { return }
         // The save sheet is still dismissing on this turn of the run loop. Asking into
         // a window mid-animation is how the prompt silently never appears.
+        // The windowless `SKStoreReviewController.requestReview()` is deprecated since
+        // macOS 15; its replacement presents over a view controller, so ask over the
+        // window the work was just saved from.
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
-            SKStoreReviewController.requestReview()
+            guard let controller = NSApp.keyWindow?.contentViewController else { return }
+            AppStore.requestReview(in: controller)
         }
     }
 }

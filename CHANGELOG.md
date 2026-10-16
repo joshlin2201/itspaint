@@ -7,6 +7,12 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+### Fixed
+- **The App Store rating prompt asks over the window you saved from.** It used
+  the windowless StoreKit call that Apple deprecated in macOS 15, and the listing
+  still has no ratings on any storefront. It now uses `AppStore.requestReview(in:)`,
+  which Apple recommends instead. When it asks hasn't changed.
+
 ## [0.24.0] — 2026-10-13
 
 ### Added
