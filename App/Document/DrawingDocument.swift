@@ -213,7 +213,7 @@ final class DrawingDocument: NSDocument {
         )
         model.setZoomExact(sized.zoom)
 
-        let window = NSWindow(contentViewController: hosting)
+        let window = DocumentWindow(contentViewController: hosting)
         window.setContentSize(sized.contentSize)
         window.minSize = Self.minimumContentSize
         window.title = displayName
