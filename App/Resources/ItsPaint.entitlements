@@ -21,6 +21,13 @@
 	<true/>
 
 	<!--
+	  File > Print. The job goes to the system's print service, not out of
+	  the app, so this adds no network access.
+	-->
+	<key>com.apple.security.print</key>
+	<true/>
+
+	<!--
 	  Deliberately NOT requested:
 	    com.apple.security.network.client / .server  — ItsPaint never phones home.
 	    com.apple.security.assets.pictures.read-write — the open panel covers it.

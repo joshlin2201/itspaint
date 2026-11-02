@@ -1037,3 +1037,133 @@ struct EditableTextDocumentTests {
     }
 
 }
+
+/// ⌘P ends in a panel no test may open, so these run the job behind it and write
+/// the page to a PDF: `print(withSettings:)` is where ⌘P goes after the menu, and
+/// a job with no printer is how a test gets to read the page back.
+@Suite("Printing", .serialized)
+@MainActor
+struct PrintingTests {
+    private final class Flag: @unchecked Sendable { var value = false }
+
+    /// Asked without waiting: a queue left jammed is the bug being guarded, and
+    /// waiting on it would hang the run instead of failing it.
+    private func queueIsFree(_ document: DrawingDocument) async throws -> Bool {
+        let ran = Flag()
+        document.performActivity(withSynchronousWaiting: false) { done in
+            ran.value = true
+            done()
+        }
+        for _ in 0..<150 where !ran.value { try await Task.sleep(for: .milliseconds(20)) }
+        return ran.value
+    }
+
+    /// `NSDocument`'s own raises, and a raise out of Swift abandons a test instead of
+    /// failing it, which leaves the whole run waiting. So this goes first.
+    private var hasItsOwnPrintOperation: Bool {
+        let selector = #selector(NSDocument.printOperation(withSettings:))
+        return DrawingDocument.instanceMethod(for: selector) != NSDocument.instanceMethod(for: selector)
+    }
+
+    private func printed(_ document: DrawingDocument) async throws -> (page: Bitmap, pageCount: Int) {
+        try #require(hasItsOwnPrintOperation, "the document would raise instead of printing")
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("itspaint-print-\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let settings: [NSPrintInfo.AttributeKey: Any] = [
+            .jobDisposition: NSPrintInfo.JobDisposition.save, .jobSavingURL: url
+        ]
+        // Settings that fell on the floor would send this to a real printer.
+        let operation = try document.printOperation(withSettings: settings)
+        try #require(operation.printInfo.jobDisposition == .save)
+
+        document.print(withSettings: settings, showPrintPanel: false, delegate: nil,
+                       didPrint: nil, contextInfo: nil)
+
+        // The job ends the activity it runs in, so a free queue is a finished file.
+        try #require(try await queueIsFree(document), "printing left the document's queue jammed")
+        let opened = try PDFCodec.open(contentsOf: url)
+        return (opened.bitmap, opened.source.pageCount)
+    }
+
+    /// By fraction of the page, because the paper size is the machine's own. Asserted
+    /// through a `let`: a failed `#expect` around this call describes its arguments,
+    /// and describing a whole page of pixels takes over a minute.
+    private func isInked(_ page: Bitmap, x: Double, y: Double) -> Bool {
+        let point = PixelPoint(x: Int(Double(page.width) * x), y: Int(Double(page.height) * y))
+        return page.pixel(at: point).map { $0.r < 60 && $0.g < 60 && $0.b < 60 } ?? false
+    }
+
+    @Test("A print job is the canvas, centred on one page")
+    func printsTheCanvas() async throws {
+        let document = DrawingDocument()
+        document.model.load(canvas: Bitmap(width: 200, height: 100, fill: .black), metadata: nil)
+
+        let printed = try await printed(document)
+
+        let centre = isInked(printed.page, x: 0.5, y: 0.5)
+        let margin = isInked(printed.page, x: 0.03, y: 0.03)
+        #expect(printed.pageCount == 1)
+        #expect(centre, "the canvas is not on the page")
+        #expect(!margin, "the canvas ran into the margin")
+    }
+
+    @Test("A canvas wider than the paper shrinks onto one page, end to end")
+    func wideCanvasFitsThePage() async throws {
+        let document = DrawingDocument()
+        // Black at both ends and white between. Cut off instead of shrunk, the left
+        // end alone would run across the page.
+        var canvas = Bitmap(width: 4000, height: 300, fill: .white)
+        let end = Bitmap(width: 400, height: 300, fill: .black)
+        canvas.composite(end, at: PixelPoint(x: 0, y: 0))
+        canvas.composite(end, at: PixelPoint(x: 3600, y: 0))
+        document.model.load(canvas: canvas, metadata: nil)
+
+        let printed = try await printed(document)
+
+        #expect(printed.pageCount == 1, "the canvas was cut across pages")
+        let inked = stride(from: 0.0, to: 1.0, by: 0.01).filter { isInked(printed.page, x: $0, y: 0.5) }
+        let centre = isInked(printed.page, x: 0.5, y: 0.5)
+        #expect((inked.first ?? 1) < 0.3, "the left end is not on the page")
+        #expect((inked.last ?? 0) > 0.7, "the right end is not on the page")
+        #expect(!centre, "the canvas was cut off, not shrunk")
+    }
+
+    @Test("A paste still floating is on the page, and printing leaves it floating")
+    func printsAFloatingPaste() async throws {
+        let document = DrawingDocument()
+        let undo = try #require(document.undoManager)
+        document.model.load(canvas: Bitmap(width: 100, height: 100, fill: .white), metadata: nil)
+        document.model.noteChange(document.model.engine.paste(Bitmap(width: 100, height: 100, fill: .black)))
+        #expect(document.model.floating != nil)
+        // A test has no run-loop turn to close the automatic group a paste may
+        // open; close it the way the end of the paste's event would.
+        while undo.groupingLevel > 0 { undo.endUndoGrouping() }
+        try await Task.sleep(for: .milliseconds(50))
+        let stepsBefore = document.model.engine.canUndo
+
+        let printed = try await printed(document)
+
+        let pasted = isInked(printed.page, x: 0.5, y: 0.5)
+        #expect(pasted, "what was on screen is not what printed")
+        #expect(document.model.floating != nil, "printing is not an edit")
+        #expect(document.model.engine.canUndo == stepsBefore)
+    }
+
+    /// Text lives over the paint layer, so `engine.canvas` would print a blank page.
+    @Test("Text still being typed is on the page")
+    func printsAnOpenTextBox() async throws {
+        let document = DrawingDocument()
+        document.model.load(canvas: Bitmap(width: 300, height: 200, fill: .white), metadata: nil)
+        // What the editor does on every keystroke: in the picture, with no undo step yet.
+        let object = TextObject(frame: PixelRect(x: 20, y: 20, width: 260, height: 160), runs: [
+            TextRun(text: "HH", style: .init(fontName: "Helvetica", pointSize: 96))
+        ])
+        document.model.noteVisualChange(document.model.engine.upsertTextObject(object, registerUndo: false))
+
+        let printed = try await printed(document)
+
+        let lettered = printed.page.pixels.contains { $0.r < 60 && $0.g < 60 && $0.b < 60 }
+        #expect(lettered, "the text is not on the page")
+    }
+}
