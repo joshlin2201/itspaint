@@ -8,6 +8,11 @@ version may still carry breaking changes to the document format.
 ## [Unreleased]
 
 ### Fixed
+- **Fast clicks on the header no longer zoom the window.** The header sits in the
+  titlebar band, so a fast second click that no enabled control claimed counted as
+  a titlebar double-click: on Undo the moment the history ran out, on a disabled
+  Redo, and on the padding and gaps around the buttons. Those clicks now do
+  nothing. Double-clicking the empty titlebar and Window ▸ Zoom work as before.
 - **Print prints, and pressing it no longer freezes the app.** File ▸ Print had
   nothing behind it: `⌘P` did nothing, and the next edit stopped the app for good,
   because the failure left the document waiting on itself. It now prints the
