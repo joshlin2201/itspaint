@@ -160,7 +160,8 @@ struct TextEditorLayoutTests {
         view.mouseDragged(with: try event(.leftMouseDragged, end))
         // Assert before mouse-up: the drag must return to AppKit for live redraw.
         #expect(view.laidOutTextHeight > before)
-        #expect(model.engine.textObjects.first?.frame.width == 111)
+        // The edge travels as far as the pointer did, from where it was.
+        #expect(model.engine.textObjects.first?.frame.width == 108)
         view.mouseUp(with: try event(.leftMouseUp, end))
         let box = view.boxBounds
         #expect(!view.isOnBorder(NSPoint(x: box.minX + 2, y: box.midY)))
@@ -515,5 +516,276 @@ struct TextBoxGrowthTests {
         let s = style(size)
         #expect(TextRenderer.lineHeight(for: s)
                 >= TextRenderer.measure("Hxgjq", style: s, maxWidth: 4000).height)
+    }
+}
+
+/// What a drag does, and what the pointer says while it does it.
+///
+/// Events go straight to the views, in order, so nothing here needs a window
+/// server or the focus. `NSCursor.current` reads back what the app last set.
+extension TextEditorLayoutTests {
+    private func mouse(_ type: NSEvent.EventType, _ point: NSPoint, _ window: NSWindow, clicks: Int = 1) throws -> NSEvent {
+        try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0,
+                                        windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                        clickCount: clicks, pressure: 1))
+    }
+
+    /// A press at `start` in `view`'s coordinates and `steps` drags to `start + delta`.
+    /// The whole path is worked out first, because a moved view moves its coordinates.
+    private func drag(_ view: NSView, from start: NSPoint, by delta: NSPoint, steps: Int = 1,
+                      release: Bool = true) throws {
+        let window = try #require(view.window)
+        let path = (0...steps).map { step in
+            view.convert(NSPoint(x: start.x + delta.x * Double(step) / Double(steps),
+                                 y: start.y + delta.y * Double(step) / Double(steps)), to: nil)
+        }
+        view.mouseDown(with: try mouse(.leftMouseDown, path[0], window))
+        for point in path.dropFirst() { view.mouseDragged(with: try mouse(.leftMouseDragged, point, window)) }
+        if release { view.mouseUp(with: try mouse(.leftMouseUp, path[steps], window)) }
+    }
+
+    private func click(_ view: NSView, at point: NSPoint, clicks: Int = 1) throws {
+        let window = try #require(view.window)
+        let at = view.convert(point, to: nil)
+        view.mouseDown(with: try mouse(.leftMouseDown, at, window, clicks: clicks))
+        view.mouseUp(with: try mouse(.leftMouseUp, at, window, clicks: clicks))
+    }
+
+    private func typed(_ text: String = "hello") throws -> (CanvasNSView, EditorModel, TextEntryView) {
+        let (canvas, model, view) = try canvasEditor()
+        view.insertText(text, replacementRange: NSRange(location: 0, length: 0))
+        return (canvas, model, view)
+    }
+
+    private func border(_ view: TextEntryView) -> NSPoint {
+        NSPoint(x: view.boxBounds.minX + view.boxBounds.width / 4, y: view.boxBounds.minY - 4)
+    }
+
+    private func frame(_ model: EditorModel) throws -> PixelRect {
+        try #require(model.engine.textObjects.first).frame
+    }
+
+    private func canvas(for model: EditorModel) -> CanvasNSView {
+        let canvas = CanvasNSView(frame: .zero)
+        canvas.model = model
+        let window = NSWindow(contentRect: canvas.bounds, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = canvas
+        Self.windows.append(window)
+        return canvas
+    }
+
+    private func floatingModel() -> EditorModel {
+        let model = EditorModel(canvas: Bitmap(width: 600, height: 400, fill: .white))
+        _ = model.engine.paste(Bitmap(width: 200, height: 200, fill: .black))
+        model.syncFromEngine()
+        return model
+    }
+
+    @Test("A slow drag at high zoom keeps up with the pointer")
+    func slowDragAtHighZoom() throws {
+        let (canvas, model, view) = try typed()
+        canvas.zoom = 4
+        let before = try frame(model)
+        try drag(view, from: border(view), by: NSPoint(x: 80, y: 40), steps: 80)
+        #expect(try frame(model).minX == before.minX + 20)
+        #expect(try frame(model).minY == before.minY + 10)
+    }
+
+    @Test("A box stopped by the edge is back under the pointer when the pointer returns")
+    func edgeDoesNotUnhookTheBox() throws {
+        let (_, model, view) = try typed()
+        let before = try frame(model)
+        let start = border(view)
+        let window = try #require(view.window)
+        let at = { (x: Double) in view.convert(NSPoint(x: start.x + x, y: start.y), to: nil) }
+        let (home, away, back) = (at(0), at(-200), at(-10))
+        view.mouseDown(with: try mouse(.leftMouseDown, home, window))
+        view.mouseDragged(with: try mouse(.leftMouseDragged, away, window))
+        #expect(try frame(model).minX == 0)
+        view.mouseDragged(with: try mouse(.leftMouseDragged, back, window))
+        view.mouseUp(with: try mouse(.leftMouseUp, back, window))
+        #expect(try frame(model).minX == before.minX - 10)
+    }
+
+    @Test("A moved box lands on the alignment grid, as a paste does")
+    func moveSnaps() throws {
+        let (_, model, view) = try typed()
+        model.snapGrid = 16
+        try drag(view, from: border(view), by: NSPoint(x: 27, y: 19))
+        #expect(try frame(model).minX % 16 == 0)
+        #expect(try frame(model).minY % 16 == 0)
+    }
+
+    @Test("The bottom handle makes the box taller, and it stays taller")
+    func bottomHandleResizes() throws {
+        let (_, model, view) = try typed()
+        let before = try frame(model)
+        try drag(view, from: NSPoint(x: view.boxBounds.midX, y: view.boxBounds.maxY + 2), by: NSPoint(x: 0, y: 80))
+        #expect(try frame(model).height == before.height + 80)
+        view.insertText("!", replacementRange: NSRange(location: 5, length: 0))
+        #expect(try frame(model).height == before.height + 80)
+    }
+
+    @Test("The top handle resizes from the top and leaves the bottom edge where it was")
+    func topHandleResizes() throws {
+        let (_, model, view) = try typed()
+        let before = try frame(model)
+        try drag(view, from: NSPoint(x: view.boxBounds.midX, y: view.boxBounds.minY - 2), by: NSPoint(x: 0, y: -30))
+        #expect(try frame(model).minY == before.minY - 30)
+        #expect(try frame(model).maxY == before.maxY)
+    }
+
+    @Test("A top handle cannot crush the text, and the bottom edge still holds")
+    func topHandleStopsAtTheText() throws {
+        let (_, model, view) = try typed()
+        let before = try frame(model)
+        try drag(view, from: NSPoint(x: view.boxBounds.midX, y: view.boxBounds.minY - 2), by: NSPoint(x: 0, y: 300))
+        #expect(try frame(model) == before)
+    }
+
+    @Test("Pressing a handle off-centre does not make the edge jump to the pointer")
+    func handleDoesNotJump() throws {
+        let (_, model, view) = try typed()
+        let before = try frame(model)
+        try drag(view, from: NSPoint(x: view.boxBounds.maxX + 6, y: view.boxBounds.midY), by: NSPoint(x: 1, y: 0))
+        #expect(try frame(model).width == before.width + 1)
+    }
+
+    @Test("A box dragged out tall keeps its height through the first keystroke")
+    func draggedOutHeightSurvivesTyping() throws {
+        let model = EditorModel(canvas: Bitmap(width: 600, height: 400, fill: .white))
+        model.tool = .text
+        let canvas = canvas(for: model)
+        try drag(canvas, from: NSPoint(x: 40, y: 60), by: NSPoint(x: 300, y: 200))
+        let view = try #require(canvas.subviews.compactMap { $0 as? TextEntryView }.first)
+        view.insertText("a", replacementRange: NSRange(location: 0, length: 0))
+        #expect(try frame(model).height >= 200)
+    }
+
+    @Test("The hand closes on the box and stays closed for the whole drag")
+    func moveCursor() throws {
+        let (_, _, view) = try typed()
+        try drag(view, from: border(view), by: NSPoint(x: 30, y: 0), steps: 3, release: false)
+        #expect(NSCursor.current === NSCursor.closedHand)
+        view.mouseUp(with: try mouse(.leftMouseUp, view.convert(border(view), to: nil), try #require(view.window)))
+        #expect(NSCursor.current === NSCursor.openHand)
+    }
+
+    @Test("A handle keeps its arrows for the whole drag, wherever the pointer goes")
+    func resizeCursor() throws {
+        let (_, _, view) = try typed()
+        try drag(view, from: NSPoint(x: view.boxBounds.midX, y: view.boxBounds.maxY + 2), by: NSPoint(x: 0, y: -200),
+                 steps: 3, release: false)
+        #expect(NSCursor.current === CanvasNSView.cursor(for: .bottom))
+    }
+
+    @Test("The grab area under the arrows is the one the press uses, on a short box too")
+    func cursorAndHitAgree() throws {
+        let model = EditorModel(canvas: Bitmap(width: 600, height: 400, fill: .white))
+        model.engine.settings.textStyle.pointSize = 12
+        let (_, _, view) = try canvasEditor(model: model)
+        for x in stride(from: 0.0, to: view.bounds.width, by: 1) {
+            for y in stride(from: 0.0, to: view.bounds.height, by: 1) {
+                let point = NSPoint(x: x, y: y)
+                guard view.isOnBorder(point) else { continue }
+                let arrows = view.handleSpots.contains { $0.spot.contains(point) }
+                #expect((view.handle(at: point) != nil) == arrows, "at \(point)")
+            }
+        }
+    }
+
+    @Test("Clicking away lands the box and opens nothing; the next click starts one")
+    func clickAwayOnlyLands() throws {
+        let (canvas, model, _) = try typed()
+        let empty = NSPoint(x: 400, y: 300)
+        try click(canvas, at: empty)
+        #expect(!model.isEditingText)
+        #expect(model.engine.textObjects.count == 1)
+        try click(canvas, at: empty)
+        #expect(model.isEditingText)
+    }
+
+    @Test("Dragging out from an open box still starts the next box in one gesture")
+    func dragAwayStartsANewBox() throws {
+        let (canvas, model, _) = try typed()
+        try drag(canvas, from: NSPoint(x: 300, y: 200), by: NSPoint(x: 120, y: 80))
+        #expect(model.isEditingText)
+    }
+
+    @Test("A double-click opens a box for the Select tool and leaves every other tool alone")
+    func doubleClickIsForSelect() throws {
+        let (canvas, model, _) = try typed()
+        try click(canvas, at: NSPoint(x: 500, y: 350))
+        let inside = NSPoint(x: 60, y: 70)
+        model.tool = .eyedropper
+        try click(canvas, at: inside, clicks: 2)
+        #expect(model.tool == .eyedropper)
+        #expect(!model.isEditingText)
+        model.tool = .select
+        try click(canvas, at: inside, clicks: 2)
+        #expect(model.tool == .text)
+        #expect(model.isEditingText)
+    }
+
+    @Test("Reopening a box that hangs off the canvas leaves its frame and wrap alone")
+    func reopenKeepsTheOverhang() throws {
+        let (canvas, model, view) = try typed()
+        try drag(view, from: border(view), by: NSPoint(x: 500, y: 0))
+        let moved = try frame(model)
+        #expect(moved.maxX > 600)
+        try click(canvas, at: NSPoint(x: 20, y: 380))
+        try click(canvas, at: NSPoint(x: moved.minX + 2, y: moved.minY + 2))
+        #expect(model.isEditingText)
+        // Landing is what writes the box back, so that is what has to be read.
+        try click(canvas, at: NSPoint(x: 20, y: 380))
+        #expect(try frame(model) == moved)
+    }
+
+    @Test("With the Text tool, a press on a paste carries it, as the cursor said it would")
+    func textToolCarriesAPaste() throws {
+        // In this order: picking a tool lands whatever is floating.
+        let model = EditorModel(canvas: Bitmap(width: 600, height: 400, fill: .white))
+        model.tool = .text
+        _ = model.engine.paste(Bitmap(width: 200, height: 200, fill: .black))
+        model.syncFromEngine()
+        let canvas = canvas(for: model)
+        let before = try #require(model.floating).frame
+        try drag(canvas, from: NSPoint(x: before.minX + 100, y: before.minY + 100), by: NSPoint(x: 40, y: 30))
+        #expect(!model.isEditingText)
+        #expect(try #require(model.floating).frame.minX == before.minX + 40)
+    }
+
+    @Test("Carrying a paste closes the hand, resizing one keeps the arrow, and letting go restores")
+    func carryCursors() throws {
+        let model = floatingModel()
+        model.tool = .select
+        let canvas = canvas(for: model)
+        let box = try #require(model.floating).frame
+        try drag(canvas, from: NSPoint(x: box.minX + 100, y: box.minY + 100), by: NSPoint(x: 20, y: 0), release: false)
+        #expect(NSCursor.current === NSCursor.closedHand)
+        let window = try #require(canvas.window)
+        canvas.mouseUp(with: try mouse(.leftMouseUp, canvas.convert(NSPoint(x: box.minX + 120, y: box.minY + 100), to: nil), window))
+        #expect(NSCursor.current === NSCursor.openHand)
+
+        let moved = try #require(model.floating).frame
+        let corner = NSPoint(x: moved.maxX - 1, y: moved.maxY - 1)
+        try drag(canvas, from: corner, by: NSPoint(x: 30, y: 30), release: false)
+        #expect(NSCursor.current === CanvasNSView.cursor(for: .bottomRight))
+    }
+
+    @Test("A key-up the app never saw cannot leave the canvas in pan mode")
+    func spaceDoesNotStick() throws {
+        let model = EditorModel(canvas: Bitmap(width: 600, height: 400, fill: .white))
+        model.tool = .pencil
+        let canvas = canvas(for: model)
+        let window = try #require(canvas.window)
+        let space = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                  windowNumber: window.windowNumber, context: nil, characters: " ",
+                                                  charactersIgnoringModifiers: " ", isARepeat: false, keyCode: 49))
+        canvas.keyDown(with: space)
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
+        let before = model.canvas
+        try drag(canvas, from: NSPoint(x: 100, y: 100), by: NSPoint(x: 50, y: 0))
+        #expect(model.canvas != before)
     }
 }

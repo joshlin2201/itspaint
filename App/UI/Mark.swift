@@ -169,11 +169,9 @@ struct Mark: View {
                     .onEnded { _ in isDragging = false }
             )
             .onTapGesture(count: 2) { value = normal }
-            .onHover { hovering in
-                isHovering = hovering
-                // The pointer says which way this moves before it is touched.
-                hovering ? NSCursor.resizeLeftRight.push() : NSCursor.pop()
-            }
+            .onHover { isHovering = $0 }
+            // The pointer says which way this moves before it is touched.
+            .hoverCursor(.resizeLeftRight)
         }
         .frame(height: hitHeight)
     }
@@ -324,7 +322,7 @@ struct SpotlightDimPlate: View {
                         dim = min(0.9, max(0.1, g.location.x / geo.size.width))
                     }
                 )
-                .onHover { $0 ? NSCursor.resizeLeftRight.push() : NSCursor.pop() }
+                .hoverCursor(.resizeLeftRight)
         }
         .frame(height: height)
         .accessibilityElement()
@@ -337,5 +335,31 @@ struct SpotlightDimPlate: View {
             @unknown default: break
             }
         }
+    }
+}
+
+extension View {
+    /// Show `cursor` while the pointer is over this view.
+    ///
+    /// `push` and `pop` are one stack for the whole app, so a panel that closed under
+    /// the pointer, which a tool shortcut does, used to skip its `pop` and leave the
+    /// cursor behind for good. The modifier pops on disappearing too.
+    func hoverCursor(_ cursor: NSCursor) -> some View { modifier(HoverCursor(cursor: cursor)) }
+}
+
+private struct HoverCursor: ViewModifier {
+    let cursor: NSCursor
+    @State private var isPushed = false
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { set($0) }
+            .onDisappear { set(false) }
+    }
+
+    private func set(_ pushed: Bool) {
+        guard pushed != isPushed else { return }
+        isPushed = pushed
+        pushed ? cursor.push() : NSCursor.pop()
     }
 }
