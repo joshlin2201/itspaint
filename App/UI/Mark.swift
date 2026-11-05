@@ -190,7 +190,7 @@ struct Mark: View {
     private var nib: some View {
         Circle()
             .fill(.primary.opacity(Tokens.Ink.regular))
-            .frame(width: 2 + 12 * t, height: 2 + 12 * t)
+            .frame(width: 2 + 12 * CGFloat(t), height: 2 + 12 * CGFloat(t))
             .frame(width: 14, height: 14)
     }
 
@@ -202,7 +202,7 @@ struct Mark: View {
         return Capsule(style: .continuous)
             .fill(.primary.opacity(Tokens.Ink.strong))
             .frame(width: thickness, height: height - 8)
-            .offset(x: max(2, min(width - thickness - 2, width * t - thickness / 2)))
+            .offset(x: max(2, min(width - thickness - 2, width * CGFloat(t) - thickness / 2)))
     }
 
     /// A stop, as a dot along the foot of the track, clear of the words. Only under the
@@ -212,7 +212,7 @@ struct Mark: View {
         return Circle()
             .fill(.primary.opacity(active ? Tokens.Ink.strong : Tokens.Ink.faint))
             .frame(width: 2.5, height: 2.5)
-            .offset(x: width * fraction(of: Double(stop)) - 1.25, y: height / 2 - 4)
+            .offset(x: width * CGFloat(fraction(of: Double(stop))) - 1.25, y: height / 2 - 4)
             .allowsHitTesting(false)
     }
 
