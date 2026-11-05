@@ -23,11 +23,13 @@ codesign -d --entitlements - --xml /Applications/ItsPaint.app | plutil -p -
   "com.apple.security.app-sandbox" => true
   "com.apple.security.files.bookmarks.app-scope" => true
   "com.apple.security.files.user-selected.read-write" => true
+  "com.apple.security.print" => true
 }
 ```
 
-Three entries. The sandbox itself, read-write access to the files you pick in an open or
-save panel, and app-scoped bookmarks so recent documents reopen without asking again.
+Four entries. The sandbox itself, read-write access to the files you pick in an open or
+save panel, app-scoped bookmarks so recent documents reopen without asking again, and
+printing, which hands the page to the system's print service.
 
 **What is absent is the point.** Neither `com.apple.security.network.client` nor
 `com.apple.security.network.server` is there. Inside the App Sandbox those are not

@@ -274,7 +274,7 @@ the app contains no third-party content.
 
 | Check | State |
 |---|---|
-| App Sandbox | On; only `files.user-selected.read-write` + app-scoped bookmarks |
+| App Sandbox | On; only `files.user-selected.read-write` + app-scoped bookmarks + `print` |
 | `get-task-allow` | Stripped from Release (`CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO`) |
 | Privacy manifest | `PrivacyInfo.xcprivacy` bundled in Resources |
 | Private API | None — verified in docs/MAC_ESSENTIALS.md |
