@@ -141,7 +141,7 @@ grep -rniE 'URLSession|NWConnection|import Network|CFSocket' App Packages
 
 | Command | What you should see |
 |---|---|
-| `codesign` | Three entitlements: the sandbox, files you pick in a panel and app-scoped bookmarks. No `network.client` or `network.server`. |
+| `codesign` | Four entitlements: the sandbox, files you pick in a panel, app-scoped bookmarks and printing. No `network.client` or `network.server`. |
 | `otool` | Apple frameworks and the Swift runtime, for both architectures. No `CFNetwork`, `Network.framework` or bundled dylib. |
 | `grep` | Nothing. `Package.swift` declares no dependencies either. |
 

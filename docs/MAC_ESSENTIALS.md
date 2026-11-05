@@ -124,7 +124,7 @@ missing.
 | Duplicate | `NSDocument.duplicate()`, also on the floating actions |
 | Restore windows on relaunch | Standard state restoration |
 | Drag and drop | Images from Finder, browsers, any app — land at the pointer as movable content |
-| Print | `NSDocument.printDocument`, paginated to the canvas |
+| Print | `NSDocument.printDocument`, one page of the canvas fitted to the paper |
 | Quick Look / Finder icon | Declared document type with an exported UTI |
 
 ---
@@ -149,7 +149,7 @@ missing.
 |---|---|
 | Developer ID signing | On for releases, with a secure timestamp |
 | Notarisation | On, stapled to the disk image **and** the app inside it |
-| App Sandbox | On, with only `files.user-selected.read-write` and app-scoped bookmarks |
+| App Sandbox | On, with only `files.user-selected.read-write`, app-scoped bookmarks and `print` |
 | Hardened Runtime | On for Release builds |
 | Privacy manifest | `PrivacyInfo.xcprivacy`, declaring file-timestamp and UserDefaults reason codes |
 | No network entitlement | The app never phones home |
