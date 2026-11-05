@@ -165,6 +165,22 @@ final class TooltipController {
 
     @ObservationIgnored private var pendingKey: String?
     @ObservationIgnored private var work: DispatchWorkItem?
+    /// A menu is the answer to the question the chip was asking, and it opens right
+    /// over it, so no chip shows while one is up. Watched here rather than at each
+    /// button because that covers every menu in the app, the menu bar's included.
+    @ObservationIgnored private var isMenuOpen = false
+    @ObservationIgnored private var menuWatch: [any NSObjectProtocol] = []
+
+    init() {
+        for (name, open) in [(NSMenu.didBeginTrackingNotification, true), (NSMenu.didEndTrackingNotification, false)] {
+            menuWatch.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.isMenuOpen = open
+                    if open { self?.dismiss() }
+                }
+            })
+        }
+    }
 
     /// How long the pointer has to rest before the first chip appears.
     ///
@@ -188,7 +204,7 @@ final class TooltipController {
         detail: String? = nil,
         anchor: CGRect
     ) {
-        guard pendingKey != key else { return }
+        guard pendingKey != key, !isMenuOpen else { return }
         pendingKey = key
         work?.cancel()
 

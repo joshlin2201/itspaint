@@ -34,7 +34,7 @@ subscription to do it, and Krita is a gigabyte built for painters. ItsPaint does
 markup for free and paints too.
 
 It has no network access. The app doesn't request the network entitlement, so the
-sandbox won't let it open a socket, and [three commands](#no-network-and-how-to-check)
+sandbox won't let it open a network connection, and [three commands](#no-network-and-how-to-check)
 will show you that on your own copy.
 
 The drawing engine, PaintKit, has no UI. It imports Foundation, CoreGraphics, ImageIO,
@@ -130,7 +130,7 @@ It works on logos, product shots and scanned diagrams. It's useless on hair.
 ## No network, and how to check
 
 ItsPaint doesn't request `com.apple.security.network.client`, so the kernel won't open a
-socket for it. The first two commands inspect the copy in `/Applications` and the third
+network connection for it. The first two commands inspect the copy in `/Applications` and the third
 searches this repository:
 
 ```bash

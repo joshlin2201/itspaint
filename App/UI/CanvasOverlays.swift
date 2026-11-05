@@ -193,10 +193,10 @@ struct DragOutHandle: View {
                         anchor: frame
                     )
                     : tooltips.endHover(key: "header-drag")
-                // A grab cursor is the other half of the instruction: it says
-                // "drag me" before anyone has waited for any tooltip at all.
-                if hovering { NSCursor.openHand.push() } else { NSCursor.pop() }
             }
+            // A grab cursor is the other half of the instruction: it says
+            // "drag me" before anyone has waited for any tooltip at all.
+            .hoverCursor(.openHand)
             .animation(Tokens.Motion.micro, value: isHovering)
             // The PNG is encoded when a drag actually begins, not on every render
             // of the header: the header follows `revision`, and a full-canvas

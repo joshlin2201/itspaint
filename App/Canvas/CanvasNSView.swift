@@ -361,7 +361,7 @@ final class CanvasNSView: NSView {
                 context.setLineWidth(1)
                 context.stroke(frame.insetBy(dx: -0.5, dy: -0.5))
                 context.restoreGState()
-                drawHandles(around: frame, context: context)
+                drawHandles(around: frame, context: context, always: true)
             }
         }
         drawBrushPreview(context: context, model: model)
@@ -529,11 +529,13 @@ final class CanvasNSView: NSView {
     /// the text box gets the same eight handles and the same look — a box you
     /// can drag by its corners should not be signalled two different ways
     /// depending on which tool made it.
-    private func drawHandles(around frame: CGRect, context: CGContext) {
+    private func drawHandles(around frame: CGRect, context: CGContext, always: Bool = false) {
         // Below this the handles would cover the content they resize; the
         // engine's hit-testing caps its tolerance the same way.
-        guard frame.width > Self.handleScreenSize * 3,
-              frame.height > Self.handleScreenSize * 3 else { return }
+        // A text box always shows them: it has a margin to hold them, and its
+        // handles answer the pointer at every size.
+        guard always || (frame.width > Self.handleScreenSize * 3
+                         && frame.height > Self.handleScreenSize * 3) else { return }
 
         context.saveGState()
         context.setShouldAntialias(true)
@@ -821,28 +823,24 @@ final class CanvasNSView: NSView {
         if window == nil {
             antsTimer?.invalidate()
             antsTimer = nil
-            // Closing a document mid-drag has to hand the cursor back too.
-            releaseGrab()
         } else {
             installSheetShadow()
             updateAntsAnimation()
-            // `NSCursor.push` is a global stack and `finish` is not guaranteed to
-            // run: Command-Tab, a notification stealing focus, or a sheet opening
-            // during a drag all end the carry without a mouse-up. Without this the
-            // pointer stays a closed hand over every window, for the rest of the
-            // session, and nothing the user does brings it back.
+            // Command-Tab, a notification stealing focus, or a sheet opening can
+            // take the key-up and the mouse-up to another window, so what was held
+            // down is let go here rather than waited for.
             for name in [NSWindow.didResignKeyNotification, NSWindow.willCloseNotification] {
                 grabWatch.append(NotificationCenter.default.addObserver(
                     forName: name, object: window, queue: .main
                 ) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.releaseGrab() }
+                    MainActor.assumeIsolated { self?.letGoOfEverything() }
                 })
             }
         }
     }
 
-    /// Observers that hand the grabbed cursor back when the window stops being the
-    /// one the drag belongs to.
+    /// Observers that end a held gesture when the window stops being the one it
+    /// belongs to.
     private var grabWatch: [any NSObjectProtocol] = []
 
     /// A hairline grid, only once a pixel is comfortably larger than the line.
@@ -996,14 +994,17 @@ final class CanvasNSView: NSView {
     }
 
     private func begin(_ event: NSEvent, button: PointerButton) {
-        begin(at: convert(event.locationInWindow, from: nil), button: button, modifiers: event.modifierFlags)
+        begin(at: convert(event.locationInWindow, from: nil), button: button,
+              modifiers: event.modifierFlags, clicks: event.clickCount)
     }
 
-    private func begin(at viewPoint: NSPoint, button: PointerButton, modifiers: NSEvent.ModifierFlags) {
+    private func begin(at viewPoint: NSPoint, button: PointerButton, modifiers: NSEvent.ModifierFlags,
+                       clicks: Int = 1) {
         guard let model else { return }
         // Text formatting remains visible while the box is being edited.
         model.isOptionsExpanded = model.tool == .text
         // A click anywhere lands an open text box before doing anything else.
+        let wasEditingText = textEditor != nil
         guard commitText() else { return }
         window?.makeFirstResponder(self)
 
@@ -1026,14 +1027,16 @@ final class CanvasNSView: NSView {
             return
         }
 
+        // Floating content takes the press whatever the tool, which is what the
+        // pointer has been saying while it was over it.
+        let isOverFloating = model.floating.map {
+            $0.handle(at: point, tolerance: canvasHandleTolerance) != nil || $0.contains(point)
+        } ?? false
+
         // Left button only: right-drag means "paint the background colour",
         // and a text box on the right button would be a second, secret binding.
-        // `clickCount` raises on anything but a mouse event, as the polygon's
-        // double-click below already knows, so only a press is asked.
-        let isDoubleClick = NSApp.currentEvent.map {
-            [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains($0.type) && $0.clickCount > 1
-        } ?? false
-        if button == .primary, model.tool == .text || isDoubleClick,
+        if !isOverFloating, button == .primary,
+           model.tool == .text || (model.tool == .select && clicks > 1),
            let object = model.engine.textObjects.last(where: { $0.frame.contains(point) }) {
             model.tool = .text
             model.isOptionsExpanded = true
@@ -1045,9 +1048,11 @@ final class CanvasNSView: NSView {
             }
             return
         }
-        if model.tool == .text, button == .primary {
+        if !isOverFloating, model.tool == .text, button == .primary {
             textOrigin = point
             textBox = nil
+            textPressLanded = wasEditingText
+            cursorForCurrentTool().set()
             return
         }
         activeButton = button
@@ -1076,23 +1081,10 @@ final class CanvasNSView: NSView {
         } else {
             commit(dirty)
         }
-        // The hand closes while you are actually carrying something. Hovering already
-        // showed an open hand; without this the pointer looks identical before and
-        // during the drag, which is the difference between "you can pick this up" and
-        // "you have it". Space-panning has done this since the beginning and nothing
-        // else did.
-        if model.engine.isMovingContent {
-            NSCursor.closedHand.push()
-            isGrabbing = true
-        }
+        if model.engine.isMovingContent { cursorForCurrentTool().set() }
         // A double-click closes a polygon where it stands, which is the other
         // half of the gesture people already know from every vector tool.
-        // `clickCount` raises on anything but a mouse event, so it is asked last,
-        // and only of a press.
-        if model.tool == .shape, model.shapeKind == .polygon,
-           let press = NSApp.currentEvent,
-           [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(press.type),
-           press.clickCount > 1 {
+        if model.tool == .shape, model.shapeKind == .polygon, clicks > 1 {
             commit(model.engine.closePolygon())
         }
         startSprayingIfNeeded(at: point, button: button)
@@ -1138,6 +1130,7 @@ final class CanvasNSView: NSView {
         if let origin = textOrigin {
             let previous = textBox
             textBox = PixelRect(corners: origin, pixelPoint(for: event))
+            cursorForCurrentTool().set()
             if let previous { invalidate(previous.insetBy(-2)) }
             if let textBox { invalidate(textBox.insetBy(-2)) }
             return
@@ -1149,27 +1142,41 @@ final class CanvasNSView: NSView {
         model.pointerPosition = point
         releaseCanvasSnapshot()
         commit(model.engine.continueStroke(to: point, constrained: isShiftHeld))
+        if model.engine.isMovingContent { cursorForCurrentTool().set() }
     }
 
     private func finish(_ event: NSEvent) {
         if textSelectionAnchor != nil { textSelectionAnchor = nil; return }
         stopSpraying()
         if panOrigin != nil { return endPan() }
+        let release = convert(event.locationInWindow, from: nil)
         if let origin = textOrigin {
             textOrigin = nil
-            openTextEditor(in: textBox ?? PixelRect(corners: origin, origin))
+            let box = textBox
+            // A click that landed a box was for that box. A drag still means a new one.
+            if textPressLanded, box.map({ $0.width < 8 || $0.height < 8 }) ?? true {
+                textBox = nil
+                if let box { invalidate(box.insetBy(-2)) }
+            } else {
+                openTextEditor(in: box ?? PixelRect(corners: origin, origin))
+            }
+            showCursor(at: release)
             return
         }
-        releaseGrab()
         guard let model, activeButton != nil else { return }
         let point = pixelPoint(for: event)
         releaseCanvasSnapshot()
+        let wasCarrying = model.engine.isMovingContent
         let dirty = model.engine.endStroke(at: point, constrained: isShiftHeld)
         activeButton = nil
         commit(dirty)
         model.syncFromEngine()
         updateAntsAnimation()
         needsDisplay = true
+        if wasCarrying {
+            model.pointerPosition = point
+            showCursor(at: release)
+        }
     }
 
     private func commit(_ dirty: PixelRect) {
@@ -1196,7 +1203,17 @@ final class CanvasNSView: NSView {
 
     /// Anchor of the box being dragged out, the box itself, and the live editor.
     private var textOrigin: PixelPoint?
+    /// Whether the press behind `textOrigin` landed an open box.
+    private var textPressLanded = false
     private var textBox: PixelRect?
+    /// The height the person gave the box. Text can grow it past this and never
+    /// below, because the box is theirs and only the overflow is the text's.
+    private var textBoxFloor = 0
+    /// The box as a move or resize found it. A drag is measured from here so that
+    /// rounding and the canvas edge cost nothing: the box is wherever the pointer's
+    /// total travel says, however many events it took to get there.
+    private var textDragStart: PixelRect?
+    private var textDragFloor = 0
     private var textEditor: TextEntryView?
     private var editingTextID: UUID?
     private var textSelectionAnchor: Int?
@@ -1218,8 +1235,11 @@ final class CanvasNSView: NSView {
         // Pulled back inside the canvas if the click was near an edge — a box
         // shorter than the line it holds renders nothing at all, so clicking
         // near the bottom would look like the tool was broken.
+        //
+        // A box being reopened is left exactly as it was: cropping one that hangs
+        // off the picture would rewrap its text.
         var rect = box
-        if rect.width < 8 || rect.height < 8 {
+        if object == nil, rect.width < 8 || rect.height < 8 {
             let lineHeight = TextRenderer.lineHeight(for: style)
             let canvasWidth = model.engine.canvas.width
             let minWidth = min(canvasWidth, Int((style.pointSize * 4).rounded()))
@@ -1229,9 +1249,10 @@ final class CanvasNSView: NSView {
             // running off to the edge would claim every later click along its row.
             rect = PixelRect(x: x, y: y, width: min(canvasWidth - x, max(minWidth, 240)), height: lineHeight)
         }
-        rect = rect.intersection(model.engine.canvas.bounds)
+        if object == nil { rect = rect.intersection(model.engine.canvas.bounds) }
         guard rect.width > 1, rect.height > 1 else { textBox = nil; return }
         textBox = rect
+        textBoxFloor = rect.height
 
         let editor = TextEntryView(frame: .zero)
         editor.contentZoom = zoom
@@ -1254,16 +1275,18 @@ final class CanvasNSView: NSView {
         editor.delegate = self
         editor.onCancel = { [weak self] in self?.cancelText() }
         editor.onCommit = { [weak self] in _ = self?.commitText() }
-        editor.onMove = { [weak self] delta in self?.moveTextBox(by: delta) }
-        editor.onResize = { [weak self] handle, point in
-            self?.resizeTextBox(handle, to: point)
+        editor.onDragBegan = { [weak self] in
+            self?.textDragStart = self?.textBox
+            self?.textDragFloor = self?.textBoxFloor ?? 0
         }
-        editor.handleTolerance = { [weak self] in
-            CGFloat(self?.canvasHandleTolerance ?? 8) * (self?.zoom ?? 1)
-        }
+        editor.onMove = { [weak self] travel in self?.moveTextBox(by: travel) }
+        editor.onResize = { [weak self] handle, travel in self?.resizeTextBox(handle, by: travel) }
 
         addSubview(editor)
         textEditor = editor
+        // A box that exactly fits its text was sized by the text, so it follows the
+        // text. Only spare height is somebody's choice.
+        if object != nil, neededTextHeight(width: rect.width) == rect.height { textBoxFloor = 0 }
         window?.makeFirstResponder(editor)
         editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
         syncSelectedTextStyle()
@@ -1274,14 +1297,25 @@ final class CanvasNSView: NSView {
     /// Grow the box to hold what has been typed.
     ///
     /// The width is the user's — they dragged it out, or resized it by a
-    /// handle — so only the height follows the text. Growing the width too
-    /// would fight the wrap they asked for.
+    /// handle — so only the height follows the text, and only past the height
+    /// they gave it. Growing the width too would fight the wrap they asked for.
     private func growTextBoxToFit() {
-        guard let editor = textEditor, let box = textBox, let model else { return }
-        // The renderer's own measure of the runs, so the box is the height the
-        // text will be drawn at, mixed sizes and all.
+        guard let editor = textEditor, let box = textBox else { return }
+        let height = max(textBoxFloor, neededTextHeight(width: box.width))
+        guard height != box.height else { return }
+
+        let grown = PixelRect(x: box.minX, y: box.minY, width: box.width, height: height)
+        textBox = grown
+        setEditorFrame(editor, box: grown)
+        invalidate(box.union(grown).insetBy(-handleInset))
+    }
+
+    /// How tall the text is at a width, by the renderer's own measure, so the box
+    /// is the height the text will be drawn at, mixed sizes and all.
+    private func neededTextHeight(width: Int) -> Int {
+        guard let editor = textEditor, let model else { return 0 }
         let runs = TextContent.runs(editor.attributedString(), zoom: zoom)
-        let needed = runs.isEmpty ? 0 : TextRenderer.measure(runs, maxWidth: box.width).height
+        let needed = runs.isEmpty ? 0 : TextRenderer.measure(runs, maxWidth: width).height
         let lineHeight = TextRenderer.lineHeight(for: model.engine.settings.textStyle)
 
         // CoreText drops exactly one trailing empty line, so pressing Return at the
@@ -1294,43 +1328,48 @@ final class CanvasNSView: NSView {
         // measured, so counting them all made a box three times too tall after three
         // Returns — which a test caught, having been written to the wrong rule first.
         let endsOnEmptyLine = editor.string.last?.isNewline == true
-        let height = max(lineHeight, needed + (endsOnEmptyLine ? lineHeight : 0))
-        guard height != box.height else { return }
-
-        let grown = PixelRect(x: box.minX, y: box.minY, width: box.width, height: height)
-        let previous = box
-        textBox = grown
-        editor.setBoxFrame(NSRect(
-            x: Double(grown.minX) * zoom, y: Double(grown.minY) * zoom,
-            width: Double(grown.width) * zoom, height: Double(grown.height) * zoom
-        ))
-        invalidate(previous.union(grown).insetBy(-handleInset))
+        return max(lineHeight, needed + (endsOnEmptyLine ? lineHeight : 0))
     }
 
-    /// Drag one of the box's own handles.
-    private func resizeTextBox(_ handle: PixelRect.Handle, to windowPoint: NSPoint) {
-        guard let editor = textEditor, let box = textBox, let model else { return }
-        let point = pixelPoint(from: convert(windowPoint, from: nil))
-        let constrained = PixelPoint(x: max(0, min(model.engine.canvas.width, point.x)),
-                                     y: max(0, min(model.engine.canvas.height, point.y)))
-        let resized = box.dragging(handle, to: constrained, uniform: false)
+    /// Drag one of the box's own handles, `travel` points from the press.
+    ///
+    /// Only the edges the handle owns move, and only as far as the pointer took them.
+    /// An edge stops at the canvas and at the height of the text, and the opposite
+    /// edge stays put. Text that needs more room than the drag gave it, because a
+    /// narrower box wraps, grows the bottom, as it does for typing. Sideways travel
+    /// says nothing about height, so it leaves the height the person chose alone.
+    private func resizeTextBox(_ handle: PixelRect.Handle, by travel: NSPoint) {
+        guard let editor = textEditor, let box = textBox, let start = textDragStart, let model else { return }
+        let canvas = model.engine.canvas
+        let smallest = 8
+        var (left, right, top, bottom) = (start.minX, start.maxX, start.minY, start.maxY)
 
-        // A box narrower than one character renders nothing, and a box dragged
-        // off-canvas can never be typed into again.
-        guard resized.width >= 8, resized.height >= 8,
-              resized.intersection(model.engine.canvas.bounds).width > 4 else { return }
+        if handle.movesLeft { left = max(0, min(left + pixels(travel.x), right - smallest)) }
+        if handle.movesRight {
+            right = min(max(canvas.width, right), max(right + pixels(travel.x), left + smallest))
+        }
+        // The width settles first, because it decides how tall the text is.
+        let needed = max(smallest, neededTextHeight(width: right - left))
+        let down = pixels(travel.y)
+        textBoxFloor = textDragFloor
+        if handle.movesTop, down != 0 {
+            let wanted = max(0, min(top + down, bottom - smallest))
+            textBoxFloor = bottom - wanted
+            top = wanted <= bottom - needed ? wanted : max(bottom - needed, min(top, wanted))
+        }
+        if handle.movesBottom, down != 0 {
+            bottom = min(max(canvas.height, bottom), max(bottom + down, top + smallest))
+            textBoxFloor = bottom - top
+        }
 
-        let previous = box
+        let resized = PixelRect(x: left, y: top, width: right - left, height: max(textBoxFloor, needed))
         textBox = resized
-        editor.setBoxFrame(NSRect(
-            x: Double(resized.minX) * zoom, y: Double(resized.minY) * zoom,
-            width: Double(resized.width) * zoom, height: Double(resized.height) * zoom
-        ))
-        invalidate(previous.union(resized).insetBy(-handleInset))
-        // Rewrapping at the new width can need more lines than before.
-        growTextBoxToFit()
+        setEditorFrame(editor, box: resized)
+        invalidate(box.union(resized).insetBy(-handleInset))
         updateLiveText()
     }
+
+    private func pixels(_ points: CGFloat) -> Int { Int((points / zoom).rounded()) }
 
     /// Room around the box for its handles, in canvas pixels.
     private var handleInset: Int { max(2, Int((Self.handleScreenSize / max(zoom, 0.01)).rounded())) }
@@ -1431,27 +1470,24 @@ final class CanvasNSView: NSView {
     ///
     /// Text you have to delete and retype because it landed four pixels left is
     /// the reason every other markup tool lets you move it.
-    private func moveTextBox(by delta: NSPoint) {
-        guard let editor = textEditor, let box = textBox, let model else { return }
+    ///
+    /// Stops at the top and left, where a document cannot store a box, and with
+    /// eight pixels showing at the bottom and right, so it can always be reached.
+    private func moveTextBox(by travel: NSPoint) {
+        guard let editor = textEditor, let box = textBox, let start = textDragStart, let model else { return }
+        let target = model.engine.snapped(PixelPoint(x: start.minX + pixels(travel.x),
+                                                     y: start.minY + pixels(travel.y)))
         let moved = PixelRect(
-            x: max(0, min(model.engine.canvas.width - 8, box.minX + Int((delta.x / zoom).rounded()))),
-            y: max(0, min(model.engine.canvas.height - 8, box.minY + Int((delta.y / zoom).rounded()))),
+            x: max(0, min(model.engine.canvas.width - 8, target.x)),
+            y: max(0, min(model.engine.canvas.height - 8, target.y)),
             width: box.width, height: box.height
         )
-        // Kept reachable: a box dragged entirely off-canvas could never be
-        // typed into again.
-        guard moved.intersection(model.engine.canvas.bounds).width > 4,
-              moved.intersection(model.engine.canvas.bounds).height > 4 else { return }
-        let previous = box
         textBox = moved
-        editor.setBoxFrame(NSRect(
-            x: Double(moved.minX) * zoom, y: Double(moved.minY) * zoom,
-            width: Double(moved.width) * zoom, height: Double(moved.height) * zoom
-        ))
+        setEditorFrame(editor, box: moved)
         // **Redraw the frame.** Without this only the editor moved: the border
         // and the handles are drawn by the canvas and stayed where they were, so
         // dragging the box looked like dragging the text and caret out of it.
-        invalidate(previous.union(moved).insetBy(-handleInset))
+        invalidate(box.union(moved).insetBy(-handleInset))
         updateLiveText()
     }
 
@@ -1542,13 +1578,12 @@ final class CanvasNSView: NSView {
 
         if event.keyCode == 49 {  // Space
             isSpaceHeld = true
-            NSCursor.openHand.set()
+            showCursor()
             return
         }
 
         switch event.keyCode {
         case 53:  // Escape — the one key that gets you out of anything.
-            releaseGrab()
             cancelText()
             if let box = textBox { textOrigin = nil; textBox = nil; invalidate(box.insetBy(-2)) }
             stopSpraying()
@@ -1560,6 +1595,7 @@ final class CanvasNSView: NSView {
             commit(dirty)
             model.syncFromEngine()
             needsDisplay = true
+            showCursor()
             return
 
         case 36, 76:  // Return / Enter — finish whatever is in flight.
@@ -1744,14 +1780,14 @@ final class CanvasNSView: NSView {
     private func beginPan(at point: NSPoint) {
         panOrigin = point
         panScroll = enclosingScrollView?.contentView.bounds.origin
-        NSCursor.closedHand.push()
+        showCursor()
     }
 
     private func endPan() {
         guard panOrigin != nil else { return }
         panOrigin = nil
         panScroll = nil
-        NSCursor.pop()
+        showCursor()
     }
 
     private func continuePan(to point: NSPoint) {
@@ -1788,8 +1824,8 @@ final class CanvasNSView: NSView {
     /// invalidate it. Every tool was affected; the pencil was simply the one
     /// whose cursor is most obviously wrong when it does not appear.
     ///
-    /// Keyed on everything `cursorForCurrentTool` actually reads, so it cannot
-    /// go stale again when a new dependency is added there without thinking.
+    /// Keyed on what `cursorForCurrentTool` reads at rest. A gesture in progress is
+    /// not in the key, because it sets the cursor itself: see `showCursor`.
     func refreshCursorIfNeeded() {
         guard let model else { return }
         let key = CursorKey(
@@ -1823,23 +1859,48 @@ final class CanvasNSView: NSView {
 
     private var cursorKey: CursorKey?
 
-    /// Whether a closed-hand cursor is currently pushed, so it is popped exactly once.
-    private var isGrabbing = false
-
-    /// Put the grabbed cursor back.
+    /// Put the pointer right now, and rebuild the rects that keep it right.
     ///
-    /// Every way a carry can end has to come through here. `NSCursor.push` and `pop`
-    /// are a stack, so a push that is only popped on mouse-up survives an Escape and
-    /// leaves the pointer stuck as a closed hand over a canvas that is not being
-    /// dragged — for the rest of the session.
-    private func releaseGrab() {
-        guard isGrabbing else { return }
-        isGrabbing = false
-        NSCursor.pop()
+    /// Cursor rects are not consulted while a button is down, so a gesture has to
+    /// say what it is holding and say it again when it lets go. Always `set`, and
+    /// never the `push`/`pop` stack: the stack is global, so any way of ending a
+    /// drag that missed its `pop` left the wrong pointer over every window.
+    private func showCursor(at point: NSPoint? = nil) {
+        window?.invalidateCursorRects(for: self)
+        let pointer = point ?? window.map { convert($0.mouseLocationOutsideOfEventStream, from: nil) }
+        if pointer.map({ bounds.contains($0) }) ?? false { cursorForCurrentTool().set() }
+    }
+
+    /// The window stopped being key, so nothing is held down here any more.
+    private func letGoOfEverything() {
+        isSpaceHeld = false
+        endPan()
+        stopSpraying()
+        textSelectionAnchor = nil
+        if textOrigin != nil {
+            textOrigin = nil
+            if let box = textBox { textBox = nil; invalidate(box.insetBy(-2)) }
+        }
+        if let model, activeButton != nil {
+            activeButton = nil
+            commit(model.engine.endStroke(at: model.pointerPosition))
+            model.syncFromEngine()
+        }
+        window?.invalidateCursorRects(for: self)
     }
 
     private func cursorForCurrentTool() -> NSCursor {
         guard let model else { return .arrow }
+
+        // A gesture in progress says what it holds, wherever the pointer has got to.
+        // The hand closes on a carry because a hover already showed it open: that is
+        // the difference between "you can pick this up" and "you have it". A resize
+        // keeps the arrows it was picked up by.
+        if panOrigin != nil { return .closedHand }
+        if textOrigin != nil { return .crosshair }
+        if let handle = model.engine.resizingHandle { return Self.cursor(for: handle) }
+        if model.engine.isMovingContent { return .closedHand }
+
         if model.engine.hasPendingShape { return .crosshair }
 
         // Over floating content the pointer means "resize" or "move", so it
@@ -2092,19 +2153,26 @@ final class TextEntryView: NSTextView {
 
     private enum BoxDrag {
         case resize(PixelRect.Handle)
-        case move(NSPoint)
+        case move
+
+        @MainActor var cursor: NSCursor {
+            switch self {
+            case .resize(let handle): CanvasNSView.cursor(for: handle)
+            case .move: .closedHand
+            }
+        }
     }
     private var boxDrag: BoxDrag?
+    private var boxDragPress: NSPoint = .zero
     private var didDragBox = false
 
     var onCancel: (() -> Void)?
     var onCommit: (() -> Void)?
+    var onDragBegan: (() -> Void)?
+    /// Move and resize report the pointer's total travel since the press, in
+    /// points, down and right being positive.
     var onMove: ((NSPoint) -> Void)?
-    /// Reports a handle drag, in window coordinates.
     var onResize: ((PixelRect.Handle, NSPoint) -> Void)?
-    /// Grab radius in this view's own points, supplied by the canvas so it
-    /// tracks zoom the same way the floating selection's does.
-    var handleTolerance: (() -> CGFloat)?
 
     func applyStyle(_ style: TextRenderer.Style, change: EditorModel.TextStyleChange, zoom: Double) {
         breakUndoCoalescing()
@@ -2321,7 +2389,7 @@ final class TextEntryView: NSTextView {
         didDragBox = false
 
         if let handle = handle(at: local) {
-            boxDrag = .resize(handle)
+            beginBoxDrag(.resize(handle), at: event)
             return
         }
 
@@ -2333,11 +2401,18 @@ final class TextEntryView: NSTextView {
         // border is the only region that can carry it: the interior has to keep
         // meaning "select text", or the box stops being a text field.
         if isOnBorder(local) || event.modifierFlags.contains(.command) {
-            boxDrag = .move(event.locationInWindow)
+            beginBoxDrag(.move, at: event)
             return
         }
 
         super.mouseDown(with: event)
+    }
+
+    private func beginBoxDrag(_ drag: BoxDrag, at event: NSEvent) {
+        boxDrag = drag
+        boxDragPress = event.locationInWindow
+        onDragBegan?()
+        drag.cursor.set()
     }
 
     /// Whether a point is in the draggable frame around the editable area.
@@ -2348,21 +2423,29 @@ final class TextEntryView: NSTextView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        if boxDrag != nil { didDragBox = true }
-        switch boxDrag {
-        case .resize(let handle): onResize?(handle, event.locationInWindow)
-        case .move(let last):
-            let point = event.locationInWindow
-            onMove?(NSPoint(x: point.x - last.x, y: last.y - point.y))
-            boxDrag = .move(point)
-        case nil: super.mouseDragged(with: event)
+        guard let drag = boxDrag else { return super.mouseDragged(with: event) }
+        didDragBox = true
+        let point = event.locationInWindow
+        let travel = NSPoint(x: point.x - boxDragPress.x, y: boxDragPress.y - point.y)
+        switch drag {
+        case .resize(let handle): onResize?(handle, travel)
+        case .move: onMove?(travel)
         }
+        drag.cursor.set()
     }
 
     override func mouseUp(with event: NSEvent) {
         guard boxDrag != nil else { super.mouseUp(with: event); return }
         if didDragBox { mouseDragged(with: event) }
         boxDrag = nil
+        window?.invalidateCursorRects(for: self)
+        let local = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(local) else { return }
+        if let handle = handle(at: local) {
+            CanvasNSView.cursor(for: handle).set()
+        } else {
+            (isOnBorder(local) ? NSCursor.openHand : .iBeam).set()
+        }
     }
 
     /// The handle under a point in this view's coordinates.
@@ -2423,22 +2506,27 @@ final class TextEntryView: NSTextView {
         }
 
         // Handles last, so they win over the frame they sit on.
+        for (handle, spot) in handleSpots {
+            for strip in frameStrips {
+                let outside = spot.intersection(strip)
+                if !outside.isEmpty { addCursorRect(outside, cursor: CanvasNSView.cursor(for: handle)) }
+            }
+        }
+    }
+
+    /// Where the arrows show, sized the way `PixelRect.handle(at:tolerance:)` sizes
+    /// a grab, cap and all, so the pointer never promises a resize a press won't do.
+    var handleSpots: [(handle: PixelRect.Handle, spot: NSRect)] {
+        let box = boxBounds
         let rect = PixelRect(
             x: 0, y: 0,
             width: max(1, Int(box.width.rounded())),
             height: max(1, Int(box.height.rounded()))
         )
-        for (handle, centre) in rect.handleCentres() {
-            let spot = NSRect(
-                x: box.minX + CGFloat(centre.x) - handleMargin,
-                y: box.minY + CGFloat(centre.y) - handleMargin,
-                width: handleMargin * 2, height: handleMargin * 2
-            ).intersection(bounds)
-            guard !spot.isEmpty else { continue }
-            for strip in frameStrips {
-                let outside = spot.intersection(strip)
-                if !outside.isEmpty { addCursorRect(outside, cursor: CanvasNSView.cursor(for: handle)) }
-            }
+        let reach = CGFloat(min(Int(handleMargin.rounded()), max(1, min(rect.width, rect.height) / 3)))
+        return rect.handleCentres().map { handle, centre in
+            (handle, NSRect(x: box.minX + CGFloat(centre.x) - reach, y: box.minY + CGFloat(centre.y) - reach,
+                            width: reach * 2 + 1, height: reach * 2 + 1).intersection(bounds))
         }
     }
 

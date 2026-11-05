@@ -42,7 +42,10 @@ enum Tokens {
 
     enum Size {
         /// Inner element of a segmented control.
-        static let segment: CGFloat = 21
+        static let segment: CGFloat = 22
+        /// Any one control in the options panel, so that a choice and a value
+        /// beside each other are the same height: a segment in its track, or a `Mark`.
+        static let optionControl: CGFloat = segment + 4
         /// The options panel's label column.
         ///
         /// Fixed, so "Tip", "Fill", "Line" and "Align" all end at the same x and
@@ -50,13 +53,13 @@ enum Tokens {
         /// difference between a panel and a stack of unrelated rows that happen to
         /// share a background.
         ///
-        /// Continuous values do not use it: a `Mark` carries its own name on a
-        /// caption line and takes the panel's whole width for its track. See
-        /// `OptionRow`, which states the rule and why it is two rules.
-        static let optionLabel: CGFloat = 42
-        /// `GeometryReader` offers only 10pt intrinsically, which is not enough
-        /// travel for a size mark when the bottom panel measures its own row.
-        static let horizontalMarkMinimum: CGFloat = 96
+        /// Continuous values do not use it: a `Mark` carries its own name inside
+        /// its track and takes the panel's whole width. See `OptionRow`.
+        static let optionLabel: CGFloat = 40
+        /// `GeometryReader` offers only 10pt intrinsically, so the bottom panel needs
+        /// a floor when it measures its own row. This one holds a mark's name, nib and
+        /// value on one line: "Opacity" and "100%" are the longest pair.
+        static let horizontalMarkMinimum: CGFloat = 128
         /// An action button inside the options panel.
         static let pillAction: CGFloat = 26
         /// A tool cell in the rail.
@@ -134,6 +137,9 @@ enum Tokens {
     enum Fill {
         /// The trough a segmented control or a grid sits in.
         static let track: Double = 0.12
+        /// How far a `Mark` has filled, over the track.
+        static let mark: Double = 0.16
+        static let markActive: Double = 0.24
         /// The faintest step: an unselected cell *inside* a track, or the well a
         /// grid sits in. Present, so an all-off toggle group still reads as
         /// three keys rather than three loose glyphs.
@@ -286,7 +292,7 @@ enum Tokens {
         /// It is also what lets the panel's rows share a grid. A panel that
         /// sizes to its widest row cannot align anything, because every tool
         /// gives it a different width to align to.
-        static let optionsWidth: CGFloat = 258
+        static let optionsWidth: CGFloat = 236
         /// Inside the panel's own padding.
         static let optionsContentWidth: CGFloat = optionsWidth - Space.snug * 2
     }
@@ -401,22 +407,23 @@ enum Tokens {
 struct SelectedSegmentFill: View {
     var cornerRadius: CGFloat = Tokens.Radius.segmentInner
 
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    /// A thumb raised out of the track. Neutral, because accent is the armed tool's
+    /// and a panel of settings is not a panel of armed tools.
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         shape
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color.accentColor.opacity(1),
-                        Color.accentColor.opacity(0.88),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
+            .fill(scheme == .dark ? Color.white.opacity(0.22) : Color.white)
             .overlay {
-                shape.strokeBorder(.white.opacity(0.22), lineWidth: Tokens.Elevation.hairline)
+                shape.strokeBorder(
+                    contrast == .increased ? AnyShapeStyle(.primary.opacity(0.6))
+                        : AnyShapeStyle(Color.white.opacity(scheme == .dark ? 0.1 : 0)),
+                    lineWidth: contrast == .increased ? 1 : Tokens.Elevation.hairline
+                )
             }
+            .shadow(color: .black.opacity(scheme == .dark ? 0.3 : 0.16), radius: 1.5, y: 0.5)
     }
 }
 

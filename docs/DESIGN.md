@@ -70,7 +70,7 @@ with steppers. It is pure read-out, so it gets the lightest surface of anything.
 | | |
 |---|---|
 | **Spacing** | 2 hair · 5 tight · 8 base · 10 snug · 14 comfortable · 20 safe inset |
-| **Controls** | 16 swatch · 18 colour swap · 24 segment · 24 colour well · 26 pill action · 26 title chip · 34 tool cell |
+| **Controls** | 16 swatch · 18 colour swap · 22 segment · 26 option control · 24 colour well · 26 pill action · 26 title chip · 34 tool cell |
 | **Radii** | 16 rail · 12 panel · 11 cell · 10 well · 8 chip · 7 segment track · 5 segment inner · 4 swatch |
 | **Rail** | run = 1 × 34 = **34pt**; cross = **34.08pt** (the overlapped colour pair, the widest thing in it); **thickness ≈48pt on either edge** |
 | **Elevation** | 0.5pt hairline · 18pt shadow radius · 7pt y-offset |
@@ -116,8 +116,10 @@ weaker illusion of one.
 to the material's own label colours, so the app tracks appearance, accent,
 Increase Contrast and Reduce Transparency for free.
 
-The **accent means exactly one thing**: this is the armed tool, or the selected
-option. Nothing else in the chrome uses it. That is why the swatch grid marks the
+The **accent means exactly one thing**: this is the armed tool. Nothing else in the
+chrome uses it. A selected option in a panel is a neutral thumb raised out of its
+track, because a panel of settings is not a panel of armed tools, and three blue bars
+would out-shout the one that matters. That is also why the swatch grid marks the
 loaded colours with a ring in the swatch's *own* contrast colour rather than an
 accent border — an accent ring there would collide with "selected tool", and an
 outer ring would shift every neighbour by a pixel as selection moved.

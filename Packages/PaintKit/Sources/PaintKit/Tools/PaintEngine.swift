@@ -81,7 +81,9 @@ public final class PaintEngine {
         /// Dragging floating content around.
         case moveFloating(grab: PixelPoint, startOrigin: PixelPoint)
         /// Dragging one of the floating content's resize handles.
-        case resizeFloating(handle: FloatingSelection.Handle)
+        /// `offset` is how far from the handle's centre it was picked up, so the
+        /// edge starts where it is rather than jumping to the pointer.
+        case resizeFloating(handle: FloatingSelection.Handle, offset: PixelPoint)
         /// Bending a chord that has already been drawn — the curve's second step.
         case bend(before: Bitmap, a: PixelPoint, b: PixelPoint, dirty: PixelRect, button: PointerButton)
         /// A press inside an Instant Alpha selection, before it is known whether
@@ -265,7 +267,9 @@ public final class PaintEngine {
 
         // A handle beats everything else, including the content underneath it.
         if let floating, let handle = floating.handle(at: point, tolerance: handleTolerance) {
-            gesture = .resizeFloating(handle: handle)
+            let centre = floating.frame.handleCentres().first { $0.handle == handle }?.centre ?? point
+            gesture = .resizeFloating(handle: handle,
+                                      offset: PixelPoint(x: centre.x - point.x, y: centre.y - point.y))
             activeRegionSize = (floating.frame.width, floating.frame.height)
             return .empty
         }
@@ -606,11 +610,12 @@ public final class PaintEngine {
             activeRegionSize = (floating.frame.width, floating.frame.height)
             return previous.union(floating.frame).insetBy(-handleTolerance)
 
-        case let .resizeFloating(handle):
+        case let .resizeFloating(handle, offset):
             guard var floating else { return .empty }
             let previous = floating.frame
+            let target = PixelPoint(x: point.x + offset.x, y: point.y + offset.y)
             // Frame only; the pixels render once, when the drag ends.
-            floating.stretch(to: floating.frame(draggingHandle: handle, to: point, uniform: constrained))
+            floating.stretch(to: floating.frame(draggingHandle: handle, to: target, uniform: constrained))
             self.floating = floating
             activeRegionSize = (floating.frame.width, floating.frame.height)
             return previous.union(floating.frame).insetBy(-handleTolerance)
@@ -1953,6 +1958,11 @@ public final class PaintEngine {
         }
     }
 
+    /// The handle a live resize is holding, so the pointer can keep showing it.
+    public var resizingHandle: FloatingSelection.Handle? {
+        if case let .resizeFloating(handle, _) = gesture { handle } else { nil }
+    }
+
     public private(set) var cloneSource: PixelPoint?
 
     /// Destination to source, fixed at the first destination of a pairing.
@@ -2482,7 +2492,7 @@ public final class PaintEngine {
     ///
     /// Clamped to the canvas afterwards, so snapping near an edge cannot round a
     /// point off the picture.
-    func snapped(_ point: PixelPoint) -> PixelPoint {
+    public func snapped(_ point: PixelPoint) -> PixelPoint {
         let grid = settings.snapGrid
         guard grid > 1 else { return point }
         func round(_ v: Int, _ limit: Int) -> Int {

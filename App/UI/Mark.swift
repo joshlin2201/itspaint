@@ -1,43 +1,35 @@
 import SwiftUI
 
-/// A continuous value, shown as the thing it controls.
+/// A continuous value, as one object you can read and drag.
 ///
 /// **Every continuous value in the tool options panel is one of these.**
 ///
-/// What it replaced was four pieces saying one word: a 42pt right-aligned label, a
-/// stock `Slider` at `.mini`, a trailing number, and a second row of capsules for the
-/// same integer. Once one property is a label plus a grey pill, every property is a
-/// label plus a grey pill, and after three rows the panel is one grey surface with no
-/// way to tell which tool you are holding.
+/// A field and a slider in the same 26pt: the name on the left, the value on the
+/// right, and the fill behind them is the value again. Nothing sits on a line of its
+/// own, so a panel of three values is three rows rather than six, and every row
+/// starts and ends at the same x without a label column to line up.
 ///
-/// The rule this is built to: cover the panel's title and you should still know the
-/// tool. So the size control carries a wedge that gets thicker to the right, the
-/// highlighter's opacity control *is* a wash of the current ink, and a meter that only
-/// reports a number recedes rather than competing.
-///
-/// The name **is** drawn, on the caption line beside the value. It was not, on the
-/// argument that the property names itself — which holds for a yellow wash and does
-/// not hold for the five plain meters this control also draws, where a grey trough
-/// over the number `16` says nothing about whether that is a tolerance, a block size
-/// or a corner radius.
+/// The styles still say what the number is for. Size carries a dot that is the
+/// nib, drawn to scale, and stops along its foot. The highlighter's fill is its own
+/// ink. A meter only reports a number and recedes.
 ///
 /// One `DragGesture(minimumDistance: 0)` over a `GeometryReader` rather than `Slider`,
 /// because the AppKit knob is the giveaway that nobody looked at this panel.
 struct Mark: View {
 
     enum Style {
-        /// Size and stroke weight. A wedge, thin to thick, with ticks at the stops.
+        /// Size and stroke weight. The nib to scale, with dots at the stops.
         case wedge(stops: [Int])
-        /// Highlighter opacity. The track is the ink itself, 10% to 80%.
+        /// Highlighter opacity. The fill is the ink itself, at that opacity.
         case wash(ink: Color)
-        /// Flow, match, block size. A plain fill that must not outrank a wedge.
+        /// Flow, match, block size. A plain fill and nothing more.
         case meter
     }
 
     @Binding var value: Double
     let range: ClosedRange<Double>
     let style: Style
-    /// Drawn at the head of the caption line, and read by VoiceOver.
+    /// Drawn at the head of the track, and read by VoiceOver.
     let name: String
     var gamma: Double = 1
     var readout: String
@@ -49,8 +41,7 @@ struct Mark: View {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.optionsAxisIsVertical) private var isVertical
 
-    private let trackHeight: CGFloat = 8
-    private let hitHeight: CGFloat = 16
+    private let height = Tokens.Size.optionControl
 
     // MARK: - The curve
 
@@ -92,37 +83,7 @@ struct Mark: View {
     }
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: Tokens.Space.hair) {
-            // **The name, on the line the readout was already using.**
-            //
-            // `Mark`'s original claim was that the property names itself and the
-            // word belongs in VoiceOver. That holds for the wash — a yellow track
-            // is a highlighter and nothing else — and it does not hold for the
-            // five plain meters this control now also draws: a grey trough over
-            // the number `16` says nothing about whether that is a tolerance, a
-            // block size or a corner radius. The panel has already had the "which
-            // Size is this one" problem badly enough to rename a row to "Area".
-            //
-            // It costs the left half of a line that was empty, and it lets these
-            // marks leave `OptionRow`'s 42pt label column entirely — so every
-            // track in the panel now starts and ends at the same x, which is the
-            // alignment this panel exists to have.
-            HStack(spacing: Tokens.Space.tight) {
-                Text(name)
-                    // The same size as the value beside it. The panel's label font
-                    // is 11.5 and the readout is 11, and two sizes on one line is
-                    // exactly the accidental look this control was built to stop.
-                    .font(.system(size: 11))
-                    .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
-                Spacer(minLength: Tokens.Space.tight)
-                Text(readout)
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                    .foregroundStyle(.primary.opacity(isDragging ? Tokens.Ink.strong : Tokens.Ink.regular))
-            }
-            .frame(height: 14)
-            .animation(Tokens.Motion.micro, value: isDragging)
-            track
-        }
+        track
         // A `GeometryReader` offers only 10pt intrinsically, so a mark measuring
         // its own row along the bottom bar collapses to a stub. Here rather than
         // at each call site: it was on `widthMark` alone, and the six controls
@@ -151,14 +112,17 @@ struct Mark: View {
             let width = geo.size.width
             ZStack(alignment: .leading) {
                 bed(width: width)
-                if case .wedge(let stops) = style {
-                    ForEach(stops, id: \.self) { stop in
-                        tick(at: stop, width: width)
+                if isHovering || isDragging {
+                    if case .wedge(let stops) = style {
+                        ForEach(stops, id: \.self) { stop in
+                            tick(at: stop, width: width)
+                        }
                     }
+                    caret(width: width)
                 }
-                caret(width: width)
+                caption
             }
-            .frame(width: width, height: hitHeight)
+            .frame(width: width, height: height)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -169,92 +133,87 @@ struct Mark: View {
                     .onEnded { _ in isDragging = false }
             )
             .onTapGesture(count: 2) { value = normal }
-            .onHover { hovering in
-                isHovering = hovering
-                // The pointer says which way this moves before it is touched.
-                hovering ? NSCursor.resizeLeftRight.push() : NSCursor.pop()
-            }
+            .onHover { isHovering = $0 }
+            // The pointer says which way this moves before it is touched.
+            .hoverCursor(.resizeLeftRight)
         }
-        .frame(height: hitHeight)
+        .frame(height: height)
     }
 
-    /// The trough, or in the wash's case the ink itself.
-    @ViewBuilder
+    /// The trough, and the value filling it from the left.
     private func bed(width: CGFloat) -> some View {
-        switch style {
-        case .wash(let ink):
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [ink.opacity(0.10), ink.opacity(0.80)],
-                    startPoint: .leading, endPoint: .trailing
-                ))
-                .overlay {
-                    // Required in both appearances: a pale yellow ink over a light
-                    // tint floor has no edge of its own.
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .strokeBorder(.primary.opacity(contrast == .increased ? 0.5 : 0.18), lineWidth: 0.5)
-                }
-                .frame(height: trackHeight)
-        case .wedge:
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(.primary.opacity(Tokens.Fill.track))
-                .overlay(alignment: .leading) { Wedge().fill(.primary.opacity(Tokens.Ink.regular)).padding(1) }
-                .overlay { increaseContrastEdge }
-                .frame(height: trackHeight)
-        case .meter:
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(.primary.opacity(Tokens.Fill.track))
-                .overlay(alignment: .leading) {
-                    GeometryReader { g in
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(.primary.opacity(Tokens.Ink.muted))
-                            .frame(width: max(0, g.size.width * t))
-                    }
-                    .padding(1)
-                }
-                .overlay { increaseContrastEdge }
-                .frame(height: trackHeight)
-        }
-    }
-
-    @ViewBuilder
-    private var increaseContrastEdge: some View {
-        if contrast == .increased {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .strokeBorder(.primary.opacity(0.5), lineWidth: 1)
-        }
-    }
-
-    /// The caret **grows** under the pointer rather than merely brightening.
-    ///
-    /// Landing a value was never the problem — the whole 16pt track is the hit
-    /// area and a click anywhere jumps the value, so nobody has to aim at a
-    /// hairline. Knowing it is draggable *at all* was the problem, and the answer
-    /// to that was 0.82 → 0.92 opacity on a 1.5pt line, which is no answer.
-    ///
-    /// A hairline at rest, an unmistakable grab handle the moment the pointer
-    /// arrives — which is the only moment discoverability is being asked for.
-    /// Still not an AppKit knob: no bezel, no fill, no shadow, no accent.
-    private func caret(width: CGFloat) -> some View {
-        let active = isHovering || isDragging
-        let thickness: CGFloat = active ? 3 : 1.5
-        return Capsule(style: .continuous)
-            .fill(.primary.opacity(active ? Tokens.Ink.strong : Tokens.Ink.regular))
-            .frame(width: thickness, height: active ? 16 : 14)
-            .offset(x: max(0, min(width - thickness, width * t - thickness / 2)))
+        let shape = RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
+        return shape
+            .fill(.primary.opacity(Tokens.Fill.track))
             .animation(Tokens.Motion.micro, value: isHovering)
-            .animation(Tokens.Motion.micro, value: isDragging)
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(fill)
+                    .frame(width: max(0, width * t))
+            }
+            .clipShape(shape)
+            .overlay {
+                if contrast == .increased { shape.strokeBorder(.primary.opacity(0.5), lineWidth: 1) }
+            }
     }
 
-    /// A stop, drawn on the trough rather than as a second row of capsules below it.
+    private var fill: AnyShapeStyle {
+        if case .wash(let ink) = style { return AnyShapeStyle(ink.opacity(value)) }
+        return AnyShapeStyle(.primary.opacity(isDragging || contrast == .increased ? Tokens.Fill.markActive : Tokens.Fill.mark))
+    }
+
+    /// The name and the number, over the fill and out of the pointer's way.
+    private var caption: some View {
+        HStack(spacing: Tokens.Space.tight) {
+            Text(name)
+                .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
+                .fixedSize()
+            Spacer(minLength: 0)
+            if case .wedge = style { nib }
+            Text(readout)
+                .font(.system(size: 11.5, weight: .medium).monospacedDigit())
+                .foregroundStyle(.primary.opacity(Tokens.Ink.strong))
+                .fixedSize()
+        }
+        .font(.system(size: 11.5))
+        // A pale ink can sit under the words, so the words bring their own edge.
+        .shadow(color: isWash ? .black.opacity(0.45) : .clear, radius: 1)
+        .padding(.horizontal, Tokens.Space.snug)
+        .allowsHitTesting(false)
+    }
+
+    private var isWash: Bool {
+        if case .wash = style { true } else { false }
+    }
+
+    /// The nib, to scale for as far as the row has room, in place of a word for it.
+    private var nib: some View {
+        Circle()
+            .fill(.primary.opacity(Tokens.Ink.regular))
+            .frame(width: 2 + 12 * CGFloat(t), height: 2 + 12 * CGFloat(t))
+            .frame(width: 14, height: 14)
+    }
+
+    /// A line at the end of the fill, for as long as the pointer is here: the moment
+    /// anybody is asking whether this drags. At rest the fill's own edge is the value,
+    /// and a line would only cut through the name at the low end of the track.
+    private func caret(width: CGFloat) -> some View {
+        let thickness: CGFloat = 2.5
+        return Capsule(style: .continuous)
+            .fill(.primary.opacity(Tokens.Ink.strong))
+            .frame(width: thickness, height: height - 8)
+            .offset(x: max(2, min(width - thickness - 2, width * CGFloat(t) - thickness / 2)))
+    }
+
+    /// A stop, as a dot along the foot of the track, clear of the words. Only under the
+    /// pointer, because that is the only time they do anything.
     private func tick(at stop: Int, width: CGFloat) -> some View {
         let active = Int(value.rounded()) == stop
-        return Capsule(style: .continuous)
+        return Circle()
             .fill(.primary.opacity(active ? Tokens.Ink.strong : Tokens.Ink.faint))
-            .frame(width: active ? 1.5 : 1, height: active ? 12 : 10)
-            .offset(x: width * fraction(of: Double(stop)))
+            .frame(width: 2.5, height: 2.5)
+            .offset(x: width * CGFloat(fraction(of: Double(stop))) - 1.25, y: height / 2 - 4)
             .allowsHitTesting(false)
-            .help("\(stop) px")
     }
 
     /// Within three points of a stop, take the stop. Leave the band and it is free
@@ -265,25 +224,6 @@ struct Mark: View {
             return Double(stop)
         }
         return raw
-    }
-}
-
-/// The wedge inside a size trough: thin on the left, thick on the right, so the
-/// control says "how wide" without the word.
-private struct Wedge: Shape {
-    func path(in rect: CGRect) -> Path {
-        // Half a point at the thin end and the full trough at the thick end. An
-        // earlier version ran 2pt to 6pt inside an 8pt trough, which at this size
-        // read as a flat bar with no taper at all — the shape was there and the
-        // information was not.
-        var p = Path()
-        let midY = rect.midY
-        p.move(to: CGPoint(x: rect.minX, y: midY - 0.25))
-        p.addLine(to: CGPoint(x: rect.maxX, y: midY - rect.height / 2))
-        p.addLine(to: CGPoint(x: rect.maxX, y: midY + rect.height / 2))
-        p.addLine(to: CGPoint(x: rect.minX, y: midY + 0.25))
-        p.closeSubpath()
-        return p
     }
 }
 
@@ -324,7 +264,7 @@ struct SpotlightDimPlate: View {
                         dim = min(0.9, max(0.1, g.location.x / geo.size.width))
                     }
                 )
-                .onHover { $0 ? NSCursor.resizeLeftRight.push() : NSCursor.pop() }
+                .hoverCursor(.resizeLeftRight)
         }
         .frame(height: height)
         .accessibilityElement()
@@ -337,5 +277,31 @@ struct SpotlightDimPlate: View {
             @unknown default: break
             }
         }
+    }
+}
+
+extension View {
+    /// Show `cursor` while the pointer is over this view.
+    ///
+    /// `push` and `pop` are one stack for the whole app, so a panel that closed under
+    /// the pointer, which a tool shortcut does, used to skip its `pop` and leave the
+    /// cursor behind for good. The modifier pops on disappearing too.
+    func hoverCursor(_ cursor: NSCursor) -> some View { modifier(HoverCursor(cursor: cursor)) }
+}
+
+private struct HoverCursor: ViewModifier {
+    let cursor: NSCursor
+    @State private var isPushed = false
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { set($0) }
+            .onDisappear { set(false) }
+    }
+
+    private func set(_ pushed: Bool) {
+        guard pushed != isPushed else { return }
+        isPushed = pushed
+        pushed ? cursor.push() : NSCursor.pop()
     }
 }
