@@ -29,7 +29,7 @@ struct ToolOptions: View {
     /// same content lays out as a row, where a fixed width would be wrong.
     var body: some View {
         let layout = isVertical
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Tokens.Space.tight))
             : AnyLayout(HStackLayout(spacing: Tokens.Space.snug))
 
         layout {
@@ -55,14 +55,13 @@ struct ToolOptions: View {
         .lineLimit(1)
         // The fixed width exists to align controls with each other. A tool with
         // no controls has nothing to align, and holding the full width for it
-        // just parks 258pt of empty glass over the artwork.
+        // just parks an empty panel over the artwork.
         .frame(
             width: isVertical && hasAlignedControls ? Tokens.Rail.optionsContentWidth : nil,
             alignment: .leading
         )
         .fixedSize(horizontal: !(isVertical && hasAlignedControls), vertical: false)
-        .padding(.horizontal, Tokens.Space.snug)
-        .padding(.vertical, Tokens.Space.base - 1)
+        .padding(Tokens.Space.snug)
         .chromeSurface(cornerRadius: Tokens.Radius.panel)
         .animation(Tokens.Motion.pillResize, value: model.tool)
         // The Flow row appears and disappears with the tip, so the panel
@@ -73,44 +72,24 @@ struct ToolOptions: View {
 
     // MARK: - Header
 
-    /// The tool's name, with its gesture hint on its own line.
-    ///
-    /// The hint used to sit beside the name, which made the header the widest
-    /// row in the panel — the Shape tool's polygon hint alone is 44 characters,
-    /// and every other control was then laid out inside a panel sized for a
-    /// sentence.
+    /// The tool's name with its gesture hint beside it, one line in either orientation.
     private var header: some View {
-        Group {
-            if isVertical {
-                VStack(alignment: .leading, spacing: 1) {
-                    title
-                    if let hint {
-                        // One line, not two. The panel's height should be a
-                        // function of its controls, not of how long a sentence
-                        // about the tool happens to be.
-                        Text(hint)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
-                            .lineLimit(1)
-                    }
-                }
-                .padding(.bottom, 2)
-            } else {
-                HStack(spacing: Tokens.Space.tight) {
-                    title
-                    if let hint {
-                        Text(hint)
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
-                    }
-                }
+        HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.tight) {
+            title
+            if let hint {
+                if isVertical { Spacer(minLength: 0) }
+                Text(hint)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.primary.opacity(Tokens.Ink.faint))
+                    .lineLimit(1)
             }
         }
+        .padding(.bottom, isVertical ? 2 : 0)
     }
 
     private var title: some View {
         Text(model.tool.displayName)
-            .font(.system(size: 11.5, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold))
     }
 
     /// Whether this tool contributes any rows to the label/control grid.
@@ -212,7 +191,7 @@ struct ToolOptions: View {
 
         case .clone:
             OptionSegment(selection: $model.cloneMode, options: CloneMode.allCases.map {
-                .init(value: $0, symbol: $0.symbolName, help: $0.displayName)
+                .init(value: $0, label: $0.displayName, symbol: $0.symbolName, help: $0.displayName)
             })
             widthMark(name: "Size")
             if model.cloneMode == .clone {
@@ -226,10 +205,12 @@ struct ToolOptions: View {
                     readout: "\(Int((model.softenStrength * 100).rounded()))%", normal: 0.4
                 )
             }
-            OptionSegment(selection: $model.cloneSoftTip, options: [
-                .init(value: true, symbol: "circle.dashed.inset.filled", help: "Soft edge"),
-                .init(value: false, symbol: "circle.fill", help: "Hard edge"),
-            ])
+            OptionRow("Edge") {
+                OptionSegment(selection: $model.cloneSoftTip, options: [
+                    .init(value: true, label: "Soft", help: "Soft edge"),
+                    .init(value: false, label: "Hard", help: "Hard edge"),
+                ])
+            }
 
         case .shape:
             ShapeGallery(model: model, columns: isVertical ? 5 : 8)
@@ -259,8 +240,8 @@ struct ToolOptions: View {
             if strokes {
                 OptionRow("Edges") {
                     OptionSegment(selection: $model.smoothEdges, options: [
-                        .init(value: true, symbol: "scribble", help: "Smooth"),
-                        .init(value: false, symbol: "squareshape.split.2x2", help: "Hard pixels"),
+                        .init(value: true, label: "Smooth"),
+                        .init(value: false, label: "Pixels", help: "Hard pixels"),
                     ])
                 }
             }
@@ -276,9 +257,8 @@ struct ToolOptions: View {
             }
 
         case .text:
-            // A meter, not a wedge. The wedge is this app's word for *stroke
-            // weight*, and a taper in the Text panel would say you were holding a
-            // brush.
+            // A meter, with no nib: the dot is this app's word for *stroke weight*,
+            // and it would say you were holding a brush.
             Mark(
                 value: $model.textSize, range: 8...200, style: .meter, name: "Size",
                 gamma: 2, readout: "\(Int(model.textSize))", normal: 36
@@ -370,15 +350,7 @@ struct ToolOptions: View {
 
     // MARK: - Size
 
-    // MARK: - Size
-
-    /// Size as one object: a wedge that thickens to the right, with the stops as ticks
-    /// on it.
-    ///
-    /// Replaces a 42pt right-aligned label, a stock `Slider` at `.mini`, a trailing
-    /// number and a second row of capsules — four pieces all saying "size", in a panel
-    /// where that pattern then repeated for every other property until the whole thing
-    /// read as one grey surface.
+    /// Size as one object: the nib to scale, with the stops along the foot of the track.
     ///
     /// The range and the ticks are asked of the armed tool, so the highlighter's 4px
     /// chisel floor cannot be offered a 2 it will not draw.
@@ -393,7 +365,7 @@ struct ToolOptions: View {
             style: .wedge(stops: ToolSettings.sizeStops(for: model.tool)),
             name: name,
             gamma: 2,
-            readout: "\(model.brushSize)",
+            readout: "\(model.brushSize) px",
             normal: Double(max(allowed.lowerBound, 2))
         )
     }
@@ -403,29 +375,13 @@ struct ToolOptions: View {
     /// What a selection can do. Crop and Copy are on the rail because they are
     /// the common case; the rest live here, one glance away.
     ///
-    /// **Icons only, both orientations.** These used to be labelled buttons, and
-    /// in a fixed 258pt panel four of them plus a size read-out truncated to
-    /// `In…` and `D…` — a label that is one letter and an ellipsis is worse than
-    /// no label, because it looks broken rather than deliberate. Dropping the
-    /// words in the side panel fixed that but left the bottom bar keeping them,
-    /// so the same four actions read two different ways depending on which edge
-    /// the toolbar was on, for four words nobody was reading. One rule instead:
-    /// a crop icon, an invert icon and a trash icon, each with its tooltip and
-    /// its accessibility label, which is how Preview's markup bar does it too.
+    /// Named, because a lone unlabelled glyph in a settings panel is a riddle. With
+    /// Crop and Delete on the selection bar there are at most two of these, so the
+    /// row has room for the words.
     @ViewBuilder
     private var selectionActions: some View {
         if isVertical {
-            // "Area", not "Size". Every tool's own row is already labelled Size,
-            // so a badge with its size slider open showed the word twice, once
-            // for the badge and once for the marquee, with different units under
-            // each. "Selection" was the obvious replacement and truncated to
-            // "Selec…" in the label column, which this file already knows is
-            // worse than no label at all — it looks broken rather than
-            // deliberate. Four letters fit.
-            // One row, not two. With Crop and Delete moved to the selection bar
-            // this track is usually a single button, and a lone segment stretched
-            // across the panel's whole width reads as a control that has lost its
-            // other halves rather than as one action.
+            // "Area", not "Size": every tool's own row is already labelled Size.
             OptionRow("Area") {
                 HStack(spacing: Tokens.Space.tight) {
                     sizeReadout
@@ -473,31 +429,25 @@ struct ToolOptions: View {
     private var selectionActionButtons: some View {
         let actions: [(String, String, () -> Void)] = {
             var list: [(String, String, () -> Void)] = [
-                ("Invert", "square.righthalf.filled", { model.invertSelection() }),
+                ("Invert", "Invert the selection", { model.invertSelection() }),
             ]
             if model.selectionKind == .instantAlpha {
-                list.append(
-                    ("Make transparent", "eraser.line.dashed", { model.makeSelectionTransparent() })
-                )
+                list.append(("Erase", "Make transparent", { model.makeSelectionTransparent() }))
             }
             return list
         }()
 
-        ForEach(actions, id: \.0) { title, symbol, action in
+        ForEach(actions, id: \.0) { title, help, action in
             Button(action: action) {
-                Image(systemName: symbol)
-                    .font(.system(size: 11))
+                Text(title)
                     .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
-                    // Equal shares along a side rail; intrinsic along the
-                    // bottom bar, where the track is not filling a column.
-                    .frame(maxWidth: isVertical ? .infinity : nil)
-                    .padding(.horizontal, isVertical ? 2 : 7)
+                    .padding(.horizontal, Tokens.Space.tight + 1)
                     .frame(height: Tokens.Size.segment)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(title)
-            .accessibilityLabel(title)
+            .help(help)
+            .accessibilityLabel(help)
         }
     }
 }
@@ -627,7 +577,7 @@ private struct ShapeGallery: View {
             } label: {
                 Image(systemName: kind.symbolName)
                     .font(.system(size: 12))
-                    .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(Tokens.Ink.regular))
+                    .foregroundStyle(isSelected ? Color.primary.opacity(Tokens.Ink.strong) : Color.primary.opacity(Tokens.Ink.muted))
                     .frame(maxWidth: isVertical ? .infinity : 26)
                     .frame(height: 26)
                     .background {
@@ -685,17 +635,22 @@ private struct BadgeNumber: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            HStack(spacing: Tokens.Space.base) {
+            HStack(spacing: 0) {
                 end("minus", enabled: model.nextBadgeNumber > 1) {
                     model.setNextBadgeNumber(model.nextBadgeNumber - 1)
                 }
                 Text("\(model.nextBadgeNumber)")
-                    .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                    .font(.system(size: 20, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.primary.opacity(Tokens.Ink.strong))
-                    .frame(minWidth: 28)
+                    .frame(maxWidth: .infinity)
                 end("plus", enabled: model.nextBadgeNumber < 99) {
                     model.setNextBadgeNumber(model.nextBadgeNumber + 1)
                 }
+            }
+            .frame(height: 36)
+            .background {
+                RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
+                    .fill(.primary.opacity(Tokens.Fill.track))
             }
             if model.nextBadgeNumber != 1 {
                 Button("Restart at 1") { model.resetBadgeNumbering() }
@@ -712,7 +667,7 @@ private struct BadgeNumber: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 11, weight: .medium))
-                .frame(width: 22, height: 22)
+                .frame(width: 36, height: 36)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -724,19 +679,8 @@ private struct BadgeNumber: View {
 
 /// One row of the panel: a label in the shared column, then its control.
 ///
-/// **Two anatomies, and which one you get is decided by what kind of control it
-/// is.** A *value* — anything continuous — is a `Mark`, which carries its own
-/// name and its live number on one caption line with a full-bleed track beneath.
-/// A *choice* stays here: a label in the 42pt column and a track of cells beside
-/// it, on one line.
-///
-/// That is a rule rather than an accident, and the alternative was measured
-/// rather than assumed. Giving the choices a caption line too would align every
-/// control in the panel at one x — and cost the Shape panel three extra lines,
-/// on the tool that is already the tallest thing the rail has to make room for.
-/// Giving the values a label column instead would hand the readout back to the
-/// end of the track, which is what made every track a different length depending
-/// on how many digits its value happened to have: "8" against "200".
+/// A *choice* lives here, with its label in the shared column. A *value* is a `Mark`,
+/// which carries its own name inside the track and takes the whole row.
 struct OptionRow<Content: View>: View {
     let title: String?
     @ViewBuilder let content: Content
@@ -830,17 +774,12 @@ struct OptionMenu<Value: Hashable>: View {
                     .foregroundStyle(.primary.opacity(Tokens.Ink.muted))
             }
             .foregroundStyle(.primary.opacity(Tokens.Ink.regular))
-            .padding(.horizontal, 6)
+            .padding(.horizontal, Tokens.Space.base)
             .frame(maxWidth: isVertical ? .infinity : 124)
-            .frame(height: Tokens.Size.segment)
-            .background {
-                RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                    .fill(.primary.opacity(isHovering ? Tokens.Fill.hover : Tokens.Fill.cell))
-            }
-            .padding(2)
+            .frame(height: Tokens.Size.optionControl)
             .background {
                 RoundedRectangle(cornerRadius: Tokens.Radius.segmentTrack, style: .continuous)
-                    .fill(.primary.opacity(Tokens.Fill.track))
+                    .fill(.primary.opacity(isHovering ? Tokens.Fill.mark : Tokens.Fill.track))
             }
             .contentShape(Rectangle())
         }
@@ -877,6 +816,7 @@ struct OptionSegment<Value: Hashable>: View {
     let options: [Option]
 
     @Environment(\.optionsAxisIsVertical) private var isVertical
+    @Namespace private var thumb
 
     var body: some View {
         SegmentTrack {
@@ -885,14 +825,13 @@ struct OptionSegment<Value: Hashable>: View {
                 Button {
                     selection = option.value
                 } label: {
-                    Group {
+                    HStack(spacing: Tokens.Space.hair + 2) {
                         if let symbol = option.symbol {
                             Image(systemName: symbol).font(.system(size: 11))
-                        } else {
-                            Text(option.label ?? "")
                         }
+                        if let label = option.label { Text(label) }
                     }
-                    .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(Tokens.Ink.regular))
+                    .foregroundStyle(isSelected ? Color.primary.opacity(Tokens.Ink.strong) : Color.primary.opacity(Tokens.Ink.muted))
                     // Equal shares of the row in the side panel, intrinsic
                     // width along the bottom bar. Padding-driven widths were
                     // why "Round / Square / Soft" was three times the size of
@@ -901,9 +840,9 @@ struct OptionSegment<Value: Hashable>: View {
                     .padding(.horizontal, isVertical ? 2 : (option.symbol == nil ? 8 : 7))
                     .frame(height: Tokens.Size.segment)
                     .background {
-                        RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                            .fill(.clear)
-                            .overlay { if isSelected { SelectedSegmentFill(cornerRadius: Tokens.Radius.segmentInner) } }
+                        if isSelected {
+                            SelectedSegmentFill().matchedGeometryEffect(id: "thumb", in: thumb)
+                        }
                     }
                     .contentShape(Rectangle())
                 }
@@ -913,6 +852,7 @@ struct OptionSegment<Value: Hashable>: View {
                 .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
             }
         }
+        .animation(Tokens.Motion.micro, value: selection)
     }
 }
 
@@ -922,12 +862,6 @@ struct OptionSegment<Value: Hashable>: View {
 /// italic and underline combine, so they are three toggles that happen to share
 /// a track rather than three states of one control.
 ///
-/// **An unselected toggle still draws its cell.** `OptionSegment` can leave the
-/// off cells empty because one of them is always filled, so the track always
-/// says "these are the states of a control". Toggles can all be off at once,
-/// and three bare glyphs in an empty trough — directly above an Align row where
-/// one cell *is* filled — read as a control that is switched off rather than
-/// three you can press. The faint cell is what distinguishes off from disabled.
 struct OptionToggle: View {
     let symbol: String
     let help: String
@@ -942,19 +876,17 @@ struct OptionToggle: View {
         } label: {
             Image(systemName: symbol)
                 .font(.system(size: 11))
-                .foregroundStyle(isOn ? Color.white : Color.primary.opacity(Tokens.Ink.regular))
+                .foregroundStyle(isOn ? Color.primary.opacity(Tokens.Ink.strong) : Color.primary.opacity(Tokens.Ink.muted))
                 .frame(maxWidth: isVertical ? .infinity : nil)
                 .padding(.horizontal, isVertical ? 2 : 7)
                 .frame(height: Tokens.Size.segment)
                 .background {
-                    RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
-                        .fill(
-                            isOn
-                                ? AnyShapeStyle(Color.accentColor)
-                                : AnyShapeStyle(.primary.opacity(
-                                    isHovering ? Tokens.Fill.hover : Tokens.Fill.cell
-                                ))
-                        )
+                    if isOn {
+                        SelectedSegmentFill()
+                    } else if isHovering {
+                        RoundedRectangle(cornerRadius: Tokens.Radius.segmentInner, style: .continuous)
+                            .fill(.primary.opacity(Tokens.Fill.cell))
+                    }
                 }
                 .contentShape(Rectangle())
         }

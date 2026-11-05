@@ -773,6 +773,16 @@ extension TextEditorLayoutTests {
         #expect(NSCursor.current === CanvasNSView.cursor(for: .bottomRight))
     }
 
+    @Test("A paste's handle, pressed off-centre, moves the edge by the drag and no more")
+    func pasteHandleDoesNotJump() throws {
+        let model = floatingModel()
+        model.tool = .select
+        let canvas = canvas(for: model)
+        let box = try #require(model.floating).frame
+        try drag(canvas, from: NSPoint(x: box.maxX + 2, y: box.maxY + 2), by: NSPoint(x: 1, y: 1))
+        #expect(try #require(model.floating).frame.width == box.width + 1)
+    }
+
     @Test("A key-up the app never saw cannot leave the canvas in pan mode")
     func spaceDoesNotStick() throws {
         let model = EditorModel(canvas: Bitmap(width: 600, height: 400, fill: .white))

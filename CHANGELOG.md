@@ -7,6 +7,14 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
+### Changed
+- **The tool options panels are redrawn.** A slider is now one control with its name
+  and value inside it, so a panel of three values is three rows rather than six. A
+  size shows the nib to scale. A selected option is a neutral thumb that slides,
+  leaving blue to mean the armed tool. Choices that were two unexplained glyphs have
+  words: Clone and Soften, Soft and Hard, Smooth and Pixels, Invert and Erase. Every
+  control is one height and the panel is narrower.
+
 ### Fixed
 - **Fast clicks on the header no longer zoom the window.** The header sits in the
   titlebar band, so a fast second click that no enabled control claimed counted as
@@ -23,6 +31,7 @@ version may still carry breaking changes to the document format.
   the windowless StoreKit call that Apple deprecated in macOS 15, and the listing
   still has no ratings on any storefront. It now uses `AppStore.requestReview(in:)`,
   which Apple recommends instead. When it asks hasn't changed.
+- **A hover tip no longer stays on screen under an open menu.**
 - **Text boxes resize and move the way the handles say.** The top and bottom
   handles fought back, because the height snapped to the text on every move, so
   the top one carried the box instead of resizing it, and a box dragged out tall

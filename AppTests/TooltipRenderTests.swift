@@ -78,6 +78,28 @@ struct TooltipRenderTests {
     ///
     /// The only honest property is the one the eye uses: a longer sentence makes a
     /// taller chip. No font arithmetic, no magic constant to tune.
+    @Test("An opening menu takes the chip with it, and none shows while it is open")
+    func menusOutrankChips() async throws {
+        let settle = Duration.seconds(TooltipController.delay * 2)
+        let tips = TooltipController()
+        tips.hover(key: "a", title: "View", shortcut: nil, anchor: .zero)
+        try await Task.sleep(for: settle)
+        #expect(tips.isVisible)
+
+        NotificationCenter.default.post(name: NSMenu.didBeginTrackingNotification, object: NSMenu())
+        try await Task.sleep(for: settle)
+        #expect(!tips.isVisible)
+        tips.hover(key: "b", title: "View", shortcut: nil, anchor: .zero)
+        try await Task.sleep(for: settle)
+        #expect(!tips.isVisible)
+
+        NotificationCenter.default.post(name: NSMenu.didEndTrackingNotification, object: NSMenu())
+        try await Task.sleep(for: settle)
+        tips.hover(key: "c", title: "View", shortcut: nil, anchor: .zero)
+        try await Task.sleep(for: settle)
+        #expect(tips.isVisible)
+    }
+
     @Test("A chip grows with the sentence it carries")
     func chipHeightTracksItsDetail() throws {
         func height(_ detail: String) throws -> CGFloat {
