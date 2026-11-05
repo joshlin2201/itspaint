@@ -271,7 +271,8 @@ jobs:
           for entitlement in \
             com.apple.security.app-sandbox \
             com.apple.security.files.bookmarks.app-scope \
-            com.apple.security.files.user-selected.read-write
+            com.apple.security.files.user-selected.read-write \
+            com.apple.security.print
           do
             value="$(/usr/libexec/PlistBuddy -c "Print :$entitlement" "$ENTITLEMENTS")"
             if [[ "$value" != "true" ]]; then

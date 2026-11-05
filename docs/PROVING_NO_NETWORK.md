@@ -36,7 +36,12 @@ printing, which hands the page to the system's print service.
 documentation — the kernel enforces them. Without `network.client` a `connect(2)` fails
 with `EPERM`. It does not matter what the code contains, what a dependency does at
 runtime, what a `dlopen`ed bundle tries, or whether the developer is lying: the process
-cannot open an outbound socket, because the operating system will not let it.
+cannot open an outbound network connection, because the operating system will not let it.
+
+There is a local exception, for printing. `com.apple.security.print` lets the app connect
+to the system's print service over the Unix socket at `/private/var/run/cupsd`. An IP
+connect still fails with `EPERM`, including to `127.0.0.1:631`, the print service's own
+port. A job for a network printer leaves from the print service, not from the app.
 
 You can watch that happen rather than take it on faith. `sandbox-exec` uses the same
 enforcement, so a short profile reproduces it on any Mac. Check the errno rather than a
