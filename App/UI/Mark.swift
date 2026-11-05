@@ -159,7 +159,7 @@ struct Mark: View {
 
     private var fill: AnyShapeStyle {
         if case .wash(let ink) = style { return AnyShapeStyle(ink.opacity(value)) }
-        return AnyShapeStyle(.primary.opacity(isDragging ? Tokens.Fill.markActive : Tokens.Fill.mark))
+        return AnyShapeStyle(.primary.opacity(isDragging || contrast == .increased ? Tokens.Fill.markActive : Tokens.Fill.mark))
     }
 
     /// The name and the number, over the fill and out of the pointer's way.

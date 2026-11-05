@@ -70,7 +70,7 @@ with steppers. It is pure read-out, so it gets the lightest surface of anything.
 | | |
 |---|---|
 | **Spacing** | 2 hair · 5 tight · 8 base · 10 snug · 14 comfortable · 20 safe inset |
-| **Controls** | 16 swatch · 18 colour swap · 24 segment · 24 colour well · 26 pill action · 26 title chip · 34 tool cell |
+| **Controls** | 16 swatch · 18 colour swap · 22 segment · 26 option control · 24 colour well · 26 pill action · 26 title chip · 34 tool cell |
 | **Radii** | 16 rail · 12 panel · 11 cell · 10 well · 8 chip · 7 segment track · 5 segment inner · 4 swatch |
 | **Rail** | run = 1 × 34 = **34pt**; cross = **34.08pt** (the overlapped colour pair, the widest thing in it); **thickness ≈48pt on either edge** |
 | **Elevation** | 0.5pt hairline · 18pt shadow radius · 7pt y-offset |

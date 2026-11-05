@@ -643,6 +643,41 @@ extension TextEditorLayoutTests {
         #expect(try frame(model) == before)
     }
 
+    @Test("A top corner dragged sideways leaves the top edge, and the rewrap grows the bottom")
+    func sidewaysTopCorner() throws {
+        let (_, model, view) = try typed("hello world again")
+        let before = try frame(model)
+        try drag(view, from: NSPoint(x: view.boxBounds.maxX + 2, y: view.boxBounds.minY - 2), by: NSPoint(x: -140, y: 0))
+        #expect(try frame(model).minY == before.minY)
+        #expect(try frame(model).width == before.width - 140)
+        #expect(try frame(model).height > before.height)
+    }
+
+    @Test("Sideways travel gives the box no height of its own to keep")
+    func sidewaysSetsNoFloor() throws {
+        let (_, model, view) = try typed("hello world again")
+        let before = try frame(model)
+        let corner = NSPoint(x: view.boxBounds.maxX + 2, y: view.boxBounds.maxY + 2)
+        try drag(view, from: corner, by: NSPoint(x: -140, y: 0))
+        #expect(try frame(model).height > before.height)
+        try drag(view, from: NSPoint(x: view.boxBounds.maxX + 2, y: view.boxBounds.maxY + 2), by: NSPoint(x: 140, y: 0))
+        #expect(try frame(model).height == before.height)
+    }
+
+    @Test("A landed box that fitted its text still follows it when reopened, and a tall one stays")
+    func reopenedFloor() throws {
+        let (canvas, model, view) = try typed("one\ntwo\nthree")
+        view.didChangeText()
+        let grown = try frame(model)
+        let away = NSPoint(x: 500, y: 350)
+        try click(canvas, at: away)
+        try click(canvas, at: NSPoint(x: grown.minX + 4, y: grown.minY + 4))
+        let reopened = try #require(canvas.subviews.compactMap { $0 as? TextEntryView }.first)
+        reopened.selectAll(nil)
+        reopened.insertText("one", replacementRange: reopened.selectedRange())
+        #expect(try frame(model).height < grown.height)
+    }
+
     @Test("Pressing a handle off-centre does not make the edge jump to the pointer")
     func handleDoesNotJump() throws {
         let (_, model, view) = try typed()
@@ -781,6 +816,20 @@ extension TextEditorLayoutTests {
         let box = try #require(model.floating).frame
         try drag(canvas, from: NSPoint(x: box.maxX + 2, y: box.maxY + 2), by: NSPoint(x: 1, y: 1))
         #expect(try #require(model.floating).frame.width == box.width + 1)
+    }
+
+    @Test("A mouse-up the app never saw cannot strand a text box being dragged out")
+    func dragOutDoesNotStick() throws {
+        let model = EditorModel(canvas: Bitmap(width: 600, height: 400, fill: .white))
+        model.tool = .text
+        let canvas = canvas(for: model)
+        try drag(canvas, from: NSPoint(x: 50, y: 50), by: NSPoint(x: 100, y: 80), release: false)
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: canvas.window)
+        model.tool = .pencil
+        let before = model.canvas
+        try drag(canvas, from: NSPoint(x: 100, y: 200), by: NSPoint(x: 50, y: 0))
+        #expect(model.canvas != before)
+        #expect(!model.isEditingText)
     }
 
     @Test("A key-up the app never saw cannot leave the canvas in pan mode")

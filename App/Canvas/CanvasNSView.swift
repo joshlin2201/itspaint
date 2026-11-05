@@ -1213,6 +1213,7 @@ final class CanvasNSView: NSView {
     /// rounding and the canvas edge cost nothing: the box is wherever the pointer's
     /// total travel says, however many events it took to get there.
     private var textDragStart: PixelRect?
+    private var textDragFloor = 0
     private var textEditor: TextEntryView?
     private var editingTextID: UUID?
     private var textSelectionAnchor: Int?
@@ -1274,12 +1275,18 @@ final class CanvasNSView: NSView {
         editor.delegate = self
         editor.onCancel = { [weak self] in self?.cancelText() }
         editor.onCommit = { [weak self] in _ = self?.commitText() }
-        editor.onDragBegan = { [weak self] in self?.textDragStart = self?.textBox }
+        editor.onDragBegan = { [weak self] in
+            self?.textDragStart = self?.textBox
+            self?.textDragFloor = self?.textBoxFloor ?? 0
+        }
         editor.onMove = { [weak self] travel in self?.moveTextBox(by: travel) }
         editor.onResize = { [weak self] handle, travel in self?.resizeTextBox(handle, by: travel) }
 
         addSubview(editor)
         textEditor = editor
+        // A box that exactly fits its text was sized by the text, so it follows the
+        // text. Only spare height is somebody's choice.
+        if object != nil, neededTextHeight(width: rect.width) == rect.height { textBoxFloor = 0 }
         window?.makeFirstResponder(editor)
         editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
         syncSelectedTextStyle()
@@ -1326,9 +1333,11 @@ final class CanvasNSView: NSView {
 
     /// Drag one of the box's own handles, `travel` points from the press.
     ///
-    /// Only the edges the handle owns move. An edge stops at the canvas, at the
-    /// smallest box that still shows a character, and at the height of the text,
-    /// and the opposite edge stays where it is in all three cases.
+    /// Only the edges the handle owns move, and only as far as the pointer took them.
+    /// An edge stops at the canvas and at the height of the text, and the opposite
+    /// edge stays put. Text that needs more room than the drag gave it, because a
+    /// narrower box wraps, grows the bottom, as it does for typing. Sideways travel
+    /// says nothing about height, so it leaves the height the person chose alone.
     private func resizeTextBox(_ handle: PixelRect.Handle, by travel: NSPoint) {
         guard let editor = textEditor, let box = textBox, let start = textDragStart, let model else { return }
         let canvas = model.engine.canvas
@@ -1341,11 +1350,17 @@ final class CanvasNSView: NSView {
         }
         // The width settles first, because it decides how tall the text is.
         let needed = max(smallest, neededTextHeight(width: right - left))
-        if handle.movesTop { top = max(0, min(top + pixels(travel.y), bottom - needed)) }
-        if handle.movesBottom {
-            bottom = min(max(canvas.height, bottom), max(bottom + pixels(travel.y), top + needed))
+        let down = pixels(travel.y)
+        textBoxFloor = textDragFloor
+        if handle.movesTop, down != 0 {
+            let wanted = max(0, min(top + down, bottom - smallest))
+            textBoxFloor = bottom - wanted
+            top = wanted <= bottom - needed ? wanted : max(bottom - needed, min(top, wanted))
         }
-        if handle.movesTop || handle.movesBottom { textBoxFloor = bottom - top }
+        if handle.movesBottom, down != 0 {
+            bottom = min(max(canvas.height, bottom), max(bottom + down, top + smallest))
+            textBoxFloor = bottom - top
+        }
 
         let resized = PixelRect(x: left, y: top, width: right - left, height: max(textBoxFloor, needed))
         textBox = resized
@@ -1809,8 +1824,8 @@ final class CanvasNSView: NSView {
     /// invalidate it. Every tool was affected; the pencil was simply the one
     /// whose cursor is most obviously wrong when it does not appear.
     ///
-    /// Keyed on everything `cursorForCurrentTool` actually reads, so it cannot
-    /// go stale again when a new dependency is added there without thinking.
+    /// Keyed on what `cursorForCurrentTool` reads at rest. A gesture in progress is
+    /// not in the key, because it sets the cursor itself: see `showCursor`.
     func refreshCursorIfNeeded() {
         guard let model else { return }
         let key = CursorKey(
@@ -1852,7 +1867,8 @@ final class CanvasNSView: NSView {
     /// drag that missed its `pop` left the wrong pointer over every window.
     private func showCursor(at point: NSPoint? = nil) {
         window?.invalidateCursorRects(for: self)
-        if point.map({ bounds.contains($0) }) ?? true { cursorForCurrentTool().set() }
+        let pointer = point ?? window.map { convert($0.mouseLocationOutsideOfEventStream, from: nil) }
+        if pointer.map({ bounds.contains($0) }) ?? false { cursorForCurrentTool().set() }
     }
 
     /// The window stopped being key, so nothing is held down here any more.
@@ -1860,9 +1876,14 @@ final class CanvasNSView: NSView {
         isSpaceHeld = false
         endPan()
         stopSpraying()
+        textSelectionAnchor = nil
+        if textOrigin != nil {
+            textOrigin = nil
+            if let box = textBox { textBox = nil; invalidate(box.insetBy(-2)) }
+        }
         if let model, activeButton != nil {
             activeButton = nil
-            commit(model.engine.endStroke())
+            commit(model.engine.endStroke(at: model.pointerPosition))
             model.syncFromEngine()
         }
         window?.invalidateCursorRects(for: self)
