@@ -554,6 +554,46 @@ final class DrawingDocument: NSDocument {
         return result
     }
 
+    // MARK: - Printing
+
+    /// One page: what is on screen at one point per canvas pixel, shrunk to the
+    /// paper when it is larger, and centred. Anything transparent stays bare paper.
+    ///
+    /// `NSDocument` has no working default. Its own version raises, and the raise
+    /// leaves the activity queue without ending the activity, so ⌘P did nothing
+    /// visible and the next edit waited for that queue on the main thread, forever.
+    ///
+    /// Printing is not an edit. A paste still floating goes onto a copy instead of
+    /// landing the way a save lands it, so the document and its undo stack are left
+    /// alone. An open text box needs nothing: it is in `model.canvas` as it is typed.
+    override func printOperation(
+        withSettings printSettings: [NSPrintInfo.AttributeKey: Any]
+    ) throws -> NSPrintOperation {
+        // A copy, so fitting one job does not rewrite the document's page setup.
+        let info = (printInfo.copy() as? NSPrintInfo) ?? printInfo
+        info.dictionary().addEntries(from: printSettings)
+        info.horizontalPagination = .fit
+        info.verticalPagination = .fit
+        info.isHorizontallyCentered = true
+        info.isVerticallyCentered = true
+
+        var canvas = model.canvas
+        if let floating = model.floating {
+            canvas.composite(floating.bitmap, at: floating.origin)
+        }
+        guard let image = canvas.makeCGImage() else {
+            throw NSError(domain: "ItsPaint", code: 4, userInfo: [NSLocalizedDescriptionKey: "This picture can't be printed."])
+        }
+        let size = NSSize(width: canvas.width, height: canvas.height)
+        let view = NSImageView(frame: NSRect(origin: .zero, size: size))
+        view.image = NSImage(cgImage: image, size: size)
+        view.imageScaling = .scaleProportionallyUpOrDown
+
+        let operation = NSPrintOperation(view: view, printInfo: info)
+        operation.jobTitle = displayName
+        return operation
+    }
+
     // MARK: - Writing
 
     /// Everything writing needs, lifted off the main actor in one hop.

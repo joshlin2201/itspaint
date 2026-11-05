@@ -8,6 +8,12 @@ version may still carry breaking changes to the document format.
 ## [Unreleased]
 
 ### Fixed
+- **Print prints, and pressing it no longer freezes the app.** File ▸ Print had
+  nothing behind it: `⌘P` did nothing, and the next edit stopped the app for good,
+  because the failure left the document waiting on itself. It now prints the
+  picture on one page, shrunk to the paper if it needs to be and centred, with a
+  paste still floating on the page and left floating. The sandbox gains
+  `com.apple.security.print`, which printing needs.
 - **The App Store rating prompt asks over the window you saved from.** It used
   the windowless StoreKit call that Apple deprecated in macOS 15, and the listing
   still has no ratings on any storefront. It now uses `AppStore.requestReview(in:)`,
