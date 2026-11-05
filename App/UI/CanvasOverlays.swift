@@ -207,6 +207,54 @@ struct DragOutHandle: View {
     }
 }
 
+/// The document window, which keeps fast clicks on the header from zooming it.
+///
+/// The header sits in the titlebar band, and on macOS 27 the titlebar's
+/// double-click is a gesture recognizer on the window frame. `NSWindow.sendEvent`
+/// feeds it before any view sees the event, and it counts clicks for itself, so
+/// neither a view nor a rewritten `clickCount` can refuse it. It wins wherever an
+/// enabled control has not claimed the click: on Undo the moment the history runs
+/// out and it goes disabled mid-burst, and on the padding and gaps around the
+/// cells. So the refusal sits where the gesture ends, in the action it sends.
+final class DocumentWindow: NSWindow {
+    private let clickGuards = NSHashTable<NSView>.weakObjects()
+
+    func addClickGuard(_ view: NSView) { clickGuards.add(view) }
+
+    /// The titlebar sends this with no sender. The green button and the Window
+    /// menu send themselves, and always get through.
+    override func performZoom(_ sender: Any?) {
+        guard sender != nil || !isRepeatClickOnHeader(NSApp.currentEvent) else { return }
+        super.performZoom(sender)
+    }
+
+    /// The type comes first: `clickCount` raises on anything but a mouse event.
+    func isRepeatClickOnHeader(_ event: NSEvent?) -> Bool {
+        guard let event, event.window === self,
+              event.type == .leftMouseDown || event.type == .leftMouseUp,
+              event.clickCount > 1
+        else { return false }
+        return clickGuards.allObjects.contains {
+            $0.convert($0.bounds, to: nil).contains(event.locationInWindow)
+        }
+    }
+}
+
+/// Marks a run of header controls for `DocumentWindow`. It takes no clicks itself.
+struct TitlebarClickGuard: NSViewRepresentable {
+    func makeNSView(context: Context) -> GuardView { GuardView() }
+    func updateNSView(_ view: GuardView, context: Context) {}
+
+    final class GuardView: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            (window as? DocumentWindow)?.addClickGuard(self)
+        }
+    }
+}
+
 /// The mouse half of the drag handle, in AppKit, so the window stops coming
 /// with the picture.
 ///
@@ -754,6 +802,7 @@ struct WorkingActions: View {
                 }
             }
         }
+        .background { TitlebarClickGuard() }
     }
 
     private var zoomLabel: String {
@@ -845,6 +894,7 @@ struct DocumentActions: View {
             }
             }
         }
+        .background { TitlebarClickGuard() }
     }
 }
 
