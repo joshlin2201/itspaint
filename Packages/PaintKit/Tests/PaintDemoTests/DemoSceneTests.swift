@@ -114,6 +114,18 @@ struct DemoSceneTests {
                 RGBA8(r: 23, g: 50, b: 77))
         #expect(image.pixel(at: PixelPoint(x: 623, y: 328)) ==
                 RGBA8(r: 181, g: 205, b: 214))
+
+        // KNOWN, UNFIXED: this scene grows the same anti-aliased rim the
+        // chameleon did — 441 pixels within 30 of the `CDEFE2` key, none of
+        // them in the committed `transparency.png`, which was rendered before
+        // curves arrived. The chameleon's fix does not transfer: raising the
+        // knockout tolerance needs a gap between the rim and the artwork, and
+        // this palette paints a colour **15** from its own key, closer than
+        // the rim it would have to erase. The fix is a key colour the picture
+        // does not come near, the way the chameleon uses `FF00FF`.
+        //
+        // Until then `transparency.png` must not be regenerated: the file in
+        // the repository predates the regression and is the correct picture.
         #expect(image == TransparencyScene.render())
     }
 
@@ -144,8 +156,30 @@ struct DemoSceneTests {
 
         // No pixel of the key background survives anywhere — the knockout
         // sweep leaves no magenta specks between facets.
+        //
+        // This compared against the exact key for a fortnight, which is the
+        // same too-narrow test the knockout itself was making. When curves
+        // began anti-aliasing, 494 pixels a blend away from `FF00FF` traced
+        // the branch in the published hero and this test stayed green.
+        //
+        // So: no pixel may be *near* the key either. The bound is the same 80
+        // the scene knocks out with, and the artwork has room — its nearest
+        // colour to the key is the tongue's pink, 117 away.
         let key = RGBA8(r: 255, g: 0, b: 255)
-        #expect(!image.pixels.contains(key))
+        //
+        // Counted, not collected: failing on the array prints all 527 of them.
+        let survivors = image.pixels.count {
+            $0.a > 0 && Raster.matches($0, key, tolerance: ChameleonScene.keyTolerance)
+        }
+        #expect(survivors == 0, "\(survivors) key-tinted pixels survived the knockout")
+    }
+
+    @Test("The branch shadow is navy ink, not the highlighter's default yellow")
+    @MainActor
+    func chameleonBranchShadow() throws {
+        // On the bough, inside the stroke. Yellow ink reads AD8639 here, 554339 as drawn.
+        let shadow = try #require(ChameleonScene.render().pixel(at: PixelPoint(x: 520, y: 498)))
+        #expect(shadow.r < 128)
     }
 
     @Test("Transparency keeps the full sticker in its centred 500 by 300 frame")

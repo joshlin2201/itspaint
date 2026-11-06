@@ -18,8 +18,21 @@ enum ChameleonScene {
     /// Where the knockout samples the key background.
     static let backgroundSample = PixelPoint(x: 12, y: 12)
 
+    /// How far from the key a pixel may sit and still be background.
+    ///
+    /// This was 0 until curves arrived. Real curves anti-alias, so every edge
+    /// that meets the key now leaves a blend of the two — pixels like
+    /// `FE09F5`, which an exact-match knockout cannot see and which shipped as
+    /// a magenta hairline tracing the branch.
+    ///
+    /// 100 sits in the gap: the furthest of those rim pixels is 99 from the key,
+    /// and the nearest colour the artwork actually uses is the tongue's pink at
+    /// 117. Tolerance is a per-channel maximum, so both numbers are measured the
+    /// same way the flood measures them.
+    static let keyTolerance = 100
+
     static func render() -> Bitmap {
-        // A key colour no facet uses, removed exactly (tolerance 0) at the end.
+        // A key colour no facet uses, removed at the end within `keyTolerance`.
         let canvas = DemoCanvas(fill: colour("FF00FF"))
 
         drawBranch(on: canvas)
@@ -415,6 +428,8 @@ enum ChameleonScene {
         let engine = canvas.engine
         engine.settings.tool = .highlighter
         engine.settings.brushSize = 12
+        // The highlighter has its own ink, yellow by default; nil means the pair.
+        engine.settings.highlighterColour = nil
         engine.colours.foreground = colour("17324D")
         canvas.drag(
             from: point(410, 508),
@@ -430,7 +445,7 @@ enum ChameleonScene {
         let engine = canvas.engine
         engine.settings.tool = .select
         engine.settings.selectionKind = .instantAlpha
-        engine.settings.selectionTolerance = 0
+        engine.settings.selectionTolerance = keyTolerance
         engine.beginStroke(at: backgroundSample)
         engine.makeSelectionTransparent()
 
@@ -438,6 +453,10 @@ enum ChameleonScene {
         // flood from the corner cannot reach. Clicking each one is exactly
         // what a user does with Instant Alpha; finding them by scanning is
         // just faster than clicking.
+        //
+        // The scan matches within the same tolerance as the flood. An enclosed
+        // pocket whose last exact-key pixel was eaten by an anti-aliased edge
+        // is still a pocket, and searching for `FF00FF` alone walks past it.
         let key = colour("FF00FF").rgba8
         while let pocket = firstPixel(matching: key, in: engine.canvas) {
             _ = engine.selectInstantAlpha(at: pocket)
@@ -449,7 +468,10 @@ enum ChameleonScene {
         for y in 0..<bitmap.height {
             for x in 0..<bitmap.width {
                 let point = PixelPoint(x: x, y: y)
-                if bitmap.pixel(at: point) == target {
+                guard let pixel = bitmap.pixel(at: point) else { continue }
+                // Transparent pixels have already been knocked out; without this
+                // the tolerance match reads a cleared pixel as key and loops.
+                if pixel.a > 0, Raster.matches(pixel, target, tolerance: keyTolerance) {
                     return point
                 }
             }
