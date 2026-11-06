@@ -81,6 +81,11 @@ struct WindowCaptureTests {
         if let toolName = environment["ITSPAINT_CAPTURE_TOOL"],
            let tool = ToolKind(rawValue: toolName) {
             document.model.selectTool(tool)
+            // `selectTool` toggles the panel when the tool is already current,
+            // which is right for a click on the rail and wrong here: brush is
+            // the default, so asking a capture for the brush's options closed
+            // them.
+            document.model.isOptionsExpanded = true
         }
         // A translucent Colour 1 and a fully clear Colour 2 — the state the rail's
         // checkerboard exists for, and one there is no other way to reach from a
