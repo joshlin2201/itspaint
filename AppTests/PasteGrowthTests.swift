@@ -127,10 +127,24 @@ struct WindowFitTests {
 
     @Test("A canvas that fits the screen gets a window its own size")
     func smallCanvasIsExact() {
-        let fit = DrawingDocument.windowFit(forCanvas: (800, 600), on: nil)
+        let fit = DrawingDocument.windowFit(forCanvas: (800, 700), on: nil)
         #expect(fit.zoom == 1, "a canvas smaller than the screen must not be scaled")
         #expect(fit.contentSize.width == 800 + Tokens.Chrome.frameGap * 2)
-        #expect(fit.contentSize.height == 600 + Tokens.Chrome.frameGap * 2)
+        #expect(fit.contentSize.height == 700 + Tokens.Chrome.frameGap * 2)
+    }
+
+    /// A screenshot crop is short, and it is the job the app is sold on. The open
+    /// path used the 420pt drag floor, so a 1000x640 image opened with Spotlight
+    /// below the rail's fold, behind a scroller that overlay scroll bars hide.
+    @Test("A short image opens in a window whose rail shows every tool")
+    func shortCanvasShowsEveryTool() {
+        for height in [16, 200, 420, 600, 640] {
+            let fit = DrawingDocument.windowFit(forCanvas: (1000, height), on: nil)
+            let length = fit.contentSize.height - Tokens.Chrome.titleReserve - Tokens.Space.safeInset
+            let pairs = RailFit.swatchPairs(fitting: length, isVertical: true)
+            let room = RailFit.toolRoom(in: length, pairs: pairs, isVertical: true)
+            #expect(room == nil, "a 1000x\(height) image opens with the tool run cut to \(room ?? 0)pt")
+        }
     }
 
     @Test("A canvas larger than the screen scales down rather than overflowing")

@@ -16,6 +16,11 @@ version may still carry breaking changes to the document format.
   control is one height and the panel is narrower.
 
 ### Fixed
+- **A short image opens with every tool in reach.** An image under about 650px tall,
+  which is most screenshot crops, opened in a window whose side rail could not hold
+  all thirteen tools, so the last ones sat below a fold with no scroll bar to say so.
+  Anything up to 420px tall showed six. A new window is now at least 667pt tall, and
+  you can still drag it smaller.
 - **Fast clicks on the header no longer zoom the window.** The header sits in the
   titlebar band, so a fast second click that no enabled control claimed counted as
   a titlebar double-click: on Undo the moment the history ran out, on a disabled

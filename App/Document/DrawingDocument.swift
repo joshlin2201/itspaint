@@ -269,6 +269,20 @@ final class DrawingDocument: NSDocument {
     /// and nothing noticed, because nothing had ever compared the two.
     static let minimumContentSize = NSSize(width: 560, height: 420)
 
+    /// The shortest window a document **opens** at: tall enough for the side rail
+    /// to show all thirteen tools, with the palette shed to make room.
+    ///
+    /// The open path used the 420pt drag floor, so any image under about 650px
+    /// tall (most screenshot crops, which is the job the app is sold on) opened
+    /// with tools below the rail's fold, behind a scroller that overlay scroll
+    /// bars do not draw. Measured: a 1000x640 image opened with Spotlight hidden.
+    /// `minimumContentSize` stays the drag floor, so a person can still choose a
+    /// smaller window; the app just does not hand them one.
+    static var openingHeight: CGFloat {
+        ceil(RailFit.tail(pairs: 0, isVertical: true) + RailFit.toolRunLength
+            + Tokens.Chrome.titleReserve + Tokens.Space.safeInset)
+    }
+
     /// The window size and zoom a canvas of `size` wants.
     ///
     /// Shared by the open path and the grow path so a window opened at 1000×640
@@ -300,7 +314,7 @@ final class DrawingDocument: NSDocument {
                 ceiling.width
             ),
             height: min(
-                max(Double(size.height) * zoom + Tokens.Chrome.frameGap * 2, 420),
+                max(Double(size.height) * zoom + Tokens.Chrome.frameGap * 2, openingHeight),
                 ceiling.height
             )
         )
