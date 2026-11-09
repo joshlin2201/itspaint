@@ -147,6 +147,15 @@ struct WindowFitTests {
         }
     }
 
+    @Test("Growing a canvas does not throw a short window to the opening height")
+    func growPathKeepsTheDragFloor() {
+        let fit = DrawingDocument.windowFit(
+            forCanvas: (1000, 300), on: nil,
+            minimumHeight: DrawingDocument.minimumContentSize.height
+        )
+        #expect(fit.contentSize.height == DrawingDocument.minimumContentSize.height)
+    }
+
     @Test("A canvas larger than the screen scales down rather than overflowing")
     func hugeCanvasScalesDown() {
         // The fallback screen is 1440x900 when no NSScreen is supplied.

@@ -286,9 +286,15 @@ final class DrawingDocument: NSDocument {
     /// The window size and zoom a canvas of `size` wants.
     ///
     /// Shared by the open path and the grow path so a window opened at 1000×640
-    /// and a window grown to 1000×640 are the same window.
+    /// and a window grown to 1000×640 are the same width. Only the height floor
+    /// differs.
+    ///
+    /// `minimumHeight` is `openingHeight` for a new window. The grow path passes the
+    /// drag floor instead, so pasting into a window someone made short does not
+    /// throw it to 667pt for a canvas that grew by a few pixels.
     static func windowFit(
-        forCanvas size: (width: Int, height: Int), on screen: NSScreen?
+        forCanvas size: (width: Int, height: Int), on screen: NSScreen?,
+        minimumHeight: CGFloat = openingHeight
     ) -> (contentSize: NSSize, zoom: Double) {
         // Size the WINDOW to the artwork, not the artwork to a fixed window.
         //
@@ -314,7 +320,7 @@ final class DrawingDocument: NSDocument {
                 ceiling.width
             ),
             height: min(
-                max(Double(size.height) * zoom + Tokens.Chrome.frameGap * 2, openingHeight),
+                max(Double(size.height) * zoom + Tokens.Chrome.frameGap * 2, minimumHeight),
                 ceiling.height
             )
         )
@@ -327,7 +333,10 @@ final class DrawingDocument: NSDocument {
     /// deliberately sized, and cropping a canvas is a far rarer intent than
     /// pasting into one.
     private func growWindow(_ window: NSWindow, toFitCanvas size: (width: Int, height: Int)) {
-        let wanted = Self.windowFit(forCanvas: size, on: window.screen ?? NSScreen.main).contentSize
+        let wanted = Self.windowFit(
+            forCanvas: size, on: window.screen ?? NSScreen.main,
+            minimumHeight: Self.minimumContentSize.height
+        ).contentSize
         let current = window.contentLayoutRect.size
         guard wanted.width > current.width + 1 || wanted.height > current.height + 1 else { return }
 
