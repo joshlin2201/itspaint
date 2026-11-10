@@ -205,7 +205,7 @@ struct WindowFitTests {
 @MainActor
 struct OpeningZoomTests {
 
-    @Test("An image that fits the screen opens at 100%, on either rail edge")
+    @Test("An image opens whole, and at 100% when the screen has room, on either rail edge")
     func opensAtActualSize() async throws {
         let original = EditorModel.ChromeEdge.remembered
         defer { original.remember() }
@@ -221,9 +221,28 @@ struct OpeningZoomTests {
                 // `DispatchQueue.main.async`, and a main-actor test spinning the
                 // run loop never drains the main queue, so the fit never ran.
                 try await Task.sleep(for: .milliseconds(500))
+                let zoom = document.model.zoom
+                let label = "\(width)x\(height), rail \(edge): opened at \(zoom) in \(window.contentLayoutRect.size)"
+                // A screen too small for the image (CI's is about 1024x768) is
+                // allowed to scale it; one with room must not.
+                let fits = DrawingDocument.windowFit(
+                    forCanvas: (width, height), on: window.screen, rail: edge
+                ).zoom == 1
+                if fits { #expect(zoom == 1, "\(label)") }
+
+                var viewports: [CGSize] = []
+                func walk(_ view: NSView) {
+                    if let scroll = view as? NSScrollView, scroll.documentView is CanvasNSView {
+                        viewports.append(scroll.contentView.bounds.size)
+                    }
+                    view.subviews.forEach(walk)
+                }
+                if let root = window.contentView { walk(root) }
+                let viewport = try #require(viewports.first)
                 #expect(
-                    document.model.zoom == 1,
-                    "\(width)x\(height), rail \(edge): opened at \(document.model.zoom) in \(window.contentLayoutRect.size)"
+                    Double(width) * zoom <= viewport.width + 0.5
+                        && Double(height) * zoom <= viewport.height + 0.5,
+                    "\(label): part of the image is out of view in \(viewport)"
                 )
                 window.close()
             }
