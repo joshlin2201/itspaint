@@ -26,6 +26,9 @@ version may still carry breaking changes to the document format.
   from under them, so every image opened shrunk to fit: a 1000×640 screenshot at 94%,
   with its text resampled. The window now makes room for the rail and the title strip,
   and Zoom to Fit now fits the picture to the space it really has.
+- **Pasting something wider no longer makes the window shorter.** When a paste grew the
+  canvas, the window measured its own height without the title strip, so growing it to
+  fit the new width also took about 32pt off a window you had dragged taller.
 - **Fast clicks on the header no longer zoom the window.** The header sits in the
   titlebar band, so a fast second click that no enabled control claimed counted as
   a titlebar double-click: on Undo the moment the history ran out, on a disabled

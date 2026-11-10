@@ -248,4 +248,27 @@ struct OpeningZoomTests {
             }
         }
     }
+
+    @Test("Growing a canvas never shrinks the window on the other axis")
+    func growKeepsTheOtherAxis() async throws {
+        let document = DrawingDocument()
+        document.model.engine.reset(to: Bitmap(width: 600, height: 400, fill: .white))
+        document.makeWindowControllers()
+        document.showWindows()
+        let window = try #require(document.windowControllers.first?.window)
+        try await Task.sleep(for: .milliseconds(500))
+        // A person drags the window taller than the art needs.
+        var tall = window.frame
+        tall.size.height += 120
+        tall.origin.y -= 120
+        window.setFrame(tall, display: true)
+        let before = window.frame
+        // A paste widens the canvas and leaves its height alone.
+        document.model.onCanvasResized?(700, 400)
+        try await Task.sleep(for: .milliseconds(800))
+        #expect(window.frame.height >= before.height - 0.5,
+                "height \(before.height) became \(window.frame.height)")
+        #expect(window.frame.width > before.width + 50, "width \(before.width) became \(window.frame.width)")
+        window.close()
+    }
 }

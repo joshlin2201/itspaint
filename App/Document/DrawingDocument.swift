@@ -340,7 +340,10 @@ final class DrawingDocument: NSDocument {
             forCanvas: size, on: window.screen ?? NSScreen.main, rail: model.chromeEdge,
             minimumHeight: Self.minimumContentSize.height
         ).contentSize
-        let current = window.contentLayoutRect.size
+        // Not `contentLayoutRect`: under the transparent titlebar that is ~32pt
+        // shorter than the content `frameRect(forContentRect:)` below expects, so
+        // a grow on one axis shrank the other by that much.
+        let current = window.contentRect(forFrameRect: window.frame).size
         guard wanted.width > current.width + 1 || wanted.height > current.height + 1 else { return }
 
         let target = NSSize(
