@@ -204,12 +204,9 @@ final class DrawingDocument: NSDocument {
         // cannot achieve that — the only ways to close the gap are to magnify
         // the artwork (which lies about pixel art) or to shrink the window to
         // the art. The second is honest, and it is what Preview does.
-        //
-        // The chrome floats *over* the canvas in this direction, so it claims
-        // no space of its own; the gap below is a hairline, not a reservation.
         let sized = Self.windowFit(
             forCanvas: (model.engine.canvas.width, model.engine.canvas.height),
-            on: NSScreen.main
+            on: NSScreen.main, rail: model.chromeEdge
         )
         model.setZoomExact(sized.zoom)
 
@@ -294,6 +291,7 @@ final class DrawingDocument: NSDocument {
     /// throw it to 667pt for a canvas that grew by a few pixels.
     static func windowFit(
         forCanvas size: (width: Int, height: Int), on screen: NSScreen?,
+        rail edge: EditorModel.ChromeEdge,
         minimumHeight: CGFloat = openingHeight
     ) -> (contentSize: NSSize, zoom: Double) {
         // Size the WINDOW to the artwork, not the artwork to a fixed window.
@@ -305,22 +303,27 @@ final class DrawingDocument: NSDocument {
         // the art. The second is honest, and it is what Preview does.
         let visible = screen?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
         let ceiling = NSSize(width: visible.width * 0.94, height: visible.height * 0.94)
+        // The editor insets the canvas by these, so the window must add them.
+        let inset = Tokens.Chrome.canvasInsets(rail: edge)
+        let chrome = NSSize(
+            width: inset.leading + inset.trailing, height: inset.top + inset.bottom
+        )
 
         // Scale down only if the artwork is bigger than the screen allows.
         let zoom = min(
             1,
             min(
-                (ceiling.width - Tokens.Chrome.frameGap * 2) / Double(max(1, size.width)),
-                (ceiling.height - Tokens.Chrome.frameGap * 2) / Double(max(1, size.height))
+                (ceiling.width - chrome.width) / Double(max(1, size.width)),
+                (ceiling.height - chrome.height) / Double(max(1, size.height))
             )
         )
         let contentSize = NSSize(
             width: min(
-                max(Double(size.width) * zoom + Tokens.Chrome.frameGap * 2, 560),
+                max(ceil(Double(size.width) * zoom + chrome.width), 560),
                 ceiling.width
             ),
             height: min(
-                max(Double(size.height) * zoom + Tokens.Chrome.frameGap * 2, minimumHeight),
+                max(ceil(Double(size.height) * zoom + chrome.height), minimumHeight),
                 ceiling.height
             )
         )
@@ -334,7 +337,7 @@ final class DrawingDocument: NSDocument {
     /// pasting into one.
     private func growWindow(_ window: NSWindow, toFitCanvas size: (width: Int, height: Int)) {
         let wanted = Self.windowFit(
-            forCanvas: size, on: window.screen ?? NSScreen.main,
+            forCanvas: size, on: window.screen ?? NSScreen.main, rail: model.chromeEdge,
             minimumHeight: Self.minimumContentSize.height
         ).contentSize
         let current = window.contentLayoutRect.size

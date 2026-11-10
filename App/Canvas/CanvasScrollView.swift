@@ -84,8 +84,9 @@ struct CanvasScrollView: NSViewRepresentable {
             viewport.height / Double(model.engine.canvas.height)
         )
         // A hair under, so rounding never leaves a one-pixel overflow that
-        // brings a scroller back.
-        let fit = min(1, scale * 0.998)
+        // brings a scroller back. Not when it already fits: an image whose
+        // window was sized to it exactly would open resampled to 99.8%.
+        let fit = scale >= 1 ? 1 : scale * 0.998
         guard abs(fit - model.zoom) > 0.002 else { return }
 
         model.setZoomExact(fit)
