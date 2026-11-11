@@ -376,17 +376,28 @@ enum Tokens {
         /// either edge, because the rail is.
         static let railFootprint: CGFloat = Rail.thickness + railInset + Space.tight
 
-        /// Canvas area available inside a window of `contentSize`.
+        /// Where `EditorView` insets the canvas: the rail's edge loses its
+        /// footprint, the top loses the title strip, the rest a hairline gap.
         ///
-        /// Canvas-first: the artwork runs to all four edges, so the chrome does
-        /// not take space away from it. Only the fit calculation pretends the
-        /// cluster is opaque, so a freshly opened image is not hidden under it.
+        /// One definition because three places need it. The window fit and
+        /// Zoom to Fit used to assume the chrome floated over the artwork after
+        /// the editor had started insetting it, so every image opened resampled
+        /// to 87-95% and Zoom to Fit overshot the viewport by the title strip.
+        static func canvasInsets(rail edge: EditorModel.ChromeEdge) -> EdgeInsets {
+            EdgeInsets(
+                top: titleReserve,
+                leading: edge.isVertical ? railFootprint : frameGap,
+                bottom: edge.isVertical ? frameGap : railFootprint,
+                trailing: frameGap
+            )
+        }
+
+        /// Canvas area available inside a window of `contentSize`.
         static func canvasArea(in contentSize: CGSize, rail edge: EditorModel.ChromeEdge) -> CGSize {
-            // The rail is opaque and permanent, so it genuinely takes its
-            // space; only the options panel floats.
-            CGSize(
-                width: max(0, contentSize.width - frameGap * 2 - (edge.isVertical ? railFootprint : 0)),
-                height: max(0, contentSize.height - frameGap * 2 - (edge.isVertical ? 0 : railFootprint))
+            let inset = canvasInsets(rail: edge)
+            return CGSize(
+                width: max(0, contentSize.width - inset.leading - inset.trailing),
+                height: max(0, contentSize.height - inset.top - inset.bottom)
             )
         }
     }
