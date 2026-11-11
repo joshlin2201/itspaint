@@ -271,4 +271,35 @@ struct OpeningZoomTests {
         #expect(window.frame.width > before.width + 50, "width \(before.width) became \(window.frame.width)")
         window.close()
     }
+
+    @Test("A canvas grown past the screen is shown whole, not at 100% behind a scroller")
+    func grownPastTheScreenFits() async throws {
+        let document = DrawingDocument()
+        document.model.engine.reset(to: Bitmap(width: 600, height: 400, fill: .white))
+        document.makeWindowControllers()
+        document.showWindows()
+        let window = try #require(document.windowControllers.first?.window)
+        try await Task.sleep(for: .milliseconds(500))
+        let screen = try #require(window.screen ?? NSScreen.main)
+        // Taller than the window can ever be, so the grow is capped.
+        let height = Int(screen.visibleFrame.height * 1.2)
+        document.model.resizeCanvas(width: 600, height: height)
+        try await Task.sleep(for: .milliseconds(1200))
+        let zoom = document.model.zoom
+        var viewports: [CGSize] = []
+        func walk(_ view: NSView) {
+            if let scroll = view as? NSScrollView, scroll.documentView is CanvasNSView {
+                viewports.append(scroll.contentView.bounds.size)
+            }
+            view.subviews.forEach(walk)
+        }
+        if let root = window.contentView { walk(root) }
+        let viewport = try #require(viewports.first)
+        #expect(zoom < 1, "600x\(height) left at \(zoom)")
+        #expect(
+            600 * zoom <= viewport.width + 0.5 && Double(height) * zoom <= viewport.height + 0.5,
+            "600x\(height) at \(zoom) overflows \(viewport)"
+        )
+        window.close()
+    }
 }
