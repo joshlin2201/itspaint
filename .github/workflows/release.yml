@@ -340,7 +340,10 @@ jobs:
           fi
 
           notarise() {
-            local target="$1" log="$RUNNER_TEMP/notarytool-$(basename "$target").log"
+            # Two statements: one `local` expands every word before assigning any,
+            # so `$target` was still unset here and every log was `notarytool-.log`.
+            local target="$1"
+            local log="$RUNNER_TEMP/notarytool-$(basename "$target").log"
             set +e
             xcrun notarytool submit "$target" "${NOTARY_AUTH[@]}" \
               --wait --timeout 75m 2>&1 | tee "$log"
