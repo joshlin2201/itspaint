@@ -7,7 +7,7 @@ version may still carry breaking changes to the document format.
 
 ## [Unreleased]
 
-## [0.25.0] — 2026-11-05
+## [0.25.0] — 2026-11-23
 
 ### Changed
 - **The tool options panels are redrawn.** A slider is now one control with its name
