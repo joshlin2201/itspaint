@@ -37,14 +37,7 @@ struct EditorView: View {
             // left of the picture makes you drag the canvas around to see what
             // is behind it, which is the opposite of having the tools to hand.
             CanvasScrollView(model: model)
-                .padding(.leading, model.chromeEdge.isVertical
-                    ? Tokens.Chrome.railFootprint
-                    : Tokens.Chrome.frameGap)
-                .padding(.trailing, Tokens.Chrome.frameGap)
-                .padding(.top, Tokens.Chrome.titleReserve)
-                .padding(.bottom, model.chromeEdge.isVertical
-                    ? Tokens.Chrome.frameGap
-                    : Tokens.Chrome.railFootprint)
+                .padding(Tokens.Chrome.canvasInsets(rail: model.chromeEdge))
                 .animation(Tokens.Motion.pillResize, value: model.chromeEdge)
 
             TitlebarScrim()

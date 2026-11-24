@@ -127,16 +127,43 @@ struct WindowFitTests {
 
     @Test("A canvas that fits the screen gets a window its own size")
     func smallCanvasIsExact() {
-        let fit = DrawingDocument.windowFit(forCanvas: (800, 600), on: nil)
-        #expect(fit.zoom == 1, "a canvas smaller than the screen must not be scaled")
-        #expect(fit.contentSize.width == 800 + Tokens.Chrome.frameGap * 2)
-        #expect(fit.contentSize.height == 600 + Tokens.Chrome.frameGap * 2)
+        for edge in EditorModel.ChromeEdge.allCases {
+            let fit = DrawingDocument.windowFit(forCanvas: (800, 700), on: nil, rail: edge)
+            #expect(fit.zoom == 1, "a canvas smaller than the screen must not be scaled")
+            // The canvas area, not the window, is what has to hold the image.
+            let area = Tokens.Chrome.canvasArea(in: fit.contentSize, rail: edge)
+            #expect(area.width >= 800 && area.width < 801, "rail \(edge): \(area)")
+            #expect(area.height >= 700 && area.height < 701, "rail \(edge): \(area)")
+        }
+    }
+
+    /// A screenshot crop is short, and it is the job the app is sold on. The open
+    /// path used the 420pt drag floor, so a 1000x640 image opened with Spotlight
+    /// below the rail's fold, behind a scroller that overlay scroll bars hide.
+    @Test("A short image opens in a window whose rail shows every tool")
+    func shortCanvasShowsEveryTool() {
+        for height in [16, 200, 420, 600, 640] {
+            let fit = DrawingDocument.windowFit(forCanvas: (1000, height), on: nil, rail: .left)
+            let length = fit.contentSize.height - Tokens.Chrome.titleReserve - Tokens.Space.safeInset
+            let pairs = RailFit.swatchPairs(fitting: length, isVertical: true)
+            let room = RailFit.toolRoom(in: length, pairs: pairs, isVertical: true)
+            #expect(room == nil, "a 1000x\(height) image opens with the tool run cut to \(room ?? 0)pt")
+        }
+    }
+
+    @Test("Growing a canvas does not throw a short window to the opening height")
+    func growPathKeepsTheDragFloor() {
+        let fit = DrawingDocument.windowFit(
+            forCanvas: (1000, 300), on: nil, rail: .left,
+            minimumHeight: DrawingDocument.minimumContentSize.height
+        )
+        #expect(fit.contentSize.height == DrawingDocument.minimumContentSize.height)
     }
 
     @Test("A canvas larger than the screen scales down rather than overflowing")
     func hugeCanvasScalesDown() {
         // The fallback screen is 1440x900 when no NSScreen is supplied.
-        let fit = DrawingDocument.windowFit(forCanvas: (6000, 4000), on: nil)
+        let fit = DrawingDocument.windowFit(forCanvas: (6000, 4000), on: nil, rail: .left)
         #expect(fit.zoom < 1)
         #expect(fit.contentSize.width <= 1440 * 0.94 + 1)
         #expect(fit.contentSize.height <= 900 * 0.94 + 1)
@@ -144,7 +171,7 @@ struct WindowFitTests {
 
     @Test("Never smaller than the window's own minimum")
     func tinyCanvasStillUsable() {
-        let fit = DrawingDocument.windowFit(forCanvas: (16, 16), on: nil)
+        let fit = DrawingDocument.windowFit(forCanvas: (16, 16), on: nil, rail: .left)
         #expect(fit.contentSize.width >= 560)
         #expect(fit.contentSize.height >= 420)
     }
@@ -153,7 +180,7 @@ struct WindowFitTests {
     func biggerCanvasNeverShrinks() {
         var previous = CGSize.zero
         for side in stride(from: 200, through: 2_000, by: 200) {
-            let fit = DrawingDocument.windowFit(forCanvas: (side, side), on: nil)
+            let fit = DrawingDocument.windowFit(forCanvas: (side, side), on: nil, rail: .left)
             #expect(fit.contentSize.width >= previous.width - 1)
             previous = fit.contentSize
         }
@@ -161,9 +188,118 @@ struct WindowFitTests {
 
     @Test("A degenerate canvas does not divide by zero")
     func zeroCanvasIsSafe() {
-        let fit = DrawingDocument.windowFit(forCanvas: (0, 0), on: nil)
+        let fit = DrawingDocument.windowFit(forCanvas: (0, 0), on: nil, rail: .left)
         #expect(fit.zoom.isFinite)
         #expect(fit.contentSize.width.isFinite)
         #expect(fit.contentSize.width >= 560)
+    }
+}
+
+/// The zoom an image actually settles at once its window is on screen.
+///
+/// `WindowFitTests` checks the arithmetic. This checks the outcome, because the
+/// arithmetic once said "window = image + 12pt" while the editor inset the canvas
+/// by the rail and the title strip, and every screenshot opened resampled to
+/// about 94% with a test asserting the arithmetic passing beside it.
+@Suite("Opening zoom", .serialized)
+@MainActor
+struct OpeningZoomTests {
+
+    @Test("An image opens whole, and at 100% when the screen has room, on either rail edge")
+    func opensAtActualSize() async throws {
+        let original = EditorModel.ChromeEdge.remembered
+        defer { original.remember() }
+        for edge in EditorModel.ChromeEdge.allCases {
+            for (width, height) in [(1000, 640), (600, 200), (800, 700)] {
+                edge.remember()
+                let document = DrawingDocument()
+                document.model.engine.reset(to: Bitmap(width: width, height: height, fill: .white))
+                document.makeWindowControllers()
+                document.showWindows()
+                let window = try #require(document.windowControllers.first?.window)
+                // `Task.sleep`, not a run-loop spin: the fit is posted with
+                // `DispatchQueue.main.async`, and a main-actor test spinning the
+                // run loop never drains the main queue, so the fit never ran.
+                try await Task.sleep(for: .milliseconds(500))
+                let zoom = document.model.zoom
+                let label = "\(width)x\(height), rail \(edge): opened at \(zoom) in \(window.contentLayoutRect.size)"
+                // A screen too small for the image (CI's is about 1024x768) is
+                // allowed to scale it; one with room must not.
+                let fits = DrawingDocument.windowFit(
+                    forCanvas: (width, height), on: window.screen, rail: edge
+                ).zoom == 1
+                if fits { #expect(zoom == 1, "\(label)") }
+
+                var viewports: [CGSize] = []
+                func walk(_ view: NSView) {
+                    if let scroll = view as? NSScrollView, scroll.documentView is CanvasNSView {
+                        viewports.append(scroll.contentView.bounds.size)
+                    }
+                    view.subviews.forEach(walk)
+                }
+                if let root = window.contentView { walk(root) }
+                let viewport = try #require(viewports.first)
+                #expect(
+                    Double(width) * zoom <= viewport.width + 0.5
+                        && Double(height) * zoom <= viewport.height + 0.5,
+                    "\(label): part of the image is out of view in \(viewport)"
+                )
+                window.close()
+            }
+        }
+    }
+
+    @Test("Growing a canvas never shrinks the window on the other axis")
+    func growKeepsTheOtherAxis() async throws {
+        let document = DrawingDocument()
+        document.model.engine.reset(to: Bitmap(width: 600, height: 400, fill: .white))
+        document.makeWindowControllers()
+        document.showWindows()
+        let window = try #require(document.windowControllers.first?.window)
+        try await Task.sleep(for: .milliseconds(500))
+        // A person drags the window taller than the art needs.
+        var tall = window.frame
+        tall.size.height += 120
+        tall.origin.y -= 120
+        window.setFrame(tall, display: true)
+        let before = window.frame
+        // A paste widens the canvas and leaves its height alone.
+        document.model.onCanvasResized?(700, 400)
+        try await Task.sleep(for: .milliseconds(800))
+        #expect(window.frame.height >= before.height - 0.5,
+                "height \(before.height) became \(window.frame.height)")
+        #expect(window.frame.width > before.width + 50, "width \(before.width) became \(window.frame.width)")
+        window.close()
+    }
+
+    @Test("A canvas grown past the screen is shown whole, not at 100% behind a scroller")
+    func grownPastTheScreenFits() async throws {
+        let document = DrawingDocument()
+        document.model.engine.reset(to: Bitmap(width: 600, height: 400, fill: .white))
+        document.makeWindowControllers()
+        document.showWindows()
+        let window = try #require(document.windowControllers.first?.window)
+        try await Task.sleep(for: .milliseconds(500))
+        let screen = try #require(window.screen ?? NSScreen.main)
+        // Taller than the window can ever be, so the grow is capped.
+        let height = Int(screen.visibleFrame.height * 1.2)
+        document.model.resizeCanvas(width: 600, height: height)
+        try await Task.sleep(for: .milliseconds(1200))
+        let zoom = document.model.zoom
+        var viewports: [CGSize] = []
+        func walk(_ view: NSView) {
+            if let scroll = view as? NSScrollView, scroll.documentView is CanvasNSView {
+                viewports.append(scroll.contentView.bounds.size)
+            }
+            view.subviews.forEach(walk)
+        }
+        if let root = window.contentView { walk(root) }
+        let viewport = try #require(viewports.first)
+        #expect(zoom < 1, "600x\(height) left at \(zoom)")
+        #expect(
+            600 * zoom <= viewport.width + 0.5 && Double(height) * zoom <= viewport.height + 0.5,
+            "600x\(height) at \(zoom) overflows \(viewport)"
+        )
+        window.close()
     }
 }
