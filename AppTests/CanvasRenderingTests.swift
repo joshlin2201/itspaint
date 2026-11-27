@@ -300,6 +300,30 @@ struct CanvasRenderingTests {
         )
     }
 
+    @Test("Select From Alpha draws ants around a transparent hole")
+    func drawsFromAlphaContour() throws {
+        var canvas = Bitmap(width: 140, height: 100, fill: .black)
+        let hole = PixelRect(x: 50, y: 35, width: 40, height: 30)
+        canvas.fill(hole, with: .clear)
+        let model = EditorModel(canvas: canvas)
+        let zoom = 2
+        let view = makeView(model, zoom: Double(zoom))
+        let before = try #require(render(view))
+
+        model.selectFromAlpha()
+        view.needsDisplay = true
+        let after = try #require(render(view))
+
+        let left = hole.minX * zoom
+        let edge = ((hole.minY * zoom + 4)..<(hole.maxY * zoom - 4)).flatMap { y in
+            ((left - 2)...(left + 1)).map { PixelPoint(x: $0, y: y) }
+        }
+        let changed = edge.count { after.pixel(at: $0) != before.pixel(at: $0) }
+        #expect(changed > 10, "no visible contour along the inner edge")
+        let inside = PixelPoint(x: (hole.minX + hole.width / 2) * zoom, y: (hole.minY + hole.height / 2) * zoom)
+        #expect(after.pixel(at: inside) == before.pixel(at: inside), "the hole's centre was drawn over")
+    }
+
     /// While an ellipse is dragged out the view draws the ellipse from the box
     /// instead of tracing the mask, which is rebuilt on every move. The ants
     /// still have to sit on the ellipse, not on its box.

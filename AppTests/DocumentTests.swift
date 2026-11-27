@@ -772,6 +772,37 @@ struct MenuCommandTests {
         }
     }
 
+    @Test("Edit menu selects the subject after Remove Background")
+    func selectFromAlphaMenu() throws {
+        let document = DrawingDocument()
+        let model = document.model
+        var canvas = Bitmap(width: 40, height: 30, fill: .white)
+        let subject = PixelRect(x: 10, y: 8, width: 15, height: 12)
+        canvas.fill(subject, with: .black)
+        model.engine.reset(to: canvas)
+        document.removeBackground(nil)
+        let keyed = model.canvas
+        let edits = model.engine.undoStack.recordedCount
+        #expect(keyed.pixel(at: PixelPoint(x: 0, y: 0)) == .clear)
+        #expect(!model.hasSelection, "Remove Background already left a selection")
+        document.updateChangeCount(.changeCleared)
+
+        let edit = try #require(
+            MainMenuBuilder.build().items.first { $0.submenu?.title == "Edit" }?.submenu
+        )
+        let item = try #require(edit.item(withTitle: "Select From Alpha"))
+        #expect(item.target == nil, "the menu item should use the responder chain")
+        #expect(document.validateMenuItem(item), "the command should work without a selection")
+        #expect(NSApp.sendAction(try #require(item.action), to: document, from: item))
+
+        #expect(model.hasSelection, "selection state did not reach the editor")
+        #expect(model.selection == Selection(bounds: subject))
+        #expect(model.tool == .select)
+        #expect(model.canvas == keyed)
+        #expect(model.engine.undoStack.recordedCount == edits, "selecting recorded a document edit")
+        #expect(!document.isDocumentEdited, "selecting marked the document as changed")
+    }
+
     @Test("The running app has a real menu bar")
     func liveMenuBarIsInstalled() throws {
         // The tests run inside the app host, so this is the actual launch path:

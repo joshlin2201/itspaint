@@ -76,6 +76,7 @@ extension DrawingDocument {
     @IBAction func selectAll(_ sender: Any?) { model.selectAll() }
     @IBAction func deselect(_ sender: Any?) { model.deselect() }
     @IBAction func invertSelection(_ sender: Any?) { model.invertSelection() }
+    @IBAction func selectFromAlpha(_ sender: Any?) { model.selectFromAlpha() }
 
     // MARK: - View
 
@@ -234,8 +235,8 @@ extension DrawingDocument {
              #selector(cropToSelection(_:)), #selector(deselect(_:)):
             return model.hasSelection
 
-        case #selector(invertSelection(_:)):
-            // Always available: with nothing selected it means "select all".
+        case #selector(invertSelection(_:)), #selector(selectFromAlpha(_:)):
+            // Both can make a selection when there is no marquee.
             return true
 
         case #selector(paste(_:)):
