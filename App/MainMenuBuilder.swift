@@ -133,6 +133,7 @@ enum MainMenuBuilder {
         deselect.keyEquivalentModifierMask = [.command, .shift]
         add(to: menu, "Invert Selection", #selector(AppCommands.invertSelection(_:)), "i")
             .keyEquivalentModifierMask = [.command, .shift]
+        add(to: menu, "Select From Alpha", #selector(AppCommands.selectFromAlpha(_:)), "")
         menu.addItem(.separator())
         add(to: menu, "Crop to Selection", #selector(AppCommands.cropToSelection(_:)), "k")
         add(to: menu, "Trim Borders", #selector(AppCommands.trimBorders(_:)), "t")
@@ -431,6 +432,7 @@ enum MainMenuBuilder {
     func toggleUnderline(_ sender: Any?)
     func deselect(_ sender: Any?)
     func invertSelection(_ sender: Any?)
+    func selectFromAlpha(_ sender: Any?)
     func zoomToFit(_ sender: Any?)
     func cropToSelection(_ sender: Any?)
     func trimBorders(_ sender: Any?)

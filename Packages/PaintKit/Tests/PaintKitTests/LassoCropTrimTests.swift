@@ -2,6 +2,42 @@ import Foundation
 import Testing
 @testable import PaintKit
 
+@Suite("Selection from alpha")
+struct AlphaSelectionTests {
+    @Test("An opaque bitmap selects the whole canvas")
+    func opaqueBitmap() {
+        let bitmap = Bitmap(width: 7, height: 5, fill: .black)
+        #expect(Selection(alphaOf: bitmap) == Selection(bounds: bitmap.bounds))
+    }
+
+    @Test("A transparent bitmap clears an existing marquee")
+    func transparentBitmap() {
+        let bitmap = Bitmap(width: 7, height: 5, fill: .clear)
+        #expect(Selection(alphaOf: bitmap) == nil)
+
+        let engine = PaintEngine(canvas: bitmap)
+        engine.selectAll()
+        let dirty = engine.selectFromAlpha()
+
+        #expect(engine.selection == nil, "the old marquee was kept")
+        #expect(dirty == bitmap.bounds.insetBy(-2), "the old ants need repainting")
+        #expect(engine.canvas == bitmap)
+        #expect(!engine.canUndo, "selecting alone should create no edit")
+    }
+
+    @Test("Alpha becomes coverage inside tight bounds, including holes and faint edges")
+    func mixedAlpha() throws {
+        var bitmap = Bitmap(width: 7, height: 5, fill: .clear)
+        bitmap.setPixel(.black, at: PixelPoint(x: 2, y: 1))
+        bitmap.setPixel(RGBA8(r: 0, g: 0, b: 0, a: 128), at: PixelPoint(x: 3, y: 2))
+        bitmap.setPixel(RGBA8(r: 0, g: 0, b: 0, a: 1), at: PixelPoint(x: 4, y: 2))
+
+        let selection = try #require(Selection(alphaOf: bitmap))
+        #expect(selection.bounds == PixelRect(x: 2, y: 1, width: 3, height: 2))
+        #expect(selection.mask == [255, 0, 0, 0, 128, 1], "coverage should preserve each alpha byte")
+    }
+}
+
 /// Lasso, crop and trim — the three that were previously stubbed or partial.
 @Suite("Lasso — freeform selection")
 struct LassoTests {

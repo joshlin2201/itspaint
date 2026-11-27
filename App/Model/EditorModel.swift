@@ -622,6 +622,14 @@ final class EditorModel {
         noteChange(engine.canvas.bounds)
     }
 
+    func selectFromAlpha() {
+        guard finishTextEditing() else { return }
+        landPendingWork()
+        let dirty = engine.selectFromAlpha()
+        if engine.hasSelection { tool = .select }
+        noteVisualChange(dirty)
+    }
+
     func deselect() { noteChange(engine.deselect()) }
 
     func deleteSelection() {

@@ -252,6 +252,22 @@ struct RetainedTextTests {
         #expect(letters.contains { $0.a == 255 && $0.r < 80 }, "the letters were keyed out with the page")
     }
 
+    @Test("Select From Alpha includes visible text and leaves it editable")
+    func selectsTextFromAlpha() throws {
+        let canvas = Bitmap(width: 160, height: 70, fill: .clear)
+        let engine = PaintEngine(canvas: canvas)
+        let text = object()
+        engine.upsertTextObject(text, registerUndo: false)
+
+        engine.selectFromAlpha()
+
+        let selection = try #require(engine.selection, "visible text contributed no coverage")
+        #expect(selection == Selection(alphaOf: engine.renderedCanvas()))
+        #expect(engine.canvas == canvas)
+        #expect(engine.textObjects == [text])
+        #expect(!engine.canUndo)
+    }
+
     @Test("The eyedropper picks up the colour of text it is over")
     func eyedropperSeesText() {
         let engine = PaintEngine(canvas: Bitmap(width: 160, height: 70, fill: .white))

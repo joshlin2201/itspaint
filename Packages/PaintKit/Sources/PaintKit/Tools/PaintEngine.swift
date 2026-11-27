@@ -907,6 +907,16 @@ public final class PaintEngine {
         selection = Selection(bounds: canvas.bounds)
     }
 
+    /// Replace the selection with the alpha coverage of the visible artwork.
+    @discardableResult
+    public func selectFromAlpha() -> PixelRect {
+        var dirty = commitPendingShape()
+        dirty = dirty.union(commitFloating()).union(selectionOverlayRect())
+        selection = Selection(alphaOf: renderedCanvas())
+        lassoPath = []
+        return dirty.union(selectionOverlayRect())
+    }
+
     /// The traced outline of the current lasso, for drawing its ants.
     public private(set) var lassoPath: [PixelPoint] = []
 

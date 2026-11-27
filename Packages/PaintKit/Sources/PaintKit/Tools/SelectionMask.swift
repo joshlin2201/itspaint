@@ -40,6 +40,17 @@ public struct Selection: Equatable, Sendable {
         self.init(bounds: clipped, mask: mask)
     }
 
+    /// Select each pixel with coverage equal to its alpha.
+    public init?(alphaOf bitmap: Bitmap) {
+        if bitmap.isOpaque(in: bitmap.bounds) {
+            self.init(bounds: bitmap.bounds)
+            return
+        }
+        let mask = bitmap.pixels.map(\.a)
+        guard mask.contains(where: { $0 > 0 }) else { return nil }
+        self = Selection(bounds: bitmap.bounds, mask: mask).tightened()
+    }
+
     public var isEmpty: Bool { bounds.isEmpty }
     public var isRectangular: Bool { mask == nil }
 
